@@ -7,48 +7,75 @@ from pathlib import Path
 from client import *
 
 
+CONDITIONS = {
+    'Poor (P)': 0,
+    'Fair (F)': 1,
+    'Good (G)': 2,
+    'Good Plus (G+)': 3,
+    'Very Good (VG)': 4,
+    'Very Good Plus (VG+)': 5,
+    'Near Mint (NM or M-)': 6,
+    'Mint (M)': 7,
+}
+
+
 if __name__ == '__main__':
     load_dotenv()
+
+    # user params
+    country = 'Germany'
+    currency = '€'
+    min_media_condition = CONDITIONS["Very Good Plus (VG+)"]
+    min_sleeve_condition = CONDITIONS["Very Good Plus (VG+)"]
+    accept_generic_sleeve = False
+    accept_no_cover_sleeve = False
+    accept_not_graded_sleeve = False
+    min_seller_rating = 98
+    min_seller_sales = None
+    max_price = None  # this has to be release specific (for those releases in the alert below threshold category)
 
     client = UserTokenClient(os.getenv("USER_AGENT"), os.getenv("USER_TOKEN"))
 
     want_list = json.load(Path('./wantlist.json').open('r'))
-    for wanted_release in want_list.get('notify_on_sight'):
-        # print(wanted_release.get('id'))
-        release = client.get_release(wanted_release.get("id"))
-        print(release)
-        break
-        # this is all we can get from a release... not the details of the actual listings => I have to use a non-official API
-        # print(json.loads(release[0])["num_for_sale"])
-        # print(json.loads(release[0])["lowest_price"])
+    for wanted_release in want_list.get('notify_below_threshold'):
 
-        import requests
-        from bs4 import BeautifulSoup
+        release_id = wanted_release.get("id")
+        valid_listings = []
 
-        r = requests.get("https://www.discogs.com/sell/release/1523619?ev=rb")
-        # print(r.content)
+        # release = client.get_release(release_id)
+        release_stats = client.get_release_stats(release_id)
+        if release_stats.get("num_for_sale") > 0 and not release_stats.get("blocked_from_sale"):
 
-        # SO I HAVE TO PARSE THE LISTINGS HERE, (HOPEFULLY SORT THIS ALREADY BY PRICE, & THEN I CAN USE THE OFFICIAL
-        # ID TO LOOK INTO EACH OF THOSE LISTINGS) --> though Discogs probably makes it very hard to parse this information
+            # TODO: pass country & currency options here, & do the conversions if not automatic
+            for listing in client.get_marketplace_listings(release_id):
 
-        soup = BeautifulSoup(r.content, 'html.parser')
-        # print(soup.prettify())
-        # print(soup.find_all('table')[2])  # this is the record playlist
-        # print(soup.find_all('table')[1])  # table for header information at top of page
-        # print(soup.find_all('table')[0])  # header header table (nothing to do with this particular release
-        # for a in soup.find_all('a'):
-        #     print("\n\n\n\n")
-        #     print(a)
+                # verify availability
+                if listing.get('availability') == f'Unavailable in {country}':
+                    continue
 
-        listings_table = soup.find_all('table')[3]
-        rows = listings_table.find('tbody').find_all('tr')
-        for row in rows:
-            cells = row.find_all('td')
-            print(cells[0])  # this contains a bunch, + I think the ID that is the primary thing we need
-            # print(cells[1])  # this contains all item description details (=> necessary for me to check), though I could just use this bit to get ID and find out condition later
-            # print(cells[2])  # contains seller info => could check that star rating is > 99% for example
-            # print(cells[3])  # seems empty
-            # print(cells[4])  # contains price + link to show shipping methods (need to get this user-specific though)
-            # print(cells[5])  # add to cart + other buttons from the RHS
-            break
-        break
+                # verify media condition
+                if min_media_condition is not None and CONDITIONS[listing['media_condition']] < min_media_condition:
+                    continue
+
+                # verify sleeve condition
+                if not accept_generic_sleeve and listing['sleeve_condition'] == "Generic":
+                    continue
+                if not accept_no_cover_sleeve and listing['sleeve_condition'] == "No Cover":
+                    continue
+                if not accept_not_graded_sleeve and listing['sleeve_condition'] == "Not Graded":
+                    continue
+                if min_sleeve_condition is not None and CONDITIONS[listing['sleeve_condition']] < min_sleeve_condition:
+                    continue
+
+                # verify seller conditions
+                if min_seller_rating is not None and listing['seller_avg_rating'] < min_seller_rating:
+                    continue
+                if min_seller_sales is not None and listing['seller_num_ratings'] < min_seller_sales:
+                    continue
+
+                # TODO: we don't necessarily want the min price here, because it might not include shipping
+                print(listing['price'])
+
+                valid_listings.append(listing)
+
+        print(len(valid_listings))
