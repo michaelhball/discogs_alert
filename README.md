@@ -13,5 +13,9 @@ seller location) to completely customize the notifications you wish to receive. 
 configure notifications to be sent in a number of different ways: push notifications, email, and 
 slack are all supported in version 1.0.  
 
-### 1 Self-Hosted
+### 1 Self-Hosted Approach
+
+
+### 2 Remote Server
+
 
