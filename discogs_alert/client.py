@@ -172,7 +172,6 @@ class Client:
 class UserOAuthClient(Client):
     """ Client class allowing my app to make requests on behalf of any user who logs in. """
 
-    # TODO: consumer_key & consumer_secret are assigned to my specific app => set these when instantiating the client
     def __init__(self, user_agent, consumer_key, consumer_secret, token=None, secret=None, *args, **kwargs):
         super().__init__(user_agent, *args, **kwargs)
         self.client = oauth1.Client(consumer_key, client_secret=consumer_secret)
