@@ -4,7 +4,7 @@ import os
 from dotenv import load_dotenv
 from pathlib import Path
 
-from client import *
+from discogs_alert.client import *
 
 
 CONDITIONS = {
