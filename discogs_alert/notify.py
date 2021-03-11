@@ -7,11 +7,11 @@ __all__ = ['send_pushbullet_push']
 
 
 def send_pushbullet_push(message_body, message_title):
-    """
+    """ Sends notification of found record via pushbullet.
 
-    @param message_body
-    @param message_title
-    :return:
+    @param message_body: (str) body of the message
+    @param message_title: (str) title of message
+    :return: True if successful, False otherwise.
     """
 
     try:
