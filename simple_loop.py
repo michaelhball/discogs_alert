@@ -1,3 +1,4 @@
+import click
 import json
 import os
 import schedule
@@ -11,31 +12,34 @@ from discogs_alert.notify import send_pushbullet_push
 from discogs_alert.utils import CONDITIONS
 
 
-def loop():
-    """
+def loop(country, currency, min_media_condition, min_sleeve_condition, accept_generic_sleeve, accept_no_sleeve,
+         accept_ungraded_sleeve):
+    """ Runs the event loop.
+
+    :return: None.
     """
 
     start_time = time.time()
     print("running loop")
 
     # user params
-    country = 'Germany'
-    currency = '€'
-    min_media_condition = CONDITIONS["Very Good Plus (VG+)"]
-    min_sleeve_condition = CONDITIONS["Very Good Plus (VG+)"]
-    accept_generic_sleeve = False
+    media_condition_cutoff = CONDITIONS[min_media_condition]
+    sleeve_condition_cutoff = CONDITIONS[min_sleeve_condition]
+
     accept_no_cover_sleeve = False
-    accept_not_graded_sleeve = False
     min_seller_rating = 98
     min_seller_sales = None
 
     try:
         client = UserTokenClient(os.getenv("USER_AGENT"), os.getenv("USER_TOKEN"))
-        want_list = json.load(Path('./wantlist.json').open('r'))
-        for wanted_release in want_list.get('notify_on_sight'):
+        wantlist = json.load(Path('./wantlist.json').open('r'))
+        print(len(wantlist.get('notify_on_sight')))
+        for wanted_release in wantlist.get('notify_on_sight'):
 
             release_id = wanted_release.get("id")
             valid_listings = []
+
+            # TODO: need to override various conditions if the user specified one for a specific release.
 
             # release = client.get_release(release_id)
             release_stats = client.get_release_stats(release_id)
@@ -50,7 +54,7 @@ def loop():
                             continue
 
                         # verify media condition
-                        if min_media_condition is not None and CONDITIONS[listing['media_condition']] < min_media_condition:
+                        if min_media_condition is not None and CONDITIONS[listing['media_condition']] < media_condition_cutoff:
                             continue
 
                         # verify sleeve condition
@@ -58,9 +62,9 @@ def loop():
                             continue
                         if not accept_no_cover_sleeve and listing['sleeve_condition'] == "No Cover":
                             continue
-                        if not accept_not_graded_sleeve and listing['sleeve_condition'] == "Not Graded":
+                        if not accept_ungraded_sleeve and listing['sleeve_condition'] == "Not Graded":
                             continue
-                        if min_sleeve_condition is not None and CONDITIONS[listing['sleeve_condition']] < min_sleeve_condition:
+                        if min_sleeve_condition is not None and CONDITIONS[listing['sleeve_condition']] < sleeve_condition_cutoff:
                             continue
 
                         # verify seller conditions
@@ -78,18 +82,43 @@ def loop():
                 listing_to_post = valid_listings[0]
                 m_body = f"Listing available: https://www.discogs.com/sell/item/{listing_to_post['id']}"
                 m_title = f"Now For Sale: {wanted_release['release_name']} - {wanted_release['artist_name']}"
-                print("SENDING NOTIFICATION")
+                print("sending notification")
                 send_pushbullet_push(m_body, m_title)
 
     except Exception as e:
         print(e)
 
-    print(f'\t\t took {time.time() - start_time}')
+    print(f'\t took {time.time() - start_time}')
 
 
-if __name__ == '__main__':
-    load_dotenv()
-    schedule.every(1).minutes.do(loop)
+@click.command()
+@click.option('-co', '--country', default='Germany', show_default=True, type=str, envvar='COUNTRY',
+              help='country where you live (e.g. for shipping availability)')
+@click.option('-$', '--currency', default='Euro', show_default=True, type=str, envvar='CURRENCY',
+              help='preferred currency')
+@click.option('-mmc', '--min-media-condition', default='VG+', show_default=True, envvar='MIN_MEDIA_CONDITION',
+              type=click.Choice(list(CONDITIONS.keys()), case_sensitive=True),
+              help='minimum media condition you want to accept')
+@click.option('-msc', '--min-sleeve-condition', default='VG+', show_default=True, envvar='MIN_SLEEVE_CONDITION',
+              type=click.Choice(list(CONDITIONS.keys()), case_sensitive=True),
+              help='minimum sleeve condition you want to accept')
+@click.option('-ags', '--accept_generic_sleeve', default=False, is_flag=True, envvar='ACCEPT_GENERIC_SLEEVE',
+              help='use flag if you want to accept generic sleeves (in addition to those of min-sleeve-condition)')
+@click.option('-ans', '--accept_no_sleeve', default=False, is_flag=True, envvar='ACCEPT_NO_SLEEVE',
+              help='use flag if you want to accept a record w no sleeve (in addition to those of min-sleeve-condition)')
+@click.option('-aus', '--accept_ungraded_sleeve', default=False, is_flag=True, envvar='ACCEPT_UNGRADED_SLEEVE',
+              help='use flag if you want to accept ungraded sleeves (in addition to those of min-sleeve-condition)')
+@click.option('-pb', '--pushbullet-token', type=str, envvar='PUSHBULLET_TOKEN',
+              help='token for pushbullet notification service. If passed, app will default to using Pushbullet.')
+def main(country, currency, min_media_condition, min_sleeve_condition, accept_generic_sleeve, accept_no_sleeve,
+         accept_ungraded_sleeve):
+    load_dotenv()  # TODO: want this to work with both docker & CLI
+    schedule.every(1).minutes.do(lambda: loop(country, currency, min_media_condition, min_sleeve_condition,
+                                              accept_generic_sleeve, accept_no_sleeve, accept_ungraded_sleeve))
     while 1:
         schedule.run_pending()
         time.sleep(1)
+
+
+if __name__ == '__main__':
+    main()
