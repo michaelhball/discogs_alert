@@ -1,4 +1,5 @@
 import click
+import os
 import schedule
 import time
 
@@ -9,10 +10,12 @@ from discogs_alert.utils import CONDITIONS
 
 
 @click.command()
+@click.option('-pb', '--pushbullet-token', required=True, type=str, envvar='PUSHBULLET_TOKEN',
+              help='token for pushbullet notification service. If passed, app will default to using Pushbullet.')
+@click.option('-ut', '--user-token', required=True, type=str, envvar='USER_TOKEN',
+              help='unique user token (indicating which discogs user is making a request)')
 @click.option('-ua', '--user-agent', default='DiscogsAlert/0.0.1 +http://discogsalert.com', type=str,
               envvar='USER_AGENT', help='user-agent indicating source of HTTP request')
-@click.option('-ut', '--user-token', type=str, envvar='USER_TOKEN',
-              help='unique user token (indicating which discogs user is making a request)')
 @click.option('-f', '--frequency', default=60, show_default=True, type=click.IntRange(1, 60), envvar='FREQUENCY',
               help='number of times per hour to check the marketplace')
 @click.option('-co', '--country', default='Germany', show_default=True, type=str, envvar='COUNTRY',
@@ -35,17 +38,16 @@ from discogs_alert.utils import CONDITIONS
               help='use flag if you want to accept a record w no sleeve (in addition to those of min-sleeve-condition)')
 @click.option('-aus', '--accept-ungraded-sleeve', default=False, is_flag=True, envvar='ACCEPT_UNGRADED_SLEEVE',
               help='use flag if you want to accept ungraded sleeves (in addition to those of min-sleeve-condition)')
-@click.option('-pb', '--pushbullet-token', type=str, envvar='PUSHBULLET_TOKEN',
-              help='token for pushbullet notification service. If passed, app will default to using Pushbullet.')
 @click.version_option("0.0.1")
-def main(user_agent, user_token, frequency, country, currency, min_seller_rating, min_seller_sales, min_media_condition,
-         min_sleeve_condition, accept_generic_sleeve, accept_no_sleeve, accept_ungraded_sleeve, pushbullet_token):
+def main(pushbullet_token, user_token, user_agent, frequency, country, currency, min_seller_rating, min_seller_sales,
+         min_media_condition, min_sleeve_condition, accept_generic_sleeve, accept_no_sleeve, accept_ungraded_sleeve):
     """"""
 
-    load_dotenv()  # TODO: want this to work with both docker & CLI
+    load_dotenv()  # WORKOUT HOW TO LOAD ENVIRONMENT VARIABLES IF USING DOCKER...
 
-    args = [user_agent, user_token, country, currency, min_seller_rating, min_seller_sales, min_media_condition,
-            min_sleeve_condition, accept_generic_sleeve, accept_no_sleeve, accept_ungraded_sleeve, pushbullet_token]
+    args = [pushbullet_token, user_agent, user_token, country, currency, min_seller_rating, min_seller_sales,
+            min_media_condition, min_sleeve_condition, accept_generic_sleeve, accept_no_sleeve, accept_ungraded_sleeve]
+
     schedule.every(int(60 / frequency)).minutes.do(lambda: loop(*args))
     while 1:
         schedule.run_pending()
