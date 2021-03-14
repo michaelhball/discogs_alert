@@ -6,6 +6,8 @@ from bs4 import BeautifulSoup
 from oauthlib import oauth1
 from urllib.parse import parse_qsl, urlencode
 
+from discogs_alert.utils import CONDITION_SHORT
+
 __all__ = ["UserOAuthClient", "UserTokenClient"]
 
 
@@ -129,11 +131,11 @@ class Client:
 
             media_condition_tooltips = condition_paragraph.find(class_='media-condition-tooltip')
             media_condition = media_condition_tooltips.get('data-condition')
-            listing['media_condition'] = media_condition
+            listing['media_condition'] = CONDITION_SHORT[media_condition]
 
             sleeve_condition_spans = condition_paragraph.find('span', class_='item_sleeve_condition')
             sleeve_condition = sleeve_condition_spans.contents[0].strip()
-            listing['sleeve_condition'] = sleeve_condition
+            listing['sleeve_condition'] = CONDITION_SHORT[sleeve_condition]
 
             seller_comment_idx = 2 if num_paragraphs == 3 else 3
             seller_comment = paragraphs[seller_comment_idx].contents[0].strip()  # TODO: be more sophisticated

@@ -8,14 +8,13 @@ from discogs_alert.notify import send_pushbullet_push
 from discogs_alert.utils import CONDITIONS
 
 
-def loop(user_agent, user_token, country, currency, min_seller_rating, min_seller_sales, min_media_condition,
-         min_sleeve_condition, accept_generic_sleeve, accept_no_sleeve, accept_ungraded_sleeve, pushbullet_token):
-    """ Runs the event loop.
+def loop(pushbullet_token, user_agent, user_token, country, currency, min_seller_rating, min_seller_sales,
+         min_media_condition, min_sleeve_condition, accept_generic_sleeve, accept_no_sleeve, accept_ungraded_sleeve,
+         verbose=False):
+    """ Event loop, each call queries the discogs marketplace. """
 
-    :return: None.
-    """
-
-    print("running loop")
+    if verbose:
+        print("running loop")
     start_time = time.time()
     mmc = CONDITIONS[min_media_condition]
     msc = CONDITIONS[min_sleeve_condition]
@@ -53,7 +52,8 @@ def loop(user_agent, user_token, country, currency, min_seller_rating, min_selle
                             continue
 
                         # verify media condition
-                        if CONDITIONS[listing['media_condition']] < temp_mmc if temp_mmc is not None else mmc:
+                        this_iter_mmc = CONDITIONS[temp_mmc if temp_mmc is not None else mmc]
+                        if CONDITIONS[listing['media_condition']] < this_iter_mmc:
                             continue
 
                         # verify sleeve condition
@@ -66,25 +66,28 @@ def loop(user_agent, user_token, country, currency, min_seller_rating, min_selle
                         aus = temp_aus if temp_aus is not None else accept_ungraded_sleeve
                         if not aus and listing['sleeve_condition'] == "Not Graded":
                             continue
-                        if CONDITIONS[listing['sleeve_condition']] < temp_msc if temp_msc is not None else msc:
+                        this_iter_msc = CONDITIONS[temp_msc if temp_msc is not None else msc]
+                        if CONDITIONS[listing['sleeve_condition']] < this_iter_msc:
                             continue
 
                         valid_listings.append(listing)
 
             else:
                 # here if something went wrong getting release stats
-                pass
+                continue
 
             # if we found something, send notification
             if len(valid_listings) > 0:
-                print("sending notification")
+                if verbose:
+                    print("sending notification")
                 listing_to_post = valid_listings[0]
+                print(wanted_release)
                 m_title = f"Now For Sale: {wanted_release['release_name']} — {wanted_release['artist_name']}"
                 m_body = f"Listing available: https://www.discogs.com/sell/item/{listing_to_post['id']}"
-                if not send_pushbullet_push(pushbullet_token, m_body, m_title):
-                    print('Exception sending pushbullet notification')
+                send_pushbullet_push(pushbullet_token, m_title, m_body)
 
     except Exception as e:
         print(e)
 
-    print(f'\t took {time.time() - start_time}')
+    if verbose:
+        print(f'\t took {time.time() - start_time}')
