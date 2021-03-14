@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "discogs_alert"
+version = "0.0.1"
+description = "Customised, real-time alerting for your discogs wantlist"
+license = "MIT"
+authors = ["Michael Ball <michael.h.s.ball@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.7"
+bs4 = "0.0.1"
+click = "7.1.2"
+oauthlib = "3.1.0"
+python-dotenv = "0.15.0"
+requests = "2.25.1"
+schedule = "0.6.0"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
