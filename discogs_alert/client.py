@@ -42,9 +42,6 @@ class Client:
         raise NotImplementedError
 
     def _get(self, url, is_api=True):
-        """
-        """
-
         response_content, status_code = self._request("GET", url, is_api=is_api)
         if status_code != 200:
             print(f"ERROR: status_code: {status_code}, content: {response_content}")
@@ -142,9 +139,14 @@ class Client:
             listing['comment'] = seller_comment
 
             # extract seller info (num ratings, average rating, & country ships from)
-            seller_num_ratings_elt = cells[2].find_all('a')[1].contents[0]
-            listing['seller_num_ratings'] = int(seller_num_ratings_elt.replace("ratings", "").replace(",", "").strip())
-            listing['seller_avg_rating'] = float(cells[2].find_all('strong')[1].contents[0].strip().split('.')[0])
+            is_new_seller = str(cells[2].find_all('span')[1].contents[0]).strip() == "New seller"
+            if is_new_seller:
+                listing['seller_num_ratings'] = 0
+                listing['seller_avg_rating'] = None
+            else:
+                seller_num_ratings_elt = cells[2].find_all('a')[1].contents[0]
+                listing['seller_num_ratings'] = int(seller_num_ratings_elt.replace("ratings", "").replace(",", "").strip())
+                listing['seller_avg_rating'] = float(cells[2].find_all('strong')[1].contents[0].strip().split('.')[0])
             listing['seller_ships_from'] = cells[2].find('span', text='Ships From:').parent.contents[1].strip()
 
             # extract price & shipping information
