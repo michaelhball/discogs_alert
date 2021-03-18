@@ -2,7 +2,7 @@
 name = "discogs_alert"
 version = "0.0.2"
 description = "Configurable, real-time alerts for your discogs wantlist"
-license = "MIT"
+license = "GPL-3.0-only"
 authors = ["mhsb <michael.h.s.ball@gmail.com>"]
 homepage = 'https://github.com/michaelhball/discogs_alert'
 repository = 'https://github.com/michaelhball/discogs_alert'
