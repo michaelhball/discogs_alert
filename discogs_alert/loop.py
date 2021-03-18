@@ -7,6 +7,8 @@ from discogs_alert.client import UserTokenClient
 from discogs_alert.notify import send_pushbullet_push
 from discogs_alert.utils import convert_currency, get_currency_rates, CONDITIONS
 
+__all__ = ['loop']
+
 
 def loop(pushbullet_token, user_agent, user_token, country, currency, min_seller_rating, min_seller_sales,
          min_media_condition, min_sleeve_condition, accept_generic_sleeve, accept_no_sleeve, accept_ungraded_sleeve,
@@ -100,12 +102,10 @@ def loop(pushbullet_token, user_agent, user_token, country, currency, min_seller
 
             # if we found something, send notification
             if len(valid_listings) > 0:
-                if verbose:
-                    print("sending notification")
                 listing_to_post = valid_listings[0]
                 m_title = f"Now For Sale: {wanted_release['release_name']} — {wanted_release['artist_name']}"
                 m_body = f"Listing available: https://www.discogs.com/sell/item/{listing_to_post['id']}"
-                send_pushbullet_push(pushbullet_token, m_title, m_body)
+                send_pushbullet_push(pushbullet_token, m_title, m_body, verbose=verbose)
 
     except Exception as e:
         raise e

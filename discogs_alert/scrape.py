@@ -4,6 +4,8 @@ from bs4 import BeautifulSoup
 
 from discogs_alert.utils import CONDITION_SHORT, CURRENCIES
 
+__all__ = ['scrape_listings_from_marketplace']
+
 
 def scrape_listings_from_marketplace(response_content):
     """ Takes response from marketplace get request (for single release) and parses the important listing information.
