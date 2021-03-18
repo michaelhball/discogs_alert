@@ -10,9 +10,9 @@ from discogs_alert.utils import convert_currency, get_currency_rates, CONDITIONS
 __all__ = ['loop']
 
 
-def loop(pushbullet_token, user_agent, user_token, country, currency, min_seller_rating, min_seller_sales,
-         min_media_condition, min_sleeve_condition, accept_generic_sleeve, accept_no_sleeve, accept_ungraded_sleeve,
-         verbose=False):
+def loop(pushbullet_token, wantlist_path, user_agent, user_token, country, currency, min_seller_rating,
+         min_seller_sales, min_media_condition, min_sleeve_condition, accept_generic_sleeve, accept_no_sleeve,
+         accept_ungraded_sleeve, verbose=False):
     """ Event loop, each time this is called we query the discogs marketplace for all items in wantlist. """
 
     start_time = time.time()
@@ -25,7 +25,7 @@ def loop(pushbullet_token, user_agent, user_token, country, currency, min_seller
 
     try:
         client = UserTokenClient(user_agent, user_token)
-        wantlist = json.load(Path('./wantlist.json').open('r'))
+        wantlist = json.load(Path(wantlist_path).open('r'))
         for wanted_release in wantlist:
 
             release_id = wanted_release.get("id")
