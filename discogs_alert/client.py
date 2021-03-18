@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 from oauthlib import oauth1
 from urllib.parse import parse_qsl, urlencode
 
-from discogs_alert.utils import CONDITION_SHORT
+from discogs_alert.utils import CONDITION_SHORT, CURRENCIES
 
 __all__ = ["UserOAuthClient", "UserTokenClient"]
 
@@ -160,10 +160,10 @@ class Client:
             shipping_currency_matches = re.findall(currency_regex, shipping_string)
             shipping_currency = shipping_currency_matches[0] if len(shipping_currency_matches) > 0 else None
             listing['price'] = {
-                'currency': price_currency,
+                'currency': CURRENCIES[price_currency],
                 'value': price_string.replace(price_currency, ""),
                 'shipping': None if shipping_currency is None else {
-                    'currency': shipping_currency,
+                    'currency': CURRENCIES[shipping_currency],
                     'value': shipping_string.replace(f"{shipping_currency}", "")
                 },
             }
