@@ -11,7 +11,7 @@ from discogs_alert.utils import convert_currency, get_currency_rates, CONDITIONS
 def loop(pushbullet_token, user_agent, user_token, country, currency, min_seller_rating, min_seller_sales,
          min_media_condition, min_sleeve_condition, accept_generic_sleeve, accept_no_sleeve, accept_ungraded_sleeve,
          verbose=False):
-    """ Event loop, each call queries the discogs marketplace. """
+    """ Event loop, each time this is called we query the discogs marketplace for all items in wantlist. """
 
     start_time = time.time()
     if verbose:
