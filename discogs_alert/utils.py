@@ -38,12 +38,22 @@ CURRENCIES = {
 
 
 def get_currency_rates(base_currency):
-    """ Get current currency rates """
+    """ Get live currency exchange rates (from one base currency).
+
+    :param base_currency: (str) one of the 3-character currency identifiers from above.
+    :return: a dict containing exchange rates to all major currencies.
+    """
 
     return requests.get(f'https://api.ratesapi.io/api/latest?base={base_currency}').json().get('rates')
 
 
-def convert_currency(currency_to_convert, value, rates=None):
-    """ """
+def convert_currency(currency_to_convert, value, rates):
+    """ Convert a price in a given currency to our base currency (implied by the rates dict)
+
+    :param currency_to_convert: (str) currency identifier of currency to convert from
+    :param value: (float) price value to convert
+    :param rates: (dict) rates allowing us to convert from specified currency to implied base currency.
+    :return: Float converted price
+    """
 
     return float(value) / rates.get(currency_to_convert)
