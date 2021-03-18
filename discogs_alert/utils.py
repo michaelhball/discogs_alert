@@ -34,6 +34,15 @@ CURRENCIES = {
     '€': 'EUR',
     '£': 'GBP',
     '$': 'USD',
+    '¥': 'JPY',
+    'A$': 'AUD',
+    'CA$': 'CAD',
+    'MX$': 'MXN',
+    'NZ$': 'NZD',
+    'B$': 'BRL',
+    'CHF': 'CHF',
+    'SEK': 'SEK',
+    'ZAR': 'ZAR',
 }
 
 
