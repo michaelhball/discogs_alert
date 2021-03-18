@@ -1,15 +1,19 @@
 [tool.poetry]
 name = "discogs_alert"
-version = "0.0.1"
+version = "0.0.2"
 description = "Configurable, real-time alerts for your discogs wantlist"
 license = "MIT"
 authors = ["mhsb <michael.h.s.ball@gmail.com>"]
+homepage = 'https://github.com/michaelhball/discogs_alert'
 repository = 'https://github.com/michaelhball/discogs_alert'
 readme = "README.md"
 keywords = ['discogs', 'dig', 'digger']
+include = [
+    "LICENSE",
+]
 
 [tool.poetry.dependencies]
-python = "^3.7"
+python = "^3.6"
 bs4 = "0.0.1"
 click = "7.1.2"
 oauthlib = "3.1.0"
