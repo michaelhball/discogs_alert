@@ -5,7 +5,7 @@
         <img alt="GitHub" src="https://img.shields.io/badge/license-GPL%203.0-blue">
     </a>
     <a href="https://github.com/michaelhball/discogs_alert/releases">
-        <img alt="GitHub release" src="https://img.shields.io/github/v/release/michaelhball/discogs_alert">
+        <img alt="GitHub release" src="https://img.shields.io/github/v/release/michaelhball/discogs_alert?sort=semver">
     </a>
 </p>
 
