@@ -14,12 +14,12 @@
 </h3>
 
 ![vinyl icon](https://github.com/michaelhball/discogs_alert/blob/main/img/vinyl.png) 
-discogs_alert enables you to set up ~real-time alerts so you get notified the moment those 
+discogs-alert enables you to set up ~real-time alerts so you get notified the moment those 
 hard-to-find releases go on sale. The project is designed to be 'set and forget'; you customise your preferences for a 
 particular release once, and then sit back and wait for a notification. 
 
 ![vinyl icon](https://github.com/michaelhball/discogs_alert/blob/main/img/vinyl.png) 
-discogs_alert enables both global and fine-grained customisation of your preferences
+discogs-alert enables both global and fine-grained customisation of your preferences
 (incl. price thresholds, minimum seller rating, and minimum media/sleeve condition). This 
 means you'll only be notified if a record goes on sale that really matches what you're looking 
 for.
@@ -33,7 +33,7 @@ for.
 You can install discogs-alert either via the Python Package Index (PyPI) or from source.
 To install using `pip`:
 ```
-pip install django-alert
+pip install discogs-alert
 ```
 
 ### Downloading and installing from source 
