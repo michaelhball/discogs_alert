@@ -239,7 +239,14 @@ $ kill $(ps aux | grep '[p]ython -m discogs_alert' | awk '{print $2}')
 
 ### Setting up the dev environment
 
+Ideally, you should work inside a virtual environment set up for this project. Once that's the case, 
+simply run the following two commands to install all dependencies:
 
+* `$ pip install --user poetry`
+* `$ poetry install` 
+
+And that's it! Until you want to push your changes and make a PR. When that's the case, you need to run 
+the tests to make sure nothing has broken, which you can do by running `$ poetry pytest tests`. 
 
 ## Changelog
 
