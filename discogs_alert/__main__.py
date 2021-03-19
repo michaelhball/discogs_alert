@@ -9,10 +9,10 @@ from discogs_alert.utils import CONDITIONS, CURRENCY_CHOICES
 @click.command()
 @click.option('-wp', '--wantlist-path', default='wantlist.json', type=click.Path(exists=True), required=True,
               help='path to your wantlist json file (including filename)', envvar='WANTLIST_PATH')
-@click.option('-pb', '--pushbullet-token', required=True, type=str, envvar='PUSHBULLET_TOKEN',
-              help='token for pushbullet notification service. If passed, app will default to using Pushbullet.')
-@click.option('-ut', '--user-token', required=True, type=str, envvar='USER_TOKEN',
-              help='unique user token (indicating which discogs user is making a request)')
+@click.option('-pt', '--pushbullet-token', required=True, type=str, envvar='PUSHBULLET_TOKEN',
+              help='token for pushbullet notification service.')
+@click.option('-dt', '--discogs-token', required=True, type=str, envvar='DISCOGS_TOKEN',
+              help='unique discogs user access token (enabling sending of requests on your behalf)')
 @click.option('-ua', '--user-agent', default='DiscogsAlert/0.0.1 +http://discogsalert.com', type=str,
               envvar='USER_AGENT', help='user-agent indicating source of HTTP request')
 @click.option('-f', '--frequency', default=60, show_default=True, type=click.IntRange(1, 60), envvar='FREQUENCY',
@@ -21,9 +21,9 @@ from discogs_alert.utils import CONDITIONS, CURRENCY_CHOICES
               help='country where you live (e.g. for shipping availability)')
 @click.option('-$', '--currency', default='EUR', show_default=True, envvar='CURRENCY',
               type=click.Choice(CURRENCY_CHOICES), help='preferred currency (to convert all others to)')
-@click.option('-msr', '--min-seller-rating', default=98, show_default=True, type=int, envvar='MIN_SELLER_RATING',
+@click.option('-msr', '--min-seller-rating', default=95, show_default=True, type=int, envvar='MIN_SELLER_RATING',
               help='minimum seller rating you want to allow')
-@click.option('-msr', '--min-seller-sales', default=None, show_default=True, type=int, envvar='MIN_SELLER_SALES',
+@click.option('-mss', '--min-seller-sales', default=None, show_default=True, type=int, envvar='MIN_SELLER_SALES',
               help='minimum number of seller sales you want to allow')
 @click.option('-mmc', '--min-media-condition', default='VG+', show_default=True, envvar='MIN_MEDIA_CONDITION',
               type=click.Choice(list(CONDITIONS.keys()), case_sensitive=True),
@@ -39,15 +39,17 @@ from discogs_alert.utils import CONDITIONS, CURRENCY_CHOICES
               help='use flag if you want to accept ungraded sleeves (in addition to those of min-sleeve-condition)')
 @click.option('-V', '--verbose', default=False, is_flag=True,
               help='use flag if you want to see print outs as the program runs')
-@click.option('-T', '--test', default=False, is_flag=True,
+@click.option('-T', '--test', default=False, is_flag=True, hidden=True,
               help='use flag if you want to immediately run the program (to test that your wantlist is correct)')
-@click.version_option("0.0.1")
-def main(pushbullet_token, wantlist_path, user_token, user_agent, frequency, country, currency, min_seller_rating,
+@click.version_option("0.0.2")
+def main(pushbullet_token, wantlist_path, discogs_token, user_agent, frequency, country, currency, min_seller_rating,
          min_seller_sales, min_media_condition, min_sleeve_condition, accept_generic_sleeve, accept_no_sleeve,
          accept_ungraded_sleeve, verbose, test):
-    """ Runs a simple event loop at regular time intervals. """
+    """ This loop queries in your watchlist at regular intervals, sending alerts if a release satisfying your criteria
+        is found.
+    """
 
-    args = [pushbullet_token, wantlist_path, user_agent, user_token, country, currency, min_seller_rating,
+    args = [pushbullet_token, wantlist_path, user_agent, discogs_token, country, currency, min_seller_rating,
             min_seller_sales, min_media_condition, min_sleeve_condition, accept_generic_sleeve, accept_no_sleeve,
             accept_ungraded_sleeve, verbose]
 

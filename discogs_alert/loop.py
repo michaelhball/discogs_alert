@@ -10,7 +10,7 @@ from discogs_alert.utils import convert_currency, get_currency_rates, CONDITIONS
 __all__ = ['loop']
 
 
-def loop(pushbullet_token, wantlist_path, user_agent, user_token, country, currency, min_seller_rating,
+def loop(pushbullet_token, wantlist_path, user_agent, discogs_token, country, currency, min_seller_rating,
          min_seller_sales, min_media_condition, min_sleeve_condition, accept_generic_sleeve, accept_no_sleeve,
          accept_ungraded_sleeve, verbose=False):
     """ Event loop, each time this is called we query the discogs marketplace for all items in wantlist. """
@@ -24,7 +24,7 @@ def loop(pushbullet_token, wantlist_path, user_agent, user_token, country, curre
     msc = CONDITIONS[min_sleeve_condition]
 
     try:
-        client = UserTokenClient(user_agent, user_token)
+        client = UserTokenClient(user_agent, discogs_token)
         wantlist = json.load(Path(wantlist_path).open('r'))
         for wanted_release in wantlist:
 
@@ -108,7 +108,7 @@ def loop(pushbullet_token, wantlist_path, user_agent, user_token, country, curre
                 send_pushbullet_push(pushbullet_token, m_title, m_body, verbose=verbose)
 
     except Exception as e:
-        raise e
+        print(e)  # don't raise error (in case it's just temporary loss of internet connection)
 
     if verbose:
         print(f'\t took {time.time() - start_time}')
