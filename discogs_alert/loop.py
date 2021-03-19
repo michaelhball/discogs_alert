@@ -17,7 +17,7 @@ def loop(pushbullet_token, wantlist_path, user_agent, discogs_token, country, cu
 
     start_time = time.time()
     if verbose:
-        print("running loop")
+        print("\nrunning loop")
 
     currency_rates = get_currency_rates(currency)
     mmc = CONDITIONS[min_media_condition]
