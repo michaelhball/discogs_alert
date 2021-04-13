@@ -83,7 +83,7 @@ where you list those hard-to-find records for which you want to be notified if a
 criteria) goes on sale. 
 
 Here is an example `wantlist.json` file:
-```json
+```yaml
 [
   {
     "id": 1061046,
