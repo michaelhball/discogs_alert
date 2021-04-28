@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "discogs_alert"
-version = "0.0.2"
+version = "0.0.3"
 description = "Configurable, real-time alerts for your discogs wantlist"
 license = "GPL-3.0-only"
 authors = ["mhsb <michael.h.s.ball@gmail.com>"]

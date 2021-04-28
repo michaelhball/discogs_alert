@@ -78,9 +78,19 @@ create an access token. As before, copy this token to your computer.
 
 ### Creating your wantlist
 
-Integration with your real Discogs Wantlist is coming soon. But for now, you have to create a single JSON file
-where you list those hard-to-find records for which you want to be notified if a copy (satisfying your 
-criteria) goes on sale. 
+There are two different ways you can create your wantlist (file containing all records you want to 
+set up notifications for) 1) by connecting to one of your Discogs lists, or 2) by creating a local 
+JSON file. The former is simpler, and requires no extra effort on your part, while the latter allows
+more expressivity, as you can specify fine-grained preferences for each release.
+
+#### Discogs List
+
+Using one of your existing Discogs [lists]() requires only specifying the ID of the list at runtime 
+(outlined in the [usage](#usage) section below). As of now, there is no fine-grained control allowed with 
+this option, meaning the list you use should be one containing only those records about which you want to 
+be notified immediately if they go on sale. 
+
+#### Local JSON   
 
 Here is an example `wantlist.json` file:
 ```yaml
@@ -134,19 +144,21 @@ As of now, discogs_alert can only be run as a python process. The minimal comman
 discogs_alert service is
 
 ```
-$ python -m discogs_alert -dt <discogs_access_token> -pt <pushbullet_token>
+$ python -m discogs_alert -dt <discogs_access_token> -pt <pushbullet_token> --list-id 12345678
 ```
 
-where the two _required_ arguments are the values of the two tokens you created earlier. In 
-order for the above command to work, your `wantlist.json` file must be in the directory from which you 
-are running the command. 
+where the two _required_ arguments are the values of the two tokens you created earlier, and --list-id 
+specifies the ID of your discogs list. This command starts the discogs_alert service, after which it 
+regularly pulls the releases from your list, checks their availability on the Discogs marketplace, and 
+sends you a notification if any release has gone on sale matching your conditions. You should leave 
+the service running in the background at all times to be most effective. Please note that you can add to 
+or change the contents of your wantlist while the service is running. The new list of releases will 
+come into effect the next time the service runs (i.e. within the next minute).
 
-The above command starts the discogs_alert service, after which it regularly pulls the releases from 
-your `wantlist.json` file, checks their availability on the Discogs marketplace,
-and sends you a notification if any release has gone on sale matching your conditions. You should leave 
-the service running in the background at all times to be most effective. Please note that you _can_  
-add to or change the contents of your `wantlist.json` while the service is running. The new list of 
-releases will come into effect the next time the service runs (i.e. within the next minute).
+As an alternative to using a Discogs list id, you can specify the path to a local 
+```wantlist.json``` file (explained below). The service works exactly the same in this case, except 
+that it pulls releases to look for from that file rather than from a Discogs list. It is required that you 
+use exactly one of these two options.
 
 Each time one of your wanted releases is found, your Pushbullet account will be sent a notification 
 with the artist and release name, and a URL to the marketplace listing. As long as you 
@@ -171,8 +183,9 @@ Here are the possible arguments:
  
 * `-dt` `--discogs-token`: (str) your discogs user access token
 * `-pt` `--pushbullet-token`: (str) your pushbullet token
+* `-lid` `--list-id`: (int) the ID of your Discogs list (NB: either this or the ```-wp``` option are required). 
 *  `-wp` `--wantlist-path`: (Path) the relative or absolute path to your `wantlist.json` file 
-(NB: this is required if the file is not in the current directory)
+(NB: either this or the ```-lid``` option are required)
 * `-f` `--frequency`: (int) how often you want the service to run (number of times per hour). 
 This value must be in [1, 60]  (default=`60`, meaning the service runs once a minute)
 * `-co` `--country`: (str) the country where you are (used for things like computing shipping) 

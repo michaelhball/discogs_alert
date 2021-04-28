@@ -9,10 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * Different notification options (SMS, Email, Slack)
 * Seller location controls (blacklists & whitelists)
-* Integration with your actual Discogs wantlist (e.g. pulling from one of your discogs lists 
-list).
 * Ability to run service using Docker or daemon service.
 * ... 
+
+## [0.0.3] — 2021.04.26
+### Added
+* Added option to load wantlist from a Discogs list (rather than from ```wantlist.json``` file).
+
+### Fixed
+* Fixed 403 authentication bug (caused by not passing user agent correctly w. marketplace queries)
+* Fixed bug when release has no sleeve condition
 
 ## [0.0.2] - 2021-02-19
 ### Added
