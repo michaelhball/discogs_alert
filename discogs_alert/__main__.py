@@ -2,13 +2,16 @@ import click
 import schedule
 import time
 
+from discogs_alert.click import NotRequiredIf
 from discogs_alert.loop import loop
 from discogs_alert.utils import CONDITIONS, CURRENCY_CHOICES
 
 
 @click.command()
-@click.option('-wp', '--wantlist-path', default='wantlist.json', type=click.Path(exists=True), required=True,
-              help='path to your wantlist json file (including filename)', envvar='WANTLIST_PATH')
+@click.option('-lid', '--list-id', type=int, envvar='LIST_ID', cls=NotRequiredIf, not_required_if='wantlist-path',
+              help='ID of Discogs list to use as wantlist')
+@click.option('-wp', '--wantlist-path', default='wantlist.json', type=click.Path(exists=True), envvar='WANTLIST_PATH',
+              cls=NotRequiredIf, not_required_if='list-id', help='path to your wantlist json file (including filename)')
 @click.option('-pt', '--pushbullet-token', required=True, type=str, envvar='PUSHBULLET_TOKEN',
               help='token for pushbullet notification service.')
 @click.option('-dt', '--discogs-token', required=True, type=str, envvar='DISCOGS_TOKEN',
@@ -41,15 +44,15 @@ from discogs_alert.utils import CONDITIONS, CURRENCY_CHOICES
               help='use flag if you want to see print outs as the program runs')
 @click.option('-T', '--test', default=False, is_flag=True, hidden=True,
               help='use flag if you want to immediately run the program (to test that your wantlist is correct)')
-@click.version_option("0.0.2")
-def main(pushbullet_token, wantlist_path, discogs_token, user_agent, frequency, country, currency, min_seller_rating,
-         min_seller_sales, min_media_condition, min_sleeve_condition, accept_generic_sleeve, accept_no_sleeve,
-         accept_ungraded_sleeve, verbose, test):
+@click.version_option("0.0.3")
+def main(pushbullet_token, list_id, wantlist_path, discogs_token, user_agent, frequency, country, currency,
+         min_seller_rating, min_seller_sales, min_media_condition, min_sleeve_condition, accept_generic_sleeve,
+         accept_no_sleeve, accept_ungraded_sleeve, verbose, test):
     """ This loop queries in your watchlist at regular intervals, sending alerts if a release satisfying your criteria
         is found.
     """
 
-    args = [pushbullet_token, wantlist_path, user_agent, discogs_token, country, currency, min_seller_rating,
+    args = [pushbullet_token, list_id, wantlist_path, user_agent, discogs_token, country, currency, min_seller_rating,
             min_seller_sales, min_media_condition, min_sleeve_condition, accept_generic_sleeve, accept_no_sleeve,
             accept_ungraded_sleeve, verbose]
 
