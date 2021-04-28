@@ -10,7 +10,7 @@ from discogs_alert.utils import convert_currency, get_currency_rates, CONDITIONS
 __all__ = ['loop']
 
 
-def loop(pushbullet_token, wantlist_path, user_agent, discogs_token, country, currency, min_seller_rating,
+def loop(pushbullet_token, list_id, wantlist_path, user_agent, discogs_token, country, currency, min_seller_rating,
          min_seller_sales, min_media_condition, min_sleeve_condition, accept_generic_sleeve, accept_no_sleeve,
          accept_ungraded_sleeve, verbose=False):
     """ Event loop, each time this is called we query the discogs marketplace for all items in wantlist. """
@@ -25,9 +25,12 @@ def loop(pushbullet_token, wantlist_path, user_agent, discogs_token, country, cu
 
     try:
         client = UserTokenClient(user_agent, discogs_token)
-        wantlist = json.load(Path(wantlist_path).open('r'))
-        for wanted_release in wantlist:
 
+        if list_id is not None:
+            wantlist = client.get_list(list_id).get('items')
+        else:
+            wantlist = json.load(Path(wantlist_path).open('r'))
+        for wanted_release in wantlist:
             release_id = wanted_release.get("id")
 
             # parameter values for current release only (if set by user)
@@ -65,7 +68,7 @@ def loop(pushbullet_token, wantlist_path, user_agent, discogs_token, country, cu
                         if not ags and listing['sleeve_condition'] == "Generic":
                             continue
                         ans = temp_ans if temp_ans is not None else accept_no_sleeve
-                        if not ans and listing['sleeve_condition'] == "No Cover":
+                        if not ans and listing['sleeve_condition'] == "No Cover" or listing['sleeve_condition'] is None:
                             continue
                         aus = temp_aus if temp_aus is not None else accept_ungraded_sleeve
                         if not aus and listing['sleeve_condition'] == "Not Graded":
@@ -103,7 +106,10 @@ def loop(pushbullet_token, wantlist_path, user_agent, discogs_token, country, cu
             # if we found something, send notification
             if len(valid_listings) > 0:
                 listing_to_post = valid_listings[0]
-                m_title = f"Now For Sale: {wanted_release['release_name']} — {wanted_release['artist_name']}"
+                if list_id is not None:
+                    m_title = f"Now For Sale: {wanted_release['display_title']}"
+                else:
+                    m_title = f"Now For Sale: {wanted_release['release_name']} — {wanted_release['artist_name']}"
                 m_body = f"Listing available: https://www.discogs.com/sell/item/{listing_to_post['id']}"
                 send_pushbullet_push(pushbullet_token, m_title, m_body, verbose=verbose)
 
