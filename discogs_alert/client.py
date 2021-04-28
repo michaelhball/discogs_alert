@@ -1,13 +1,10 @@
 import json
-import re
 import requests
 
-from bs4 import BeautifulSoup
 from oauthlib import oauth1
 from urllib.parse import parse_qsl, urlencode
 
 from discogs_alert.scrape import scrape_listings_from_marketplace
-from discogs_alert.utils import CONDITION_SHORT, CURRENCIES
 
 __all__ = ["UserOAuthClient", "UserTokenClient"]
 
@@ -43,7 +40,8 @@ class Client:
         raise NotImplementedError
 
     def _get(self, url, is_api=True):
-        response_content, status_code = self._request("GET", url, is_api=is_api)
+        headers = None if is_api else {'User-Agent': self.user_agent}  # needed to prevent cookies/captcha 403
+        response_content, status_code = self._request("GET", url, is_api=is_api, headers=headers)
         if status_code != 200:
             print(f"ERROR: status_code: {status_code}, content: {response_content}")
             return False
@@ -60,6 +58,16 @@ class Client:
 
     def _put(self, url, data, is_api=True):
         return self._request('PUT', url, data=data, is_api=is_api)
+
+    def get_list(self, list_id):
+        """ Get user-created list.
+
+        :param list_id:
+        :return:
+        """
+
+        url = f'{self._base_url}/lists/{list_id}'
+        return self._get(url)
 
     def get_listing(self, listing_id):
         """
