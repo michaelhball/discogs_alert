@@ -45,8 +45,12 @@ def scrape_listings_from_marketplace(response_content):
         listing['media_condition'] = CONDITION_SHORT[media_condition]
 
         sleeve_condition_spans = condition_paragraph.find('span', class_='item_sleeve_condition')
-        sleeve_condition = sleeve_condition_spans.contents[0].strip()
-        listing['sleeve_condition'] = CONDITION_SHORT[sleeve_condition]
+        if sleeve_condition_spans is not None:
+            sleeve_condition = sleeve_condition_spans.contents[0].strip()
+            sleeve_condition = CONDITION_SHORT[sleeve_condition]
+        else:
+            sleeve_condition = None
+        listing['sleeve_condition'] = sleeve_condition
 
         seller_comment_idx = 2 if num_paragraphs == 3 else 3
         seller_comment = paragraphs[seller_comment_idx].contents[0].strip()  # TODO: be more sophisticated
