@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "discogs_alert"
-version = "0.0.3"
+version = "0.0.4"
 description = "Configurable, real-time alerts for your discogs wantlist"
 license = "GPL-3.0-only"
 authors = ["mhsb <michael.h.s.ball@gmail.com>"]
@@ -16,10 +16,11 @@ include = [
 python = "^3.6"
 bs4 = "0.0.1"
 click = "7.1.2"
-oauthlib = "3.1.0"
+fake-useragent = "0.1.11"
 python-dotenv = "0.15.0"
 requests = "2.25.1"
 schedule = "0.6.0"
+selenium = "3.141.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "6.2.2"
