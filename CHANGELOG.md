@@ -9,8 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * Different notification options (SMS, Email, Slack)
 * Seller location controls (blacklists & whitelists)
-* Ability to run service using Docker or daemon service.
-* ... 
+* Ability to run service as a daemon service.
+
+## [0.0.3] — 2021.05.???
+### Added
+* Ability to run server as a docker image (=> no dependency installation required)
+
+### Fixed
+* Fixed 403 authentication bug (much more properly this time)
 
 ## [0.0.3] — 2021.04.26
 ### Added
