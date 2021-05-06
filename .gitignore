@@ -7,3 +7,5 @@ venv
 wantlist.json
 TODO
 dist
+
+nohup.out
