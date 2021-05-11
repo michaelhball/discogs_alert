@@ -4,13 +4,14 @@ import time
 from pathlib import Path
 
 from discogs_alert.client import UserTokenClient
-from discogs_alert.notify import send_pushbullet_push
+from discogs_alert.notify import send_email, send_pushbullet_push
 from discogs_alert.utils import convert_currency, get_currency_rates, CONDITIONS
 
 __all__ = ['loop']
 
 
-def loop(pushbullet_token, list_id, wantlist_path, user_agent, discogs_token, country, currency, min_seller_rating,
+def loop(pushbullet_token, email_enabled, email_server_smtp, email_server_port, email_from, email_password, email_to,
+         list_id, wantlist_path, user_agent, discogs_token, country, currency, min_seller_rating,
          min_seller_sales, min_media_condition, min_sleeve_condition, accept_generic_sleeve, accept_no_sleeve,
          accept_ungraded_sleeve, verbose=False):
     """ Event loop, each time this is called we query the discogs marketplace for all items in wantlist. """
@@ -30,6 +31,7 @@ def loop(pushbullet_token, list_id, wantlist_path, user_agent, discogs_token, co
             wantlist = client.get_list(list_id).get('items')
         else:
             wantlist = json.load(Path(wantlist_path).open('r'))
+
         for wanted_release in wantlist:
             release_id = wanted_release.get("id")
 
@@ -90,7 +92,8 @@ def loop(pushbullet_token, list_id, wantlist_path, user_agent, discogs_token, co
                             if shipping.get('currency') != currency:
                                 converted_shipping = convert_currency(shipping.get('currency'), shipping.get('value'),
                                                                       currency_rates)
-                                listing['price']['shipping'] = {'currency': currency, 'value': converted_shipping}
+                                listing['price']['shipping'] = {
+                                    'currency': currency, 'value': converted_shipping}
 
                         # use price threshold if we have one
                         total_price = float(listing['price']['value'])
@@ -111,10 +114,17 @@ def loop(pushbullet_token, list_id, wantlist_path, user_agent, discogs_token, co
                 else:
                     m_title = f"Now For Sale: {wanted_release['release_name']} — {wanted_release['artist_name']}"
                 m_body = f"Listing available: https://www.discogs.com/sell/item/{listing_to_post['id']}"
-                send_pushbullet_push(pushbullet_token, m_title, m_body, verbose=verbose)
+
+                if (email_enabled):
+                    send_email(email_server_smtp, email_server_port,
+                               email_from, email_password, email_to, m_title, m_body)
+                else:
+                    send_pushbullet_push(
+                        pushbullet_token, m_title, m_body, verbose=verbose)
 
     except Exception as e:
-        print(e)  # don't raise error (in case it's just temporary loss of internet connection)
+        # don't raise error (in case it's just temporary loss of internet connection)
+        print(e)
 
     if verbose:
         print(f'\t took {time.time() - start_time}')

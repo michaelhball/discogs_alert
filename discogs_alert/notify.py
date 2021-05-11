@@ -1,7 +1,9 @@
+from email.message import EmailMessage
 import json
 import requests
+import smtplib
 
-__all__ = ['send_pushbullet_push']
+__all__ = ['send_pushbullet_push', 'send_email']
 
 
 def send_pushbullet_push(token, message_title, message_body, verbose=False):
@@ -15,8 +17,10 @@ def send_pushbullet_push(token, message_title, message_body, verbose=False):
     """
 
     try:
-        headers = {'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'}
-        message = {"type": "note", "title": message_title, "body": message_body}
+        headers = {'Authorization': 'Bearer ' +
+                   token, 'Content-Type': 'application/json'}
+        message = {"type": "note",
+                   "title": message_title, "body": message_body}
         url = 'https://api.pushbullet.com/v2/pushes'
 
         # work out if there is an existing, identical push
@@ -31,9 +35,11 @@ def send_pushbullet_push(token, message_title, message_body, verbose=False):
         if not have_already_sent:
             if verbose:
                 print("sending notification")
-            resp = requests.post(url, data=json.dumps(message), headers=headers)
+            resp = requests.post(
+                url, data=json.dumps(message), headers=headers)
             if resp.status_code != 200:
-                print(f"error {resp.status_code} sending pushbullet notification: {resp.content}")
+                print(
+                    f"error {resp.status_code} sending pushbullet notification: {resp.content}")
                 return False
             else:
                 return True
@@ -41,3 +47,20 @@ def send_pushbullet_push(token, message_title, message_body, verbose=False):
     except Exception as e:
         print(f"Exception sending pushbullet push: {e}")
         return False
+
+
+def send_email(email_server_smtp, email_server_port, email_from, email_password, email_to, title, body):
+    server = smtplib.SMTP(email_server_smtp, email_server_port)
+    server.ehlo()
+    server.starttls()
+    server.ehlo()
+    server.login(email_from, email_password)
+    print('sending email')
+
+    msg = EmailMessage()
+    msg['Subject'] = title
+    msg['From'] = email_from
+    msg['To'] = email_to
+    msg.set_content(body)
+    print('email sent')
+    server.quit()

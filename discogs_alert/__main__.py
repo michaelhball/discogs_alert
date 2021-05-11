@@ -12,8 +12,20 @@ from discogs_alert.utils import CONDITIONS, CURRENCY_CHOICES
               help='ID of Discogs list to use as wantlist')
 @click.option('-wp', '--wantlist-path', default='wantlist.json', type=click.Path(exists=True), envvar='WANTLIST_PATH',
               cls=NotRequiredIf, not_required_if='list-id', help='path to your wantlist json file (including filename)')
-@click.option('-pt', '--pushbullet-token', required=True, type=str, envvar='PUSHBULLET_TOKEN',
+@click.option('-pt', '--pushbullet-token', not_required_if='email-enabled', type=str, envvar='PUSHBULLET_TOKEN',
               help='token for pushbullet notification service.')
+@click.option('-ee', '--email-enabled', default=False, is_flag=True, hidden=True,
+              help='use flag if you want to use email notification instead of pushbullet')
+@click.option('-es', '--email-server-smtp', not_required_if='email-enabled', type=str, hidden=True,
+              help='use flag to define the smtp server')
+@click.option('-esp', '--email-server-port', type=int, default=587, hidden=True,
+              help='use flag to define the smtp server')
+@click.option('-ef', '--email-from', type=str, hidden=True,
+              help='email address to send the notification from')
+@click.option('-ep', '--email-password', type=str, hidden=True,
+              help='password of the email address to send the notification from')
+@click.option('-et', '--email-to', type=str, hidden=True,
+              help='destination email address to send the notification to')
 @click.option('-dt', '--discogs-token', required=True, type=str, envvar='DISCOGS_TOKEN',
               help='unique discogs user access token (enabling sending of requests on your behalf)')
 @click.option('-ua', '--user-agent', default='DiscogsAlert/0.0.1 +http://discogsalert.com', type=str,
@@ -45,14 +57,16 @@ from discogs_alert.utils import CONDITIONS, CURRENCY_CHOICES
 @click.option('-T', '--test', default=False, is_flag=True, hidden=True,
               help='use flag if you want to immediately run the program (to test that your wantlist is correct)')
 @click.version_option("0.0.3")
-def main(pushbullet_token, list_id, wantlist_path, discogs_token, user_agent, frequency, country, currency,
+def main(pushbullet_token, email_enabled, email_server_smtp, email_server_port, email_from, email_password, email_to,
+         list_id, wantlist_path, discogs_token, user_agent, frequency, country, currency,
          min_seller_rating, min_seller_sales, min_media_condition, min_sleeve_condition, accept_generic_sleeve,
          accept_no_sleeve, accept_ungraded_sleeve, verbose, test):
     """ This loop queries in your watchlist at regular intervals, sending alerts if a release satisfying your criteria
         is found.
     """
 
-    args = [pushbullet_token, list_id, wantlist_path, user_agent, discogs_token, country, currency, min_seller_rating,
+    args = [pushbullet_token, email_enabled, email_server_smtp, email_server_port, email_from, email_password, email_to,
+            list_id, wantlist_path, user_agent, discogs_token, country, currency, min_seller_rating,
             min_seller_sales, min_media_condition, min_sleeve_condition, accept_generic_sleeve, accept_no_sleeve,
             accept_ungraded_sleeve, verbose]
 
