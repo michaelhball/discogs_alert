@@ -27,6 +27,8 @@ for.
 ## Requirements
 
 - Python >= 3.6
+- [Chromedriver](https://chromedriver.chromium.org/) (if you have Google Chrome or any Chromium browser 
+installed on your computer, you'll be fine).
 
 ## Installation & Setup
 

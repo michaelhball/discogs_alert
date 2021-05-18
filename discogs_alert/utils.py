@@ -14,6 +14,7 @@ CONDITIONS = {
 
 
 CONDITION_SHORT = {
+    'Generic': 'Generic',
     'Poor (P)': 'P',
     'Fair (F)': 'F',
     'Good (G)': 'G',
