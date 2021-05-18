@@ -21,6 +21,7 @@ python-dotenv = "0.15.0"
 requests = "2.25.1"
 schedule = "0.6.0"
 selenium = "3.141.0"
+webdriver-manager = "3.4.1"
 
 [tool.poetry.dev-dependencies]
 pytest = "6.2.2"
