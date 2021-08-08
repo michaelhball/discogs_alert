@@ -78,6 +78,9 @@ on all devices where you would like to receive notifications.
 Once you've created an account, simply navigate to your [settings](https://www.pushbullet.com/#settings) page and 
 create an access token. As before, copy this token to your computer.
 
+NB: when using pushbullet, please note that you'll need to open the pushbullet mobile or web app once a month. 
+If you don't, the notification service won't work, as it deems you to have a 'dead' account.
+
 ### Creating your wantlist
 
 There are two different ways you can create your wantlist (file containing all records you want to 

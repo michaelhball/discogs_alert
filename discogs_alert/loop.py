@@ -94,7 +94,7 @@ def loop(pushbullet_token, list_id, wantlist_path, user_agent, discogs_token, co
                                 listing['price']['shipping'] = {'currency': currency, 'value': converted_shipping}
 
                         # use price threshold if we have one
-                        total_price = float(listing['price']['value'])
+                        total_price = float(listing['price']['value'].replace(',', ''))
                         if price_threshold is not None and total_price > price_threshold:
                             continue
 
