@@ -14,6 +14,7 @@ CONDITIONS = {
 
 
 CONDITION_SHORT = {
+    'Generic': 'Generic',
     'Poor (P)': 'P',
     'Fair (F)': 'F',
     'Good (G)': 'G',
@@ -53,7 +54,7 @@ def get_currency_rates(base_currency):
     :return: a dict containing exchange rates to all major currencies.
     """
 
-    return requests.get(f'https://api.ratesapi.io/api/latest?base={base_currency}').json().get('rates')
+    return requests.get(f'https://api.exchangerate.host/latest?base={base_currency}').json().get('rates')
 
 
 def convert_currency(currency_to_convert, value, rates):

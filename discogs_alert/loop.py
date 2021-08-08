@@ -3,7 +3,7 @@ import time
 
 from pathlib import Path
 
-from discogs_alert.client import UserTokenClient
+from discogs_alert.client import AnonClient, UserTokenClient
 from discogs_alert.notify import send_email, send_pushbullet_push
 from discogs_alert.utils import convert_currency, get_currency_rates, CONDITIONS
 
@@ -25,10 +25,11 @@ def loop(pushbullet_token, email_enabled, email_server_smtp, email_server_port, 
     msc = CONDITIONS[min_sleeve_condition]
 
     try:
-        client = UserTokenClient(user_agent, discogs_token)
+        client_anon = AnonClient(user_agent)
+        user_token_client = UserTokenClient(user_agent, discogs_token)
 
         if list_id is not None:
-            wantlist = client.get_list(list_id).get('items')
+            wantlist = user_token_client.get_list(list_id).get('items')
         else:
             wantlist = json.load(Path(wantlist_path).open('r'))
 
@@ -44,10 +45,10 @@ def loop(pushbullet_token, email_enabled, email_server_smtp, email_server_port, 
             price_threshold = wanted_release.get('price_threshold')
 
             valid_listings = []
-            release_stats = client.get_release_stats(release_id)
+            release_stats = user_token_client.get_release_stats(release_id)
             if release_stats:
                 if release_stats.get("num_for_sale") > 0 and not release_stats.get("blocked_from_sale"):
-                    for listing in client.get_marketplace_listings(release_id):
+                    for listing in client_anon.get_marketplace_listings(release_id):
 
                         # verify availability
                         if listing.get('availability') == f'Unavailable in {country}':
@@ -96,7 +97,7 @@ def loop(pushbullet_token, email_enabled, email_server_smtp, email_server_port, 
                                     'currency': currency, 'value': converted_shipping}
 
                         # use price threshold if we have one
-                        total_price = float(listing['price']['value'])
+                        total_price = float(listing['price']['value'].replace(',', ''))
                         if price_threshold is not None and total_price > price_threshold:
                             continue
 
@@ -123,8 +124,7 @@ def loop(pushbullet_token, email_enabled, email_server_smtp, email_server_port, 
                         pushbullet_token, m_title, m_body, verbose=verbose)
 
     except Exception as e:
-        # don't raise error (in case it's just temporary loss of internet connection)
-        print(e)
+        print(e)  # don't raise error (in case it's just temporary loss of internet connection)
 
     if verbose:
         print(f'\t took {time.time() - start_time}')
