@@ -12,9 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Ability to run service as a daemon service.
 * Ability to run server as a docker image (=> no dependency installation required)
 
-## [0.0.3] — 2021.05.17
+## [0.0.6] — 2021.08.08
+
 ### Fixed
-* Fixed 403 authentication bug (for real this time)
+* 3rd party exchange rate API service shut down; now using a new one
+* Fixed bug converting currencies for item values >1000
+
+## [0.0.5] — 2021.05.17
+### Fixed
+* Fixed 403 authentication bug (by modifying clients to use rotating user-agents + Selenium)
 
 ## [0.0.3] — 2021.04.26
 ### Added
