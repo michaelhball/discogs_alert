@@ -4,25 +4,28 @@ import time
 from pathlib import Path
 from requests.exceptions import ConnectionError
 
-from discogs_alert import client as da_client, notify as da_notify, util as da_util
+from discogs_alert import client as da_client, notify as da_notify, types as da_types, util as da_util
+
+
+# TODO: move parts of this to separate functions, e.g. the media/sleeve quality part can be one etc.
 
 
 def loop(
-    pushbullet_token,
-    list_id,
-    wantlist_path,
-    user_agent,
-    discogs_token,
-    country,
-    currency,
-    min_seller_rating,
-    min_seller_sales,
-    min_media_condition,
-    min_sleeve_condition,
-    accept_generic_sleeve,
-    accept_no_sleeve,
-    accept_ungraded_sleeve,
-    verbose=False,
+    discogs_token: str,
+    pushbullet_token: str,
+    list_id: int,
+    wantlist_path: str,
+    user_agent: str,
+    country: str,
+    currency: str,
+    min_seller_rating: int,
+    min_seller_sales: int,
+    min_media_condition: da_types.CONDITION,
+    min_sleeve_condition: da_types.CONDITION,
+    accept_generic_sleeve: bool,
+    accept_no_sleeve: bool,
+    accept_ungraded_sleeve: bool,
+    verbose: bool = False,
 ):
     """Event loop, each time this is called we query the discogs marketplace for all items in wantlist."""
 
@@ -30,6 +33,7 @@ def loop(
     if verbose:
         print("\nrunning loop")
 
+    # TODO: fix this ??
     mmc = da_util.CONDITIONS[min_media_condition]
     msc = da_util.CONDITIONS[min_sleeve_condition]
 
@@ -39,22 +43,28 @@ def loop(
         user_token_client = da_client.UserTokenClient(user_agent, discogs_token)
 
         if list_id is not None:
-            wantlist = user_token_client.get_list(list_id).get("items")
+            wantlist = user_token_client.get_list(list_id).items
         else:
+            # TODO: fix this to load things in the correct type
             wantlist = json.load(Path(wantlist_path).open("r"))
-        for wanted_release in wantlist:
-            release_id = wanted_release.get("id")
 
+        for release in wantlist:
+            release = da_types.Release(**release)
+            release_id = release.id
+
+            # TODO: clean up this, super non-interpretable as I read through
             # parameter values for current release only (if set by user)
-            temp_mmc = wanted_release.get("min_media_condition")
-            temp_msc = wanted_release.get("min_sleeve_condition")
-            temp_ags = wanted_release.get("accept_generic_sleeve")
-            temp_ans = wanted_release.get("accept_no_sleeve")
-            temp_aus = wanted_release.get("accept_ungraded_sleeve")
-            price_threshold = wanted_release.get("price_threshold")
+            temp_mmc = release.min_media_condition
+            temp_msc = release.min_sleeve_condition
+            temp_ags = release.accept_generic_sleeve
+            temp_ans = release.accept_no_sleeve
+            temp_aus = release.accept_ungraded_sleeve
+            price_threshold = release.price_threshold
 
             valid_listings = []
             release_stats = user_token_client.get_release_stats(release_id)
+            print(release_stats)
+            return
             if release_stats:
                 if release_stats.get("num_for_sale") > 0 and not release_stats.get("blocked_from_sale", False):
                     for listing in client_anon.get_marketplace_listings(release_id):
@@ -92,6 +102,7 @@ def loop(
 
                         # convert listing price & shipping --> base currency
                         price = listing["price"]
+                        print(price)
                         if price["currency"] != currency:
                             converted_price = da_util.convert_currency(
                                 price.get("currency"), price.get("value"), currency_rates
