@@ -11,7 +11,9 @@ from fake_useragent import UserAgent
 from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
 
-from discogs_alert import scrape as da_scrape
+from discogs_alert import scrape as da_scrape, types as da_types, util as da_util
+
+# TODO: add type annotations & deserialisation to everything here...
 
 
 class Client:
@@ -62,17 +64,11 @@ class Client:
     def _put(self, url, data, is_api=True):
         return self._request("PUT", url, data=data)
 
-    def get_list(self, list_id):
-        """Get user-created list.
+    def get_list(self, list_id: int) -> da_types.UserList:
+        user_list_dict = self._get(f"{self._base_url}/lists/{list_id}")
+        return da_types.UserList(**user_list_dict)
 
-        :param list_id:
-        :return:
-        """
-
-        url = f"{self._base_url}/lists/{list_id}"
-        return self._get(url)
-
-    def get_listing(self, listing_id):
+    def get_listing(self, listing_id) -> da_types.Listing:
         """
 
         @param listing_id
@@ -92,15 +88,9 @@ class Client:
         url = f"{self._base_url}/releases/{release_id}"
         return self._get(url)
 
-    def get_release_stats(self, release_id):
-        """Get number of items that are for sale, lowest listed price, & for provided release.
-
-        @param release_id
-        :return:
-        """
-
-        url = f"{self._base_url}/marketplace/stats/{release_id}"
-        return self._get(url)
+    def get_release_stats(self, release_id: int) -> da_types.ReleaseStats:
+        release_stats_dict = self._get(f"{self._base_url}/marketplace/stats/{release_id}")
+        return da_types.ReleaseStats(**release_stats_dict)
 
     def get_wantlist(self, username):
         url = f"{self._base_url}/users/{username}/wants"

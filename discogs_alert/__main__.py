@@ -7,6 +7,22 @@ from discogs_alert import click as da_click, loop as da_loop, util as da_util
 
 @click.command()
 @click.option(
+    "-dt",
+    "--discogs-token",
+    required=True,
+    type=str,
+    envvar="DISCOGS_TOKEN",
+    help="unique discogs user access token (enabling sending of requests on your behalf)",
+)
+@click.option(
+    "-pt",
+    "--pushbullet-token",
+    required=True,
+    type=str,
+    envvar="PUSHBULLET_TOKEN",
+    help="token for pushbullet notification service.",
+)
+@click.option(
     "-lid",
     "--list-id",
     type=int,
@@ -23,22 +39,6 @@ from discogs_alert import click as da_click, loop as da_loop, util as da_util
     cls=da_click.NotRequiredIf,
     not_required_if="list-id",
     help="path to your wantlist json file (including filename)",
-)
-@click.option(
-    "-pt",
-    "--pushbullet-token",
-    required=True,
-    type=str,
-    envvar="PUSHBULLET_TOKEN",
-    help="token for pushbullet notification service.",
-)
-@click.option(
-    "-dt",
-    "--discogs-token",
-    required=True,
-    type=str,
-    envvar="DISCOGS_TOKEN",
-    help="unique discogs user access token (enabling sending of requests on your behalf)",
 )
 @click.option(
     "-ua",
@@ -148,10 +148,10 @@ from discogs_alert import click as da_click, loop as da_loop, util as da_util
 )
 @click.version_option("0.0.7")
 def main(
+    discogs_token,
     pushbullet_token,
     list_id,
     wantlist_path,
-    discogs_token,
     user_agent,
     frequency,
     country,
@@ -172,11 +172,11 @@ def main(
 
     # TODO: sort out this ridiculousness...
     args = [
+        discogs_token,
         pushbullet_token,
         list_id,
         wantlist_path,
         user_agent,
-        discogs_token,
         country,
         currency,
         min_seller_rating,
