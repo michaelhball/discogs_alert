@@ -1,11 +1,9 @@
 import json
 import requests
 
-__all__ = ['send_pushbullet_push']
-
 
 def send_pushbullet_push(token, message_title, message_body, verbose=False):
-    """ Sends notification of found record via pushbullet.
+    """Sends notification of found record via pushbullet.
 
     @param token: (str) pushbullet token needed to send notification to correct user
     @param message_title: (str) title of message
@@ -15,15 +13,15 @@ def send_pushbullet_push(token, message_title, message_body, verbose=False):
     """
 
     try:
-        headers = {'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'}
+        headers = {"Authorization": "Bearer " + token, "Content-Type": "application/json"}
         message = {"type": "note", "title": message_title, "body": message_body}
-        url = 'https://api.pushbullet.com/v2/pushes'
+        url = "https://api.pushbullet.com/v2/pushes"
 
         # work out if there is an existing, identical push
         resp = requests.get(url, headers=headers)
         have_already_sent = False
-        for p in resp.json().get('pushes'):
-            if p.get('title') == message.get('title') and p.get('body') == message.get('body'):
+        for p in resp.json().get("pushes"):
+            if p.get("title") == message.get("title") and p.get("body") == message.get("body"):
                 have_already_sent = True
                 break
 
