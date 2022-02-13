@@ -2,7 +2,7 @@ import click
 import schedule
 import time
 
-from discogs_alert import click as da_click, loop as da_loop, util as da_util
+from discogs_alert import click as da_click, currency as da_currency, loop as da_loop, types as da_type
 
 
 @click.command()
@@ -72,7 +72,7 @@ from discogs_alert import click as da_click, loop as da_loop, util as da_util
     default="EUR",
     show_default=True,
     envvar="CURRENCY",
-    type=click.Choice(da_util.CURRENCY_CHOICES),
+    type=click.Choice(da_currency.CURRENCY_CHOICES),
     help="preferred currency (to convert all others to)",
 )
 @click.option(
@@ -96,19 +96,19 @@ from discogs_alert import click as da_click, loop as da_loop, util as da_util
 @click.option(
     "-mmc",
     "--min-media-condition",
-    default="VG",
+    default=da_type.CONDITION.VERY_GOOD,
     show_default=True,
     envvar="MIN_MEDIA_CONDITION",
-    type=click.Choice(list(da_util.CONDITIONS.keys()), case_sensitive=True),
+    type=click.Choice(da_type.CONDITION),
     help="minimum media condition you want to accept",
 )
 @click.option(
     "-msc",
     "--min-sleeve-condition",
-    default="VG",
+    default=da_type.CONDITION.VERY_GOOD,
     show_default=True,
     envvar="MIN_SLEEVE_CONDITION",
-    type=click.Choice(list(da_util.CONDITIONS.keys()), case_sensitive=True),
+    type=click.Choice(da_type.CONDITION),
     help="minimum sleeve condition you want to accept",
 )
 @click.option(
