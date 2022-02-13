@@ -63,10 +63,8 @@ def loop(
 
             valid_listings = []
             release_stats = user_token_client.get_release_stats(release_id)
-            print(release_stats)
-            return
             if release_stats:
-                if release_stats.get("num_for_sale") > 0 and not release_stats.get("blocked_from_sale", False):
+                if release_stats.num_for_sale > 0 and not release_stats.blocked_from_sale:
                     for listing in client_anon.get_marketplace_listings(release_id):
 
                         # verify availability
@@ -132,10 +130,7 @@ def loop(
             # if we found something, send notification
             if len(valid_listings) > 0:
                 listing_to_post = valid_listings[0]
-                if list_id is not None:
-                    m_title = f"Now For Sale: {wanted_release['display_title']}"
-                else:
-                    m_title = f"Now For Sale: {wanted_release['release_name']} — {wanted_release['artist_name']}"
+                m_title = f"Now For Sale: {release.display_title}"
                 m_body = f"Listing available: https://www.discogs.com/sell/item/{listing_to_post['id']}"
                 da_notify.send_pushbullet_push(pushbullet_token, m_title, m_body, verbose=verbose)
 
