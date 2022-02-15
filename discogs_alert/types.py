@@ -1,13 +1,13 @@
-from dataclasses import dataclass
 import enum
-from typing import Any, Dict, List, NamedTuple, Optional
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
 
-
-# TODO: convert all NamedTuples to dataclasses ???
+from discogs_alert import currency as da_currency
 
 
 @enum.unique
 class CONDITION(enum.IntEnum):
+    GENERIC: -1
     POOR = 0
     FAIR = 1
     GOOD = 2
@@ -16,6 +16,19 @@ class CONDITION(enum.IntEnum):
     VERY_GOOD_PLUS = 5
     NEAR_MINT = 6
     MINT = 7
+
+
+CONDITION_PARSER = {
+    "Generic": CONDITION.GENERIC,
+    "Poor (P)": CONDITION.POOR,
+    "Fair (F)": CONDITION.FAIR,
+    "Good (G)": CONDITION.GOOD,
+    "Good Plus (G+)": CONDITION.GOOD_PLUS,
+    "Very Good (VG)": CONDITION.VERY_GOOD,
+    "Very Good Plus (VG+)": CONDITION.VERY_GOOD_PLUS,
+    "Near Mint (NM or M-)": CONDITION.NEAR_MINT,
+    "Mint (M)": CONDITION.MINT,
+}
 
 
 @dataclass
@@ -42,7 +55,8 @@ class Release:
     stats: Optional[Dict] = None
 
 
-class UserList(NamedTuple):
+@dataclass
+class UserList:
     id: int
     user: Dict[str, Any]
     name: str
@@ -63,24 +77,47 @@ class ReleaseStats:
     blocked_from_sale: bool = False
 
 
-class Shipping(NamedTuple):
+@dataclass
+class Shipping:
     currency: str
     value: float
 
 
-# TODO: put some Optionals in here for stuff that might not exist
-class ListingPrice(NamedTuple):
+@dataclass
+class ListingPrice:
     currency: str
     value: float
-    shipping: Shipping
+    shipping: Optional[Shipping] = None
+
+    def convert_currency(self, currency: str):
+        """Converts this object to another currency"""
+        
+        # convert self.value to new currency
+        if self.currency == currency:
+            return
+        currency_rates = da_currency.get_currency_rates(currency)
+        converted_price = da_currency.convert_currency(self.currency, self.value, currency_rates)
+        self.currency = currency
+        self.value = converted_price
+
+        # convert shipping to new currency
+        if self.shipping is None:
+            return
+        converted_shipping = da_currency.convert_currency(self.shipping.currency, self.shipping.value, currency_rates)
+        self.shipping = Shipping(currency=currency, value=converted_shipping)
 
 
-class Listing(NamedTuple):
-    id: str
+@dataclass
+class Listing:
+    id: int
+    availability: str
     media_condition: CONDITION
     sleeve_condition: CONDITION
     comment: str
     seller_num_ratings: int
-    seller_avg_rating: float
+    seller_avg_rating: Optional[float]  # None if new seller
     seller_ships_from: str
     price: ListingPrice
+
+
+Listings = List[Listing]

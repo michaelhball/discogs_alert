@@ -140,10 +140,10 @@ class AnonClient(Client):
             self.driver_manager, options=self.options, service_log_path="/dev/null" if sys.platform in unix else "NUL"
         )  # disable logs
 
-    def get_marketplace_listings(self, release_id):
+    def get_marketplace_listings(self, release_id: int) -> da_types.Listings:
         """Get list of listings currently for sale for particular release.
 
-        :param release_id: (int) discogs ID of release whose listings we want.
+        :param release_id: discogs ID of release whose listings we want.
         :return: list of listings (dicts) if successful, False otherwise.
         """
 

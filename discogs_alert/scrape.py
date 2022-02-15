@@ -2,14 +2,14 @@ import re
 
 from bs4 import BeautifulSoup
 
-from discogs_alert import util as da_util
+from discogs_alert import types as da_types, util as da_util
 
 
-def scrape_listings_from_marketplace(response_content):
+def scrape_listings_from_marketplace(response_content: str) -> da_types.Listings:
     """Takes response from marketplace get request (for single release) and parses the important listing information.
 
     :param response_content: (bytes) content of response from release marketplace GET request.s
-    :return: List of listings (dicts) containing all useful information about listing for sale.
+    :return: List of Listing objects containing all useful information about listing for sale.
     """
 
     listings = []
@@ -40,12 +40,12 @@ def scrape_listings_from_marketplace(response_content):
 
         media_condition_tooltips = condition_paragraph.find(class_="media-condition-tooltip")
         media_condition = media_condition_tooltips.get("data-condition")
-        listing["media_condition"] = da_util.CONDITION_SHORT[media_condition]
+        listing["media_condition"] = da_util.CONDITION_PARSER[media_condition]
 
         sleeve_condition_spans = condition_paragraph.find("span", class_="item_sleeve_condition")
         if sleeve_condition_spans is not None:
             sleeve_condition = sleeve_condition_spans.contents[0].strip()
-            sleeve_condition = da_util.CONDITION_SHORT[sleeve_condition]
+            sleeve_condition = da_util.CONDITION_PARSER[sleeve_condition]
         else:
             sleeve_condition = None
         listing["sleeve_condition"] = sleeve_condition
@@ -79,17 +79,25 @@ def scrape_listings_from_marketplace(response_content):
         shipping_string = cells[4].find("span", class_="item_shipping").contents[0].strip().replace("+", "")
         shipping_currency_matches = re.findall(currency_regex, shipping_string)
         shipping_currency = shipping_currency_matches[0] if len(shipping_currency_matches) > 0 else None
-        listing["price"] = {
-            "currency": da_util.CURRENCIES[price_currency],
-            "value": price_string.replace(price_currency, ""),
-            "shipping": None
+
+        # construct Listing object
+        shipping = (
+            None
             if shipping_currency is None
-            else {
-                "currency": da_util.CURRENCIES[shipping_currency],
-                "value": shipping_string.replace(f"{shipping_currency}", ""),
-            },
-        }
+            else da_types.Shipping(
+                **{
+                    "currency": da_util.CURRENCIES[shipping_currency],
+                    "value": shipping_string.replace(f"{shipping_currency}", ""),
+                }
+            )
+        )
+        listing["price"] = da_types.ListingPrice(
+            **{
+                "currency": da_util.CURRENCIES[price_currency],
+                "value": price_string.replace(price_currency, ""),
+                "shipping": shipping,
+            }
+        )
+        listings.append(da_types.Listing(**listing))
 
-        listings.append(listing)
-
-    return sorted(listings, key=lambda x: x["price"]["value"])
+    return sorted(listings, key=lambda x: x.price.value)
