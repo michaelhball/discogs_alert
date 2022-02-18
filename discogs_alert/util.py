@@ -118,19 +118,17 @@ def convert_currency(value: float, old_currency: str, new_currency: str) -> floa
 def convert_listing_price_currency(listing_price: da_types.ListingPrice, new_currency: str) -> da_types.ListingPrice:
     """Converts a `ListingPrice` object from its existing currency to another."""
 
-    if listing_price.currency == new_currency:
-        print(f"The given listing is already in the currency: {new_currency}")
-        return listing_price
-
     # convert listing price to new currency
-    converted_price = convert_currency(listing_price.value, listing_price.currency, new_currency)
-    listing_price.currency = new_currency
-    listing_price.value = converted_price
+    if listing_price.currency != new_currency:
+        converted_price = convert_currency(listing_price.value, listing_price.currency, new_currency)
+        listing_price.currency = new_currency
+        listing_price.value = converted_price
 
     # convert listing price shipping to new currency
-    if listing_price.shipping is None:
-        return listing_price
-    converted_shipping = convert_currency(listing_price.shipping.value, listing_price.shipping.currency, new_currency)
-    listing_price.shipping = da_types.Shipping(currency=new_currency, value=converted_shipping)
+    if listing_price.shipping is not None and listing_price.shipping.currency != new_currency:
+        converted_shipping = convert_currency(
+            listing_price.shipping.value, listing_price.shipping.currency, new_currency
+        )
+        listing_price.shipping = da_types.Shipping(currency=new_currency, value=converted_shipping)
 
     return listing_price
