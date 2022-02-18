@@ -12,6 +12,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Ability to run service as a daemon service.
 * Ability to run server as a docker image (=> no dependency installation required)
 
+## [0.0.7] — 2022.02.18
+
+### Fixed
+* Fixed fake-useragent HTML-parsing bug
+* Fixed Discogs-list-as-wantlist functionality
+
+### Added
+* _Major_ codebase refactor
+* Updated dependencies
+
 ## [0.0.6] — 2021.08.08
 
 ### Fixed
