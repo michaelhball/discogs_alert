@@ -1,5 +1,8 @@
 import functools
 import time
+from typing import Dict
+
+import requests
 
 from discogs_alert import types as da_types
 
@@ -82,3 +85,29 @@ def time_cache(seconds: int, maxsize=None, typed=False):
         return _wrapped
 
     return _decorator
+
+
+@time_cache(seconds=3600)
+def get_currency_rates(base_currency: str) -> Dict[str, float]:
+    """Get live currency exchange rates (from one base currency). Cached for one hour at a time,
+    per currency.
+
+    Args:
+        base_currency: one of the 3-character currency identifiers from above.
+
+    Returns: a dict containing exchange rates _to_ all major currencies _from_ the given base currency
+    """
+    return requests.get(f"https://api.exchangerate.host/latest?base={base_currency}").json().get("rates")
+
+
+# TODO: rename & type annotate this function
+def convert_currency(currency_to_convert, value, rates):
+    """Convert a price in a given currency to our base currency (implied by the rates dict)
+
+    :param currency_to_convert: (str) currency identifier of currency to convert from
+    :param value: (float) price value to convert
+    :param rates: (dict) rates allowing us to convert from specified currency to implied base currency.
+    :return: Float converted price
+    """
+
+    return float(value) / rates.get(currency_to_convert)
