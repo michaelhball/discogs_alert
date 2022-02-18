@@ -57,7 +57,7 @@ def loop(
 
             # get release stats, & move on to the next release if there are no listings available
             release_stats = user_token_client.get_release_stats(release.id)
-            if release_stats.num_for_sale == 0 or release_stats.blocked_from_sale:
+            if not release_stats or release_stats.num_for_sale == 0 or release_stats.blocked_from_sale:
                 continue
 
             for listing in client_anon.get_marketplace_listings(release.id):

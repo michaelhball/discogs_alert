@@ -158,19 +158,12 @@ python-versions = ">=3.6"
 dev = ["pytest (>=5)", "pytest-cov", "coveralls", "black", "mypy", "pylint"]
 
 [[package]]
-name = "fake-useragent"
+name = "fake-useragent-migs"
 version = "0.1.11"
 description = "Up to date simple useragent faker with real world database"
 category = "main"
 optional = false
 python-versions = "*"
-develop = false
-
-[package.source]
-type = "git"
-url = "https://github.com/michaelhball/fake-useragent.git"
-reference = "master"
-resolved_reference = "510039be17f7526bbce15150de23de7cb97b0530"
 
 [[package]]
 name = "h11"
@@ -494,7 +487,7 @@ testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytest-
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.7,<4.0"
-content-hash = "f9cf2ab1f110c85f1d811f6cf7c9b44ef9477a52531efdbf4e5432e3cc892674"
+content-hash = "315a8e850c5adca0f30ba96379354a0a1b2d34461ee7463acbfc086401efbf72"
 
 [metadata.files]
 async-generator = [
@@ -618,7 +611,10 @@ dacite = [
     {file = "dacite-1.6.0-py3-none-any.whl", hash = "sha256:4331535f7aabb505c732fa4c3c094313fc0a1d5ea19907bf4726a7819a68b93f"},
     {file = "dacite-1.6.0.tar.gz", hash = "sha256:d48125ed0a0352d3de9f493bf980038088f45f3f9d7498f090b50a847daaa6df"},
 ]
-fake-useragent = []
+fake-useragent-migs = [
+    {file = "fake-useragent-migs-0.1.11.tar.gz", hash = "sha256:39319e28bacedfecd380f81cb91d3b166693bd3a0d19f1c530fd58e400df6d59"},
+    {file = "fake_useragent_migs-0.1.11-py3-none-any.whl", hash = "sha256:6d8b832ab74621d4b38ede3d7c92eebe079381f31077fac0895ccb744970ffcc"},
+]
 h11 = [
     {file = "h11-0.13.0-py3-none-any.whl", hash = "sha256:8ddd78563b633ca55346c8cd41ec0af27d3c79931828beffb46ce70a379e7442"},
     {file = "h11-0.13.0.tar.gz", hash = "sha256:70813c1135087a248a4d38cc0e1a0181ffab2188141a93eaf567940c3957ff06"},
