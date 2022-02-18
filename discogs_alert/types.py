@@ -2,8 +2,6 @@ import enum
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
-from discogs_alert import currency as da_currency
-
 
 @enum.unique
 class CONDITION(enum.IntEnum):
@@ -106,23 +104,6 @@ class ListingPrice:
     currency: str
     value: float
     shipping: Optional[Shipping] = None
-
-    def convert_currency(self, currency: str):
-        """Converts this object to another currency"""
-
-        # convert self.value to new currency
-        if self.currency == currency:
-            return
-        currency_rates = da_currency.get_currency_rates(currency)
-        converted_price = da_currency.convert_currency(self.currency, self.value, currency_rates)
-        self.currency = currency
-        self.value = converted_price
-
-        # convert shipping to new currency
-        if self.shipping is None:
-            return
-        converted_shipping = da_currency.convert_currency(self.shipping.currency, self.shipping.value, currency_rates)
-        self.shipping = Shipping(currency=currency, value=converted_shipping)
 
 
 @dataclass

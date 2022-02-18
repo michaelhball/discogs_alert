@@ -100,14 +100,37 @@ def get_currency_rates(base_currency: str) -> Dict[str, float]:
     return requests.get(f"https://api.exchangerate.host/latest?base={base_currency}").json().get("rates")
 
 
-# TODO: rename & type annotate this function
-def convert_currency(currency_to_convert, value, rates):
-    """Convert a price in a given currency to our base currency (implied by the rates dict)
+def convert_currency(value: float, old_currency: str, new_currency: str) -> float:
+    """Convert `value` from old_currency to new_currency
 
-    :param currency_to_convert: (str) currency identifier of currency to convert from
-    :param value: (float) price value to convert
-    :param rates: (dict) rates allowing us to convert from specified currency to implied base currency.
-    :return: Float converted price
+    Args:
+        value: the value in the old currency
+        old_currency: the existing currency
+        new_currency: the currency to convert to
+
+    Returns: value in the new currency.
     """
 
-    return float(value) / rates.get(currency_to_convert)
+    rates = get_currency_rates(new_currency)
+    return float(value) / rates.get(old_currency)
+
+
+def convert_listing_price_currency(listing_price: da_types.ListingPrice, new_currency: str) -> da_types.ListingPrice:
+    """Converts a `ListingPrice` object from its existing currency to another."""
+
+    if listing_price.currency == new_currency:
+        print(f"The given listing is already in the currency: {new_currency}")
+        return listing_price
+
+    # convert listing price to new currency
+    converted_price = convert_currency(listing_price.value, listing_price.currency, new_currency)
+    listing_price.currency = new_currency
+    listing_price.value = converted_price
+
+    # convert listing price shipping to new currency
+    if listing_price.shipping is None:
+        return listing_price
+    converted_shipping = convert_currency(listing_price.shipping.value, listing_price.shipping.currency, new_currency)
+    listing_price.shipping = da_types.Shipping(currency=new_currency, value=converted_shipping)
+
+    return listing_price
