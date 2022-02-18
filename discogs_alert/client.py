@@ -55,6 +55,7 @@ class Client:
 
     def get_list(self, list_id: int) -> da_types.UserList:
         user_list_dict = self._get(f"{self._base_url}/lists/{list_id}")
+        user_list_dict["items"] = [da_types.Release(**item) for item in user_list_dict["items"]]
         return da_types.UserList(**user_list_dict)
 
     def get_listing(self, listing_id: int) -> da_types.Listing:
