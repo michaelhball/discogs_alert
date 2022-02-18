@@ -34,6 +34,7 @@ def scrape_listings_from_marketplace(response_content: str) -> da_types.Listings
         num_paragraphs = len(paragraphs)
 
         # check listing availability
+        listing["availability"] = None
         if num_paragraphs == 4:
             listing["availability"] = paragraphs[0].contents[0].strip()
 
@@ -73,33 +74,28 @@ def scrape_listings_from_marketplace(response_content: str) -> da_types.Listings
         listing["seller_ships_from"] = cells[2].find("span", text="Ships From:").parent.contents[1].strip()
 
         # extract price & shipping information
-        price_spans = cells[4].find("span", class_="converted_price")
-        if price_spans is None:  # means item is in the same currency and has no shipping option displayed
-            price_spans = cells[4].find("span", class_="price")
-        price_string = [elt for elt in price_spans.contents if elt.name is None][0].strip().replace("+", "")
         currency_regex = ".*?(?:[\£\$\€]{1})"
+        price_spans = cells[4].find("span", class_="price")
+        price_string = (
+            [elt for elt in price_spans.contents if elt.name is None][0].strip().replace("+", "").replace(",", "")
+        )
         price_currency = re.findall(currency_regex, price_string)[0]
+        price_string = price_string.replace(price_currency, "")
+
         shipping_string = cells[4].find("span", class_="item_shipping").contents[0].strip().replace("+", "")
         shipping_currency_matches = re.findall(currency_regex, shipping_string)
         shipping_currency = shipping_currency_matches[0] if len(shipping_currency_matches) > 0 else None
+        if shipping_currency is not None:
+            shipping_string = shipping_string.replace(shipping_currency, "")
 
         # construct Listing object
         shipping = (
             None
             if shipping_currency is None
-            else da_types.Shipping(
-                **{
-                    "currency": da_types.CURRENCIES[shipping_currency],
-                    "value": shipping_string.replace(f"{shipping_currency}", ""),
-                }
-            )
+            else da_types.Shipping(currency=da_types.CURRENCIES[shipping_currency], value=shipping_string)
         )
         listing["price"] = da_types.ListingPrice(
-            **{
-                "currency": da_types.CURRENCIES[price_currency],
-                "value": price_string.replace(price_currency, ""),
-                "shipping": shipping,
-            }
+            currency=da_types.CURRENCIES[price_currency], value=price_string, shipping=shipping
         )
         listings.append(da_types.Listing(**listing))
 
