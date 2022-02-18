@@ -16,6 +16,7 @@ include = [
 python = ">=3.7,<4.0"
 bs4 = "0.0.1"
 click = "8.0.3"
+dacite = "1.6.0"
 fake-useragent = { git = "https://github.com/michaelhball/fake-useragent.git" }
 python-dotenv = "0.19.2"
 requests = "2.27.1"

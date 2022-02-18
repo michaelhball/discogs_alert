@@ -1,5 +1,6 @@
 import re
 
+import dacite
 from bs4 import BeautifulSoup
 
 from discogs_alert import types as da_types
@@ -28,12 +29,12 @@ def scrape_listings_from_marketplace(response_content: str) -> da_types.Listings
         # extract listing ID
         a_elements = cells[0].find_all("a")
         listing_href = a_elements[0]["href"]
-        listing["id"] = listing_href.split("/")[-1].split("?")[0]
+        listing["id"] = int(listing_href.split("/")[-1].split("?")[0])
 
         paragraphs = cells[1].find_all("p")
         num_paragraphs = len(paragraphs)
 
-        # check listing availability
+        # extract listing availability
         listing["availability"] = None
         if num_paragraphs == 4:
             listing["availability"] = paragraphs[0].contents[0].strip()
@@ -81,22 +82,18 @@ def scrape_listings_from_marketplace(response_content: str) -> da_types.Listings
         )
         price_currency = re.findall(currency_regex, price_string)[0]
         price_string = price_string.replace(price_currency, "")
+        listing["price"] = {"currency": da_types.CURRENCIES[price_currency], "value": float(price_string)}
 
         shipping_string = cells[4].find("span", class_="item_shipping").contents[0].strip().replace("+", "")
         shipping_currency_matches = re.findall(currency_regex, shipping_string)
         shipping_currency = shipping_currency_matches[0] if len(shipping_currency_matches) > 0 else None
         if shipping_currency is not None:
             shipping_string = shipping_string.replace(shipping_currency, "")
+            listing["price"]["shipping"] = {
+                "currency": da_types.CURRENCIES[shipping_currency],
+                "value": float(shipping_string),
+            }
 
-        # construct Listing object
-        shipping = (
-            None
-            if shipping_currency is None
-            else da_types.Shipping(currency=da_types.CURRENCIES[shipping_currency], value=shipping_string)
-        )
-        listing["price"] = da_types.ListingPrice(
-            currency=da_types.CURRENCIES[price_currency], value=price_string, shipping=shipping
-        )
-        listings.append(da_types.Listing(**listing))
+        listings.append(dacite.from_dict(da_types.Listing, listing))
 
     return sorted(listings, key=lambda x: x.price.value)

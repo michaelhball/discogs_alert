@@ -1,18 +1,40 @@
 import json
 import time
-from typing import List
+from typing import List, Optional
 
+import dacite
 from pathlib import Path
 from requests.exceptions import ConnectionError
 
 from discogs_alert import client as da_client, notify as da_notify, types as da_types, util as da_util
 
 
+def load_wantlist(
+    list_id: Optional[int] = None,
+    user_token_client: Optional[da_client.UserTokenClient] = None,
+    wantlist_path: Optional[str] = None,
+) -> List[da_types.Release]:
+    """Loads the user's wantlist from one of two sources, as a list of `Release` objects."""
+    assert wantlist_path is not None or (list_id is not None and user_token_client is not None)
+    if list_id is not None:
+        return user_token_client.get_list(list_id).items
+    else:
+        # TODO: find a way to automatically instantiate these nested Enums based on the strings
+        wantlist = []
+        for release_dict in json.load(Path(wantlist_path).open("r")):
+            if (min_media_condition := release_dict.get("min_media_condition")) is not None:
+                release_dict["min_media_condition"] = da_types.CONDITION[min_media_condition]
+            if (min_sleeve_condition := release_dict.get("min_sleeve_condition")) is not None:
+                release_dict["min_sleeve_condition"] = da_types.CONDITION[min_sleeve_condition]
+            wantlist.append(dacite.from_dict(da_types.Release, release_dict))
+        return wantlist
+
+
 def loop(
     discogs_token: str,
     pushbullet_token: str,
-    list_id: int,
-    wantlist_path: str,
+    list_id: Optional[int],
+    wantlist_path: Optional[str],
     user_agent: str,
     country: str,
     currency: str,
@@ -30,13 +52,7 @@ def loop(
         client_anon = da_client.AnonClient(user_agent)
         user_token_client = da_client.UserTokenClient(user_agent, discogs_token)
 
-        if list_id is not None:
-            wantlist = user_token_client.get_list(list_id).items
-        else:
-            # TODO: fix this to load things in the same type as the discogs list wantlist
-            wantlist = json.load(Path(wantlist_path).open("r"))
-
-        for release in wantlist:
+        for release in load_wantlist(list_id, user_token_client, wantlist_path):
             valid_listings: List[da_types.Listing] = []
 
             # get release stats, & move on to the next release if there are no listings available
