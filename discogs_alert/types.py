@@ -53,13 +53,11 @@ class Release:
     """An entity that represents a record the user is searching for."""
 
     id: int
-    comment: str
 
     # artist & track name
     display_title: str
 
     # optional args from from `wantlist.json`
-    # TODO: convert these to a `RecordFilters` object ??
     min_media_condition: Optional[CONDITION] = None
     min_sleeve_condition: Optional[CONDITION] = None
     accept_generic_sleeve: Optional[bool] = None
@@ -68,6 +66,7 @@ class Release:
     price_threshold: Optional[int] = None
 
     # optional args from Discogs list
+    comment: Optional[str] = None
     uri: Optional[str] = None
     resource_url: Optional[str] = None
     image_url: Optional[str] = None
