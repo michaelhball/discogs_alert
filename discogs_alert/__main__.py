@@ -2,7 +2,7 @@ import click
 import schedule
 import time
 
-from discogs_alert import click as da_click, loop as da_loop, types as da_type
+from discogs_alert import click as da_click, loop as da_loop, types as da_types
 
 
 @click.command()
@@ -72,7 +72,7 @@ from discogs_alert import click as da_click, loop as da_loop, types as da_type
     default="EUR",
     show_default=True,
     envvar="CURRENCY",
-    type=click.Choice(da_type.CURRENCY_CHOICES),
+    type=click.Choice(da_types.CURRENCY_CHOICES),
     help="preferred currency (to convert all others to)",
 )
 @click.option(
@@ -96,19 +96,19 @@ from discogs_alert import click as da_click, loop as da_loop, types as da_type
 @click.option(
     "-mmc",
     "--min-media-condition",
-    default=da_type.CONDITION.VERY_GOOD,
+    default=da_types.CONDITION.VERY_GOOD,
     show_default=True,
     envvar="MIN_MEDIA_CONDITION",
-    type=click.Choice(da_type.CONDITION),
+    type=click.Choice(da_types.CONDITION),
     help="minimum media condition you want to accept",
 )
 @click.option(
     "-msc",
     "--min-sleeve-condition",
-    default=da_type.CONDITION.VERY_GOOD,
+    default=da_types.CONDITION.VERY_GOOD,
     show_default=True,
     envvar="MIN_SLEEVE_CONDITION",
-    type=click.Choice(da_type.CONDITION),
+    type=click.Choice(da_types.CONDITION),
     help="minimum sleeve condition you want to accept",
 )
 @click.option(
@@ -170,7 +170,6 @@ def main(
     your criteria is found.
     """
 
-    # TODO: sort out this ridiculousness...
     args = [
         discogs_token,
         pushbullet_token,
@@ -179,13 +178,10 @@ def main(
         user_agent,
         country,
         currency,
-        min_seller_rating,
-        min_seller_sales,
-        min_media_condition,
-        min_sleeve_condition,
-        accept_generic_sleeve,
-        accept_no_sleeve,
-        accept_ungraded_sleeve,
+        da_types.SellerFilters(min_seller_rating, min_seller_sales),
+        da_types.RecordFilters(
+            min_media_condition, min_sleeve_condition, accept_generic_sleeve, accept_no_sleeve, accept_ungraded_sleeve
+        ),
         verbose,
     ]
 
