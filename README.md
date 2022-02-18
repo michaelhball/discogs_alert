@@ -24,6 +24,10 @@ discogs-alert enables both global and fine-grained customisation of your prefere
 means you'll only be notified if a record goes on sale that really matches what you're looking 
 for.
 
+![vinyl icon](https://github.com/michaelhball/discogs_alert/blob/main/img/vinyl.png) 
+If you have suggestions or ideas, please reach out! I'll be maintaining this repo much more actively this year, and
+I'd love to continue making `discogs_alert` as useful as possible!
+
 ## Requirements
 
 - Python >= 3.8
