@@ -32,7 +32,24 @@ CONDITION_PARSER = {
 
 
 @dataclass
+class SellerFilters:
+    min_seller_rating: Optional[float] = None
+    min_seller_sales: Optional[int] = None
+
+
+@dataclass
+class RecordFilters:
+    min_media_condition: Optional[CONDITION] = None
+    min_sleeve_condition: Optional[CONDITION] = None
+    accept_generic_sleeve: Optional[bool] = None
+    accept_no_sleeve: Optional[bool] = None
+    accept_ungraded_sleeve: Optional[bool] = None
+
+
+@dataclass
 class Release:
+    """An entity that represents a record the user is searching for."""
+
     id: int
     comment: str
 
@@ -40,6 +57,7 @@ class Release:
     display_title: str
 
     # optional args from from `wantlist.json`
+    # TODO: convert these to a `RecordFilters` object ??
     min_media_condition: Optional[CONDITION] = None
     min_sleeve_condition: Optional[CONDITION] = None
     accept_generic_sleeve: Optional[bool] = None
@@ -91,7 +109,7 @@ class ListingPrice:
 
     def convert_currency(self, currency: str):
         """Converts this object to another currency"""
-        
+
         # convert self.value to new currency
         if self.currency == currency:
             return
@@ -109,6 +127,8 @@ class ListingPrice:
 
 @dataclass
 class Listing:
+    """An entity that represents a specific instance of a record for sale (found on the marketplace)"""
+
     id: int
     availability: str
     media_condition: CONDITION
@@ -121,3 +141,56 @@ class Listing:
 
 
 Listings = List[Listing]
+
+
+CURRENCY_CHOICES = {
+    "EUR",
+    "GBP",
+    "HKD",
+    "IDR",
+    "ILS",
+    "DKK",
+    "INR",
+    "CHF",
+    "MXN",
+    "CZK",
+    "SGD",
+    "THB",
+    "HRK",
+    "MYR",
+    "NOK",
+    "CNY",
+    "BGN",
+    "PHP",
+    "SEK",
+    "PLN",
+    "ZAR",
+    "CAD",
+    "ISK",
+    "BRL",
+    "RON",
+    "NZD",
+    "TRY",
+    "JPY",
+    "RUB",
+    "KRW",
+    "USD",
+    "HUF",
+    "AUD",
+}
+
+
+CURRENCIES = {
+    "€": "EUR",
+    "£": "GBP",
+    "$": "USD",
+    "¥": "JPY",
+    "A$": "AUD",
+    "CA$": "CAD",
+    "MX$": "MXN",
+    "NZ$": "NZD",
+    "B$": "BRL",
+    "CHF": "CHF",
+    "SEK": "SEK",
+    "ZAR": "ZAR",
+}

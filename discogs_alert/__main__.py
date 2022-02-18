@@ -2,7 +2,7 @@ import click
 import schedule
 import time
 
-from discogs_alert import click as da_click, currency as da_currency, loop as da_loop, types as da_type
+from discogs_alert import click as da_click, loop as da_loop, types as da_type
 
 
 @click.command()
@@ -72,7 +72,7 @@ from discogs_alert import click as da_click, currency as da_currency, loop as da
     default="EUR",
     show_default=True,
     envvar="CURRENCY",
-    type=click.Choice(da_currency.CURRENCY_CHOICES),
+    type=click.Choice(da_type.CURRENCY_CHOICES),
     help="preferred currency (to convert all others to)",
 )
 @click.option(
