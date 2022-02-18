@@ -5,7 +5,9 @@ from typing import Any, Dict, List, Optional
 
 @enum.unique
 class CONDITION(enum.IntEnum):
-    GENERIC: -1
+    NOT_GRADED = -3
+    NO_COVER = -2
+    GENERIC = -1
     POOR = 0
     FAIR = 1
     GOOD = 2
@@ -17,6 +19,8 @@ class CONDITION(enum.IntEnum):
 
 
 CONDITION_PARSER = {
+    "Not Graded": CONDITION.NOT_GRADED,
+    "No Cover": CONDITION.NO_COVER,
     "Generic": CONDITION.GENERIC,
     "Poor (P)": CONDITION.POOR,
     "Fair (F)": CONDITION.FAIR,
