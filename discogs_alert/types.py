@@ -115,7 +115,7 @@ class Listing:
     """An entity that represents a specific instance of a record for sale (found on the marketplace)"""
 
     id: int
-    availability: str
+    availability: Optional[str]  # sometimes can't be parsed (if the seller didn't set this attribute)
     media_condition: CONDITION
     sleeve_condition: CONDITION
     comment: str
@@ -123,6 +123,17 @@ class Listing:
     seller_avg_rating: Optional[float]  # None if new seller
     seller_ships_from: str
     price: ListingPrice
+
+    @property
+    def total_price(self) -> float:
+        return self.price.value if self.price.shipping is None else self.price.value + self.price.shipping.value
+
+    def is_definitely_unavailable(self, country: str) -> bool:
+        return self.availability == f"Unavailable in {country}"
+
+    def price_is_above_threshold(self, price_threshold: Optional[float] = None) -> bool:
+        return price_threshold is not None and self.total_price > price_threshold
+        # total_price = float(listing.price.value.replace(",", ""))
 
 
 Listings = List[Listing]
