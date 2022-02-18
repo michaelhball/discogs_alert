@@ -6,6 +6,7 @@ os.environ["WDM_LOG_LEVEL"] = "0"
 import json
 import requests
 import sys
+from typing import Union
 
 from fake_useragent import UserAgent
 from selenium import webdriver
@@ -66,9 +67,9 @@ class Client:
         release_dict = self._get(f"{self._base_url}/releases/{release_id}")
         return da_types.Release(**release_dict)
 
-    def get_release_stats(self, release_id: int) -> da_types.ReleaseStats:
+    def get_release_stats(self, release_id: int) -> Union[da_types.ReleaseStats, bool]:
         release_stats_dict = self._get(f"{self._base_url}/marketplace/stats/{release_id}")
-        return da_types.ReleaseStats(**release_stats_dict)
+        return da_types.ReleaseStats(**release_stats_dict) if isinstance(release_stats_dict, dict) else False
 
     def get_wantlist(self, username: str):
         # TODO: add entities to deserialise this correctly
