@@ -11,9 +11,7 @@ from fake_useragent import UserAgent
 from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
 
-from discogs_alert import scrape as da_scrape, types as da_types, util as da_util
-
-# TODO: add type annotations & deserialisation to everything here...
+from discogs_alert import scrape as da_scrape, types as da_types
 
 
 class Client:
@@ -34,65 +32,45 @@ class Client:
         # TODO: use these to notify when limits are close to exceeded
 
     def _request(self, method, url, data=None, headers=None):
-        """
-
-        @param method
-        @param url
-        @param data
-        @param headers
-        :return:
-        """
-
         raise NotImplementedError
 
-    def _get(self, url, is_api=True):
+    def _get(self, url: str, is_api: bool = True):
         response_content, status_code = self._request("GET", url, headers=None)
         if status_code != 200:
             print(f"ERROR: status_code: {status_code}, content: {response_content}")
             return False
         return json.loads(response_content) if is_api else response_content
 
-    def _delete(self, url, is_api=True):
+    def _delete(self, url: str, is_api: bool = True):
         return self._request("DELETE", url)
 
-    def _patch(self, url, data, is_api=True):
+    def _patch(self, url: str, data, is_api: bool = True):
         return self._request("PATCH", url, data=data)
 
-    def _post(self, url, data, is_api=True):
+    def _post(self, url: str, data, is_api: bool = True):
         return self._request("POST", url, data=data)
 
-    def _put(self, url, data, is_api=True):
+    def _put(self, url: str, data, is_api: bool = True):
         return self._request("PUT", url, data=data)
 
     def get_list(self, list_id: int) -> da_types.UserList:
         user_list_dict = self._get(f"{self._base_url}/lists/{list_id}")
         return da_types.UserList(**user_list_dict)
 
-    def get_listing(self, listing_id) -> da_types.Listing:
-        """
+    def get_listing(self, listing_id: int) -> da_types.Listing:
+        listing_dict = self._get(f"{self._base_url}/marketplace/listings/{listing_id}")
+        return da_types.Listing(**listing_dict)
 
-        @param listing_id
-        :return:
-        """
-
-        url = f"{self._base_url}/marketplace/listings/{listing_id}"
-        return self._get(url)
-
-    def get_release(self, release_id):
-        """Get all info about a given release, returned as a bytes blob.
-
-        :param release_id:
-        :return:
-        """
-
-        url = f"{self._base_url}/releases/{release_id}"
-        return self._get(url)
+    def get_release(self, release_id: int) -> da_types.Release:
+        release_dict = self._get(f"{self._base_url}/releases/{release_id}")
+        return da_types.Release(**release_dict)
 
     def get_release_stats(self, release_id: int) -> da_types.ReleaseStats:
         release_stats_dict = self._get(f"{self._base_url}/marketplace/stats/{release_id}")
         return da_types.ReleaseStats(**release_stats_dict)
 
-    def get_wantlist(self, username):
+    def get_wantlist(self, username: str):
+        # TODO: add entities to deserialise this correctly
         url = f"{self._base_url}/users/{username}/wants"
         return self._get(url)
 
@@ -100,11 +78,11 @@ class Client:
 class UserTokenClient(Client):
     """A client for sending requests with a user token (for non-oauth authentication)."""
 
-    def __init__(self, user_agent, user_token, *args, **kwargs):
+    def __init__(self, user_agent: str, user_token: str, *args, **kwargs):
         super().__init__(user_agent, *args, **kwargs)
         self.user_token = user_token
 
-    def _request(self, method, url, data=None, headers=None):
+    def _request(self, method: str, url: str, data=None, headers=None):
         params = {"token": self.user_token}
         resp = requests.request(method, url, params=params, data=data, headers=headers)
         self.rate_limit = resp.headers.get("X-Discogs-Ratelimit")
@@ -116,7 +94,7 @@ class UserTokenClient(Client):
 class AnonClient(Client):
     """A Client for anonymous scraping requests (when not using the Discogs API, i.e. for the marketplace)."""
 
-    def __init__(self, user_agent, *args, **kwargs):
+    def __init__(self, user_agent: str, *args, **kwargs):
         super().__init__(user_agent, *args, **kwargs)
 
         self.user_agent = UserAgent()  # can pull up-to-date user agents from any modern browser
@@ -143,8 +121,10 @@ class AnonClient(Client):
     def get_marketplace_listings(self, release_id: int) -> da_types.Listings:
         """Get list of listings currently for sale for particular release.
 
-        :param release_id: discogs ID of release whose listings we want.
-        :return: list of listings (dicts) if successful, False otherwise.
+        Args:
+            release_id: discogs ID of release whose listings we want.
+
+        Returns: list of Listing objects if successful, False otherwise.
         """
 
         # update user_agent (don't need because we choose a new one on instantiation, every loop).

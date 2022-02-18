@@ -6,10 +6,13 @@ from discogs_alert import types as da_types, util as da_util
 
 
 def scrape_listings_from_marketplace(response_content: str) -> da_types.Listings:
-    """Takes response from marketplace get request (for single release) and parses the important listing information.
+    """Takes response from marketplace get request (for single release) and parses
+    the important listing information.
 
-    :param response_content: (bytes) content of response from release marketplace GET request.s
-    :return: List of Listing objects containing all useful information about listing for sale.
+    Args:
+        response_content: content of response from release marketplace GET request
+
+    Returns: List of `Listing` objects containing information about each listing for sale.
     """
 
     listings = []

@@ -2,16 +2,17 @@ import json
 import requests
 
 
-def send_pushbullet_push(token, message_title, message_body, verbose=False):
-    """Sends notification of found record via pushbullet.
+def send_pushbullet_push(token: str, message_title: str, message_body: str, verbose: bool = False) -> bool:
+    """Sends notification to pushbullet.
 
-    @param token: (str) pushbullet token needed to send notification to correct user
-    @param message_title: (str) title of message
-    @param message_body: (str) body of the message
-    @param verbose: (bool) boolean indicating whether to print stuff
-    :return: True if successful, False otherwise.
+    Args:
+        token: pushbullet token required to send notification to correct user
+        message_title: title of message
+        message_body: body of the message
+        verbose: boolean indicating whether or not to log
+
+    Returns: True if successful, False otherwise.
     """
-
     try:
         headers = {"Authorization": "Bearer " + token, "Content-Type": "application/json"}
         message = {"type": "note", "title": message_title, "body": message_body}
@@ -37,5 +38,6 @@ def send_pushbullet_push(token, message_title, message_body, verbose=False):
                 return True
         return True
     except Exception as e:
+        # TODO: what type of exception is thrown here ?
         print(f"Exception sending pushbullet push: {e}")
         return False
