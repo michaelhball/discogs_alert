@@ -2,7 +2,7 @@ import re
 
 from bs4 import BeautifulSoup
 
-from discogs_alert import types as da_types, util as da_util
+from discogs_alert import types as da_types
 
 
 def scrape_listings_from_marketplace(response_content: str) -> da_types.Listings:
@@ -43,12 +43,12 @@ def scrape_listings_from_marketplace(response_content: str) -> da_types.Listings
 
         media_condition_tooltips = condition_paragraph.find(class_="media-condition-tooltip")
         media_condition = media_condition_tooltips.get("data-condition")
-        listing["media_condition"] = da_util.CONDITION_PARSER[media_condition]
+        listing["media_condition"] = da_types.CONDITION_PARSER[media_condition]
 
         sleeve_condition_spans = condition_paragraph.find("span", class_="item_sleeve_condition")
         if sleeve_condition_spans is not None:
             sleeve_condition = sleeve_condition_spans.contents[0].strip()
-            sleeve_condition = da_util.CONDITION_PARSER[sleeve_condition]
+            sleeve_condition = da_types.CONDITION_PARSER[sleeve_condition]
         else:
             sleeve_condition = None
         listing["sleeve_condition"] = sleeve_condition
@@ -89,14 +89,14 @@ def scrape_listings_from_marketplace(response_content: str) -> da_types.Listings
             if shipping_currency is None
             else da_types.Shipping(
                 **{
-                    "currency": da_util.CURRENCIES[shipping_currency],
+                    "currency": da_types.CURRENCIES[shipping_currency],
                     "value": shipping_string.replace(f"{shipping_currency}", ""),
                 }
             )
         )
         listing["price"] = da_types.ListingPrice(
             **{
-                "currency": da_util.CURRENCIES[price_currency],
+                "currency": da_types.CURRENCIES[price_currency],
                 "value": price_string.replace(price_currency, ""),
                 "shipping": shipping,
             }
