@@ -78,7 +78,7 @@ from discogs_alert import click as da_click, loop as da_loop, types as da_types
 @click.option(
     "-msr",
     "--min-seller-rating",
-    default=95,
+    default=99,
     show_default=True,
     type=int,
     envvar="MIN_SELLER_RATING",
