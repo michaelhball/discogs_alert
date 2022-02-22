@@ -1,3 +1,4 @@
+from cmath import isfinite
 import json
 import time
 from typing import List, Optional
@@ -73,7 +74,9 @@ def loop(
                 # if the price is above our threshold (after converting to the base currency),
                 # move to the next listing
                 listing.price = da_util.convert_listing_price_currency(listing.price, currency)
-                if listing.price_is_above_threshold(release.price_threshold):
+                if (isinstance(listing.price, bool) and not listing.price) or listing.price_is_above_threshold(
+                    release.price_threshold
+                ):
                     continue
 
                 valid_listings.append(listing)
@@ -89,6 +92,10 @@ def loop(
 
     except ConnectionError:
         print("ConnectionError: looping will continue as usual")
+
+    except AttributeError as ae:
+        print(ae)
+        print("Attribute error, will continue looping as usual")
 
     if verbose:
         print(f"\t took {time.time() - start_time}")

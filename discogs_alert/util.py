@@ -1,6 +1,6 @@
 import functools
 import time
-from typing import Dict
+from typing import Dict, Union
 
 import requests
 
@@ -115,20 +115,28 @@ def convert_currency(value: float, old_currency: str, new_currency: str) -> floa
     return float(value) / rates.get(old_currency)
 
 
-def convert_listing_price_currency(listing_price: da_types.ListingPrice, new_currency: str) -> da_types.ListingPrice:
+def convert_listing_price_currency(
+    listing_price: da_types.ListingPrice, new_currency: str
+) -> Union[da_types.ListingPrice, bool]:
     """Converts a `ListingPrice` object from its existing currency to another."""
 
     # convert listing price to new currency
     if listing_price.currency != new_currency:
-        converted_price = convert_currency(listing_price.value, listing_price.currency, new_currency)
+        try:
+            converted_price = convert_currency(listing_price.value, listing_price.currency, new_currency)
+        except AttributeError:
+            return False
         listing_price.currency = new_currency
         listing_price.value = converted_price
 
     # convert listing price shipping to new currency
     if listing_price.shipping is not None and listing_price.shipping.currency != new_currency:
-        converted_shipping = convert_currency(
-            listing_price.shipping.value, listing_price.shipping.currency, new_currency
-        )
+        try:
+            converted_shipping = convert_currency(
+                listing_price.shipping.value, listing_price.shipping.currency, new_currency
+            )
+        except AttributeError:
+            return False
         listing_price.shipping = da_types.Shipping(currency=new_currency, value=converted_shipping)
 
     return listing_price
