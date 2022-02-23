@@ -1,5 +1,5 @@
-from cmath import isfinite
 import json
+import logging
 import time
 from typing import List, Optional
 
@@ -8,6 +8,9 @@ from pathlib import Path
 from requests.exceptions import ConnectionError
 
 from discogs_alert import client as da_client, notify as da_notify, types as da_types, util as da_util
+
+
+logger = logging.getLogger(__name__)
 
 
 def load_wantlist(
@@ -47,7 +50,7 @@ def loop(
 
     start_time = time.time()
     if verbose:
-        print("\nrunning loop")
+        logger.info("\nrunning loop")
 
     try:
         client_anon = da_client.AnonClient(user_agent)
@@ -91,11 +94,13 @@ def loop(
                 )
 
     except ConnectionError:
-        print("ConnectionError: looping will continue as usual")
+        logger.info("ConnectionError: looping will continue as usual", exc_info=True)
 
-    except AttributeError as ae:
-        print(ae)
-        print("Attribute error, will continue looping as usual")
+    except AttributeError:
+        logger.info("AttributeError: will continue looping as usual", exc_info=True)
+
+    except:
+        logger.info("Exception: this might be a real exception, but we're continuing anyway", exc_info=True)
 
     if verbose:
-        print(f"\t took {time.time() - start_time}")
+        logger.info(f"\t took {time.time() - start_time}")
