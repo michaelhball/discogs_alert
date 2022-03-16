@@ -3,31 +3,28 @@ import json
 import requests
 import smtplib
 
-__all__ = ['send_pushbullet_push', 'send_email']
+def send_pushbullet_push(token: str, message_title: str, message_body: str, verbose: bool = False) -> bool:
+    """Sends notification to pushbullet.
 
+    Args:
+        token: pushbullet token required to send notification to correct user
+        message_title: title of message
+        message_body: body of the message
+        verbose: boolean indicating whether or not to log
 
-def send_pushbullet_push(token, message_title, message_body, verbose=False):
-    """ Sends notification of found record via pushbullet.
-
-    @param token: (str) pushbullet token needed to send notification to correct user
-    @param message_title: (str) title of message
-    @param message_body: (str) body of the message
-    @param verbose: (bool) boolean indicating whether to print stuff
-    :return: True if successful, False otherwise.
+    Returns: True if successful, False otherwise.
     """
-
     try:
-        headers = {'Authorization': 'Bearer ' +
-                   token, 'Content-Type': 'application/json'}
-        message = {"type": "note",
-                   "title": message_title, "body": message_body}
+
+        headers = {"Authorization": "Bearer " + token, "Content-Type": "application/json"}
+        message = {"type": "note",  "title": message_title, "body": message_body}
         url = 'https://api.pushbullet.com/v2/pushes'
 
         # work out if there is an existing, identical push
         resp = requests.get(url, headers=headers)
         have_already_sent = False
-        for p in resp.json().get('pushes'):
-            if p.get('title') == message.get('title') and p.get('body') == message.get('body'):
+        for p in resp.json().get("pushes"):
+            if p.get("title") == message.get("title") and p.get("body") == message.get("body"):
                 have_already_sent = True
                 break
 
@@ -45,6 +42,7 @@ def send_pushbullet_push(token, message_title, message_body, verbose=False):
                 return True
         return True
     except Exception as e:
+        # TODO: what type of exception is thrown here ?
         print(f"Exception sending pushbullet push: {e}")
         return False
 
