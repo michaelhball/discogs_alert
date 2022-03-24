@@ -220,14 +220,13 @@ no sleeve (default=`false`)
 * `-aus`, `--accept-ungraded-sleeve`: (bool) whether or not you want to accept listings with an
 ungraded sleeve (default=`false`).
 * `-V` `--verbose`: (bool) use this flag if you want to run the server in verbose mode, meaning 
-it will print updates to the command line as it runs (default=`false`) 
+it will log updates to the command line as it runs (default=`false`) 
  
 ### Full Example
 
 To clarify the CLI outlined above, here is a realistic example. In this case, we are replicating a user 
-who has their `wantlist.json` on their Desktop, and who wants verbose printouts from 
-the service, no minimum seller rating, and a global minimum media condition of `VERY_GOOD`. The 
-command to run the service in this case would be
+who has their `wantlist.json` on their Desktop and who wants verbose logs,  no minimum seller rating, and
+a global minimum media condition of `VERY_GOOD`. The command to run the service in this case would be
  
 ```
 $ python -m discogs_alert -dt <discogs_access_token> -pt <pushbullet_token> -wp ~/Desktop/wantlist.json --msr None -mmc VERY_GOOD --verbose

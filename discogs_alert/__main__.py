@@ -1,8 +1,16 @@
-import click
-import schedule
+import logging
+
+logging.basicConfig(level=logging.INFO)
+
 import time
 
+import click
+import schedule
+
 from discogs_alert import click as da_click, loop as da_loop, types as da_types
+
+
+logger = logging.getLogger(__name__)
 
 
 @click.command()
@@ -136,7 +144,7 @@ from discogs_alert import click as da_click, loop as da_loop, types as da_types
     help="use flag if you want to accept ungraded sleeves (in addition to those of min-sleeve-condition)",
 )
 @click.option(
-    "-V", "--verbose", default=False, is_flag=True, help="use flag if you want to see print outs as the program runs"
+    "-V", "--verbose", default=False, is_flag=True, help="use flag if you want to see logs as the program runs"
 )
 @click.option(
     "-T",
@@ -185,7 +193,7 @@ def main(
         verbose,
     ]
 
-    print(
+    logger.info(
         """
 *****************************************************************************
  _____  __                                    _______ __              __   
