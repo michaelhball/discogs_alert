@@ -1,7 +1,7 @@
 import os
 
 # to prevent the webdriver manager from polluting logs
-os.environ["WDM_LOG_LEVEL"] = "0"
+os.environ["WDM_LOG"] = "0"
 
 import json
 import requests
