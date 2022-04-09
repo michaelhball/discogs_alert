@@ -88,7 +88,7 @@ def scrape_listings_from_marketplace(response_content: str) -> da_types.Listings
         listing["seller_ships_from"] = seller_info_cell.find("span", text="Ships From:").parent.contents[1].strip()
 
         # extract price & shipping information
-        currency_regex = ".*?(?:[\£\$\€]{1})"
+        currency_regex = ".*?(?:[\£\$\€\¥]{1})"
         price_spans = item_price_cell.find("span", class_="price")
         price_string = (
             [elt for elt in price_spans.contents if elt.name is None][0].strip().replace("+", "").replace(",", "")
@@ -104,7 +104,7 @@ def scrape_listings_from_marketplace(response_content: str) -> da_types.Listings
         shipping_currency_matches = re.findall(currency_regex, shipping_string)
         shipping_currency = shipping_currency_matches[0] if len(shipping_currency_matches) > 0 else None
         if shipping_currency is not None:
-            shipping_string = shipping_string.replace(shipping_currency, "")
+            shipping_string = shipping_string.replace(shipping_currency, "").replace(",", "")
             listing["price"]["shipping"] = {
                 "currency": da_types.CURRENCIES[shipping_currency],
                 "value": float(shipping_string),

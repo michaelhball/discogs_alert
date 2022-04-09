@@ -127,6 +127,10 @@ class Listing:
     def total_price(self) -> float:
         return self.price.value if self.price.shipping is None else self.price.value + self.price.shipping.value
 
+    @property
+    def url(self) -> float:
+        return f"https://www.discogs.com/sell/item/{self.id}"
+
     def is_definitely_unavailable(self, country: str) -> bool:
         return self.availability == f"Unavailable in {country}"
 
