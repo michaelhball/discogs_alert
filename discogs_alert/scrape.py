@@ -20,34 +20,44 @@ def scrape_listings_from_marketplace(response_content: str) -> da_types.Listings
 
     soup = BeautifulSoup(response_content, "html.parser")
 
-    listings_table = soup.find_all("table")[3]  # [2] = tracklist, [1] = top page header info, [0] = header-header
+    # [2] = tracklist, [1] = top page header info, [0] = header-header
+    listings_table = soup.find_all("table")[3]
+
+    # each row is a single listing
     rows = listings_table.find("tbody").find_all("tr")
     for row in rows:
         listing = {}
+
+        # each cell here corresponds to one of the major 'columns'. There are some filler 'td' elements in
+        # between but the important class names are item_description, seller_info, item_price, and item_add_to_cart
         cells = row.find_all("td")
 
-        # extract listing ID
-        a_elements = cells[0].find_all("a")
-        listing_href = a_elements[0]["href"]
-        listing["id"] = int(listing_href.split("/")[-1].split("?")[0])
+        item_desc_cell = row.find("td", class_="item_description")
+        seller_info_cell = row.find("td", class_="seller_info")
+        item_price_cell = row.find("td", class_="item_price")
 
-        paragraphs = cells[1].find_all("p")
+        # get the listing ID
+        listing_url = item_desc_cell.find("a")["href"]
+        listing["id"] = int(listing_url.split("/")[-1].split("?")[0])
+
+        paragraphs = item_desc_cell.find_all("p")
         num_paragraphs = len(paragraphs)
 
-        # extract listing availability
+        # extract listing availability. If there are 4 paragraphs, the first is a
+        # hidden para containing the string "Unavailable in <country>"
         listing["availability"] = None
         if num_paragraphs == 4:
             listing["availability"] = paragraphs[0].contents[0].strip()
 
-        # extract media & sleeve condition
-        condition_idx = 1 if num_paragraphs == 3 else 2
-        condition_paragraph = paragraphs[condition_idx]
+        item_condition_para = item_desc_cell.find("p", class_="item_condition")
 
-        media_condition_tooltips = condition_paragraph.find(class_="media-condition-tooltip")
+        # extract media condition
+        media_condition_tooltips = item_condition_para.find(class_="media-condition-tooltip")
         media_condition = media_condition_tooltips.get("data-condition")
         listing["media_condition"] = da_types.CONDITION_PARSER[media_condition]
 
-        sleeve_condition_spans = condition_paragraph.find("span", class_="item_sleeve_condition")
+        # extract sleeve condition
+        sleeve_condition_spans = item_condition_para.find("span", class_="item_sleeve_condition")
         if sleeve_condition_spans is not None:
             sleeve_condition = sleeve_condition_spans.contents[0].strip()
             sleeve_condition = da_types.CONDITION_PARSER[sleeve_condition]
@@ -55,36 +65,42 @@ def scrape_listings_from_marketplace(response_content: str) -> da_types.Listings
             sleeve_condition = None
         listing["sleeve_condition"] = sleeve_condition
 
-        seller_comment_idx = 2 if num_paragraphs == 3 else 3
-        seller_comment = paragraphs[seller_comment_idx].contents[0].strip()  # TODO: be more sophisticated
+        # the seller's comment is the last paragraph (doesn't have a nice class name)
+        seller_comment = paragraphs[-1].contents[0].strip()
         listing["comment"] = seller_comment
 
         # extract seller info (num ratings, average rating, & country ships from)
-        is_new_seller = str(cells[2].find_all("span")[1].contents[0]).strip() == "New seller"
+        is_new_seller = str(seller_info_cell.find_all("span")[1].contents[0]).strip() == "New seller"
         if is_new_seller:
             listing["seller_num_ratings"] = 0
             listing["seller_avg_rating"] = None
         else:
-            seller_num_ratings_elt = cells[2].find_all("a")[1].contents[0]
-            if "ratings" in seller_num_ratings_elt:
-                seller_num_ratings_elt = seller_num_ratings_elt.replace("ratings", "")
-            elif "rating" in seller_num_ratings_elt:
-                seller_num_ratings_elt = seller_num_ratings_elt.replace("rating", "")
-            listing["seller_num_ratings"] = int(seller_num_ratings_elt.replace(",", "").strip())
-            listing["seller_avg_rating"] = float(cells[2].find_all("strong")[1].contents[0].strip().split(".")[0])
-        listing["seller_ships_from"] = cells[2].find("span", text="Ships From:").parent.contents[1].strip()
+            # the first 'a' element is the link to then seller, this one is the link to their reviewings
+            # we just extract the text content from that link
+            seller_num_ratings_elt = seller_info_cell.find_all("a")[1].contents[0]
+            listing["seller_num_ratings"] = int(seller_num_ratings_elt.split()[0].replace(",", "").strip())
+
+            # the seller rating is the second bold thing (their name is also in bold).
+            seller_avg_rating_elt = seller_info_cell.find_all("strong")[1].contents[0]
+            listing["seller_avg_rating"] = float(seller_avg_rating_elt.strip().split("%")[0])
+
+        # TODO: find the other seller stuff this way using 'text' of the span within the 'li'
+        listing["seller_ships_from"] = seller_info_cell.find("span", text="Ships From:").parent.contents[1].strip()
 
         # extract price & shipping information
         currency_regex = ".*?(?:[\£\$\€]{1})"
-        price_spans = cells[4].find("span", class_="price")
+        price_spans = item_price_cell.find("span", class_="price")
         price_string = (
             [elt for elt in price_spans.contents if elt.name is None][0].strip().replace("+", "").replace(",", "")
         )
         price_currency = re.findall(currency_regex, price_string)[0]
         price_string = price_string.replace(price_currency, "")
-        listing["price"] = {"currency": da_types.CURRENCIES[price_currency], "value": float(price_string)}
+        listing["price"] = {
+            "currency": da_types.CURRENCIES[price_currency],
+            "value": float(price_string),
+        }
 
-        shipping_string = cells[4].find("span", class_="item_shipping").contents[0].strip().replace("+", "")
+        shipping_string = item_price_cell.find("span", class_="item_shipping").contents[0].strip().replace("+", "")
         shipping_currency_matches = re.findall(currency_regex, shipping_string)
         shipping_currency = shipping_currency_matches[0] if len(shipping_currency_matches) > 0 else None
         if shipping_currency is not None:

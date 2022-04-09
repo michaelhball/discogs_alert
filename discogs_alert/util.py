@@ -57,7 +57,7 @@ def conditions_satisfied(
         and (release.accept_ungraded_sleeve and record_filters.accept_ungraded_sleeve)
     )
     we_good = we_good or (
-        listing.sleeve_condition < (release.min_sleeve_condition or record_filters.min_sleeve_condition)
+        listing.sleeve_condition >= (release.min_sleeve_condition or record_filters.min_sleeve_condition)
     )
 
     return we_good

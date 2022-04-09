@@ -68,10 +68,12 @@ def loop(
 
                 # if listing is definitely unavailable, move to the next listing
                 if listing.is_definitely_unavailable(country):
+                    logger.info(f"Listing found that's unavailable in {country}: {listing}")
                     continue
 
                 # if seller, sleeve, and media conditions are not satisfied, move to the next listing
                 if not da_util.conditions_satisfied(listing, release, seller_filters, record_filters):
+                    logger.info(f"Listing found that doesn't satisfy conditions: {listing}")
                     continue
 
                 # if the price is above our threshold (after converting to the base currency),
@@ -80,6 +82,7 @@ def loop(
                 if (isinstance(listing.price, bool) and not listing.price) or listing.price_is_above_threshold(
                     release.price_threshold
                 ):
+                    logger.info(f"Listing found that's above the price threshold: {listing}")
                     continue
 
                 valid_listings.append(listing)

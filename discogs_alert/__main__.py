@@ -178,6 +178,11 @@ def main(
     your criteria is found.
     """
 
+    # if both a list ID and a local wantlist path are provided, use the wantlist (to force-enable local testing)
+    # TODO: combine them?
+    if list_id is not None and wantlist_path is not None:
+        list_id = None
+
     args = [
         discogs_token,
         pushbullet_token,

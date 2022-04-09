@@ -33,3 +33,6 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry2conda]
 name = "da"
+
+[tool.black]
+line-length = 120
