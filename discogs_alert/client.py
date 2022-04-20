@@ -1,9 +1,10 @@
 import os
 
 # to prevent the webdriver manager from polluting logs
-os.environ["WDM_LOG_LEVEL"] = "0"
+os.environ["WDM_LOG"] = "0"
 
 import json
+import logging
 import requests
 import sys
 from typing import Union
@@ -13,6 +14,9 @@ from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
 
 from discogs_alert import scrape as da_scrape, types as da_types
+
+
+logger = logging.getLogger(__name__)
 
 
 class Client:
@@ -38,7 +42,7 @@ class Client:
     def _get(self, url: str, is_api: bool = True):
         response_content, status_code = self._request("GET", url, headers=None)
         if status_code != 200:
-            print(f"ERROR: status_code: {status_code}, content: {response_content}")
+            logger.info(f"ERROR: status_code: {status_code}, content: {response_content}")
             return False
         return json.loads(response_content) if is_api else response_content
 

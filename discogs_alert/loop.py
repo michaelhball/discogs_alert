@@ -1,4 +1,5 @@
 import json
+import logging
 import time
 from typing import List, Optional
 
@@ -7,6 +8,9 @@ from pathlib import Path
 from requests.exceptions import ConnectionError
 
 from discogs_alert import client as da_client, notify as da_notify, types as da_types, util as da_util
+
+
+logger = logging.getLogger(__name__)
 
 
 def load_wantlist(
@@ -46,7 +50,7 @@ def loop(
 
     start_time = time.time()
     if verbose:
-        print("\nrunning loop")
+        logger.info("\nrunning loop")
 
     try:
         client_anon = da_client.AnonClient(user_agent)
@@ -64,31 +68,55 @@ def loop(
 
                 # if listing is definitely unavailable, move to the next listing
                 if listing.is_definitely_unavailable(country):
+                    logger.info(
+                        f"Listing found that's unavailable in {country}:\n"
+                        f"\tRelease: {release.display_title}\n"
+                        f"\tListing: {listing.url}"
+                    )
                     continue
 
                 # if seller, sleeve, and media conditions are not satisfied, move to the next listing
                 if not da_util.conditions_satisfied(listing, release, seller_filters, record_filters):
+                    logger.info(
+                        f"Listing found that doesn't satisfy conditions:\n"
+                        f"\tRelease: {release.display_title}\n"
+                        f"\tListing: {listing.url}"
+                    )
                     continue
 
                 # if the price is above our threshold (after converting to the base currency),
                 # move to the next listing
                 listing.price = da_util.convert_listing_price_currency(listing.price, currency)
-                if listing.price_is_above_threshold(release.price_threshold):
+                if (isinstance(listing.price, bool) and not listing.price) or listing.price_is_above_threshold(
+                    release.price_threshold
+                ):
+                    logger.info(
+                        f"Listing found that's above the price threshold:\n"
+                        f"\tRelease: {release.display_title}\n"
+                        f"\tListing: {listing.url}"
+                    )
                     continue
 
                 valid_listings.append(listing)
 
             # if we found something, send notification
             if len(valid_listings) > 0:
+                # TODO: send a push for _each_ valid listing if there are somehow more than one
                 da_notify.send_pushbullet_push(
                     token=pushbullet_token,
                     message_title=f"Now For Sale: {release.display_title}",
-                    message_body=f"Listing available: https://www.discogs.com/sell/item/{valid_listings[0].id}",
+                    message_body=f"Listing available: {valid_listings[0].url}",
                     verbose=verbose,
                 )
 
     except ConnectionError:
-        print("ConnectionError: looping will continue as usual")
+        logger.info("ConnectionError: looping will continue as usual", exc_info=True)
+
+    except AttributeError:
+        logger.info("AttributeError: will continue looping as usual", exc_info=True)
+
+    except:
+        logger.info("Exception: this might be a real exception, but we're continuing anyway", exc_info=True)
 
     if verbose:
-        print(f"\t took {time.time() - start_time}")
+        logger.info(f"\t took {time.time() - start_time}")

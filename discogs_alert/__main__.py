@@ -1,8 +1,16 @@
-import click
-import schedule
+import logging
+
+logging.basicConfig(level=logging.INFO)
+
 import time
 
+import click
+import schedule
+
 from discogs_alert import click as da_click, loop as da_loop, types as da_types
+
+
+logger = logging.getLogger(__name__)
 
 
 @click.command()
@@ -136,7 +144,7 @@ from discogs_alert import click as da_click, loop as da_loop, types as da_types
     help="use flag if you want to accept ungraded sleeves (in addition to those of min-sleeve-condition)",
 )
 @click.option(
-    "-V", "--verbose", default=False, is_flag=True, help="use flag if you want to see print outs as the program runs"
+    "-V", "--verbose", default=False, is_flag=True, help="use flag if you want to see logs as the program runs"
 )
 @click.option(
     "-T",
@@ -170,6 +178,11 @@ def main(
     your criteria is found.
     """
 
+    # if both a list ID and a local wantlist path are provided, use the wantlist (to force-enable local testing)
+    # TODO: combine them?
+    if list_id is not None and wantlist_path is not None:
+        list_id = None
+
     args = [
         discogs_token,
         pushbullet_token,
@@ -185,7 +198,7 @@ def main(
         verbose,
     ]
 
-    print(
+    logger.info(
         """
 *****************************************************************************
  _____  __                                    _______ __              __   
