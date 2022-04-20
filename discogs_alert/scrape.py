@@ -20,8 +20,7 @@ def scrape_listings_from_marketplace(response_content: str) -> da_types.Listings
 
     soup = BeautifulSoup(response_content, "html.parser")
 
-    # [2] = tracklist, [1] = top page header info, [0] = header-header
-    listings_table = soup.find_all("table")[3]
+    listings_table = soup.find("table", class_="mpitems")
 
     # each row is a single listing
     rows = listings_table.find("tbody").find_all("tr")
