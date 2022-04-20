@@ -16,7 +16,7 @@
 ![vinyl icon](https://github.com/michaelhball/discogs_alert/blob/main/img/vinyl.png) 
 discogs-alert enables you to set up ~real-time alerts so you get notified the moment those 
 hard-to-find releases go on sale. The project is designed to be 'set and forget'; you customise your preferences for a 
-particular release once, and then sit back and wait for a notification. 
+particular release once, and then sit back and wait for a notification.
 
 ![vinyl icon](https://github.com/michaelhball/discogs_alert/blob/main/img/vinyl.png) 
 discogs-alert enables both global and fine-grained customisation of your preferences
@@ -279,7 +279,7 @@ The complete release history for this project can be found in [CHANGELOG.md](CHA
 
 [**Michael Ball**](https://github.com/michaelhball)
 
-<a href="https://mhsb.me" rel="nofollow">
+<a href="https://www.mhsb.me" rel="nofollow">
 <img alt="home icon" src="https://github.com/michaelhball/discogs_alert/blob/main/img/home.png"/>
 </a>
 

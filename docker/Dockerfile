@@ -34,6 +34,9 @@ COPY --from=builder /venv /venv
 COPY --from=builder /discogs_alert/dist .
 RUN . /venv/bin/activate && pip install *.whl
 
+# install chromium (TODO: can we move this outside the final stage?)
+RUN apt-get update && apt-get install -y chromium
+
 # run entrypoint
 COPY ./docker/docker-entrypoint.sh ./
 CMD ["./docker-entrypoint.sh"]
