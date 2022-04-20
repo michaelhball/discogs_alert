@@ -36,13 +36,17 @@ installed on your computer, you'll be fine).
 
 ## Installation & Setup
 
-You can install discogs-alert either via the Python Package Index (PyPI) or from source.
+You can install discogs-alert as a Python package, either via the Python Package Index (PyPI) or from source, or as a docker image
+from DockerHub.
+
+### Python
+
 To install using `pip`:
 ```
 pip install discogs-alert
 ```
 
-### Downloading and installing from source 
+#### Downloading and installing from source 
 Download the latest version of discogs-alert from PyPI:
 
 [https://pypi.org/project/discogs-alert/](https://pypi.org/project/discogs-alert/)
@@ -56,13 +60,24 @@ $ python setup.py install
 ```
 The last command must be executed as a privileged user if you aren't currently using a virtualenv.
 
+### Docker
+
+Assuming you have docker installed, you can pull the latest image via
+```bash
+docker pull miggleball/discogs_alert:latest
+```
+
+NB: the `discogs_alert` docker image doesn't yet support M1 macs (those recent models with the ARM64 chip). Support there will
+hopefully be coming soon.
+
+
 ## Setup
 
 Before you can use this project, there are a couple more things that need to be setup.
 
 ### Discogs access token
 
-A Discogs access token allows discogs_alert to send requests to the discogs API on your behalf, as well as to
+A Discogs access token allows `discogs_alert` to send requests to the discogs API on your behalf, as well as to
 increase its allowed rate of request. This token can only be used to access the music database features of 
 the Discogs API, not the marketplace, so there is no concern that you are accidentally granting control over 
 the buying or selling of records. You can find more information 
@@ -85,22 +100,27 @@ create an access token. As before, copy this token to your computer.
 NB: when using pushbullet, please note that you'll need to open the pushbullet mobile or web app once a month. 
 If you don't, the notification service won't work, as it deems you to have a 'dead' account.
 
+NB: support for more notification options is coming soon! Please bear with me (or open a PR!)
+
 ### Creating your wantlist
 
 There are two different ways you can create a wantlist: 1) by connecting to one of your existing Discogs lists,
-or 2) by creating a local JSON file. The first option is easier, faster, and more connected to your regular
-Discogs workflow, but the latter enables more expressivity, as you can specify fine-grained filters
-(e.g. price, media/sleeve quality) for each release (as opposed to overall).
+or 2) by creating a local JSON file. The first option is easier, faster, and fits within your regular Discogs workflow,
+while the latter enables more expressivity as you can specify fine-grained filters (e.g. price, media/sleeve quality)
+for each release (in addition to overall). I will add support for this expressivity to the Discogs List approach
+as soon as possible.
 
 #### Discogs List
 
 Using one of your existing Discogs [lists]() requires only specifying the ID of the list at runtime 
 (outlined in the [usage](#usage) section below). As of now, there is no fine-grained control allowed with 
-this option, meaning the list you use should be one containing only those records about which you want to 
+this option, meaning the list you use should be one containing _only_ those records about which you want to 
 be notified immediately if they go on sale. You can set global media/sleeve condition filters, but you
-cannot customize this for each release separately.
+cannot customize this for each release separately. This approach makes it incredibly easy to add new releases
+to your wantlist: adding a release to the specificied list means it will automatically be searched for by your
+running `discogs_alert` jobs on its next iteration.
 
-#### Local JSON   
+#### Local JSON
 
 Here is an example `wantlist.json` file:
 ```yaml
@@ -150,41 +170,64 @@ The possible optional filters are as follows:
 
 ## Usage
 
-As of now, discogs_alert can only be run as a python process. The minimal command required to run the 
-`discogs_alert` service is
+`discogs_alert` can be run either as a Python process or as a Docker container. Regardless of which command is used, the
+`discogs_alert` service will regularly pull the releases from your wantlist, check their availability on the Discogs
+marketplace, and send you a notification if any release (satisfying your filters) is for sale. You should leave the service
+running in the background at all times to be most effective.
 
+#### Python
+
+The minimal command needed to run the `discogs_alert` Python package is 
+```bash
+$ python -m discogs_alert
 ```
-$ python -m discogs_alert -dt <discogs_access_token> -pt <pushbullet_token> --list-id 12345678
+though that assumes the prior setting of a few environment variables: `DISCOGS_TOKEN`, `PUSHBULLET_TOKEN`, and
+`LIST_ID` or `WANTLIST_PATH`. The token values must be set to the values of the tokens created earlier, while
+the `LIST_ID` should be set to the ID of the Discogs list you want to use as your `discogs_alert` wantlist (or
+`WANTLIST_PATH` should be set to the path of a local `wantlist.json` file that will be used instead). If you specify
+both a Discogs list ID and a local wantlist path, only the latter will be used.
+
+If you aren't sure how to set environment variables, you can instead pass these values manually using the following
+command
+```bash
+$ python -m discogs_alert -dt <discogs_access_token> -pt <pushbullet_token> --list-id <discogs_list_id>
 ```
 
-where the two _required_ arguments are the values of the two tokens you created earlier, and --list-id 
-specifies the ID of your discogs list. This command starts the `discogs_alert` service, after which it 
-regularly pulls the releases from your list, checks their availability on the Discogs marketplace, and 
-sends you a notification if any release has gone on sale satisfying your filters. You should leave 
-the service running in the background at all times to be most effective. Please note that you _can_ add to 
-or change the contents of your wantlist while the service is running; the new list of releases will 
-come into effect the next time the service runs (i.e. within the next minute).
+#### Docker
 
-As an alternative to using a Discogs list id, you can specify the path to a local  `wantlist.json` file.
-The service works exactly the same in this case, except that it pulls releases to look for from that file
-rather than from a Discogs list. It is required that you use only one of these two options.
+The minimal command needed to run the `discogs_alert` Docker image is
+```bash
+$ docker run -d --env-file .env miggleball/discogs_alert:latest
+```
+where it is assumed that you have specified the three minimal environment variables outlined above (as well as any additional
+customizations) in an `.env` txt file in the current directory. Your env file should simply look as follows:
+```bash
+DISCOGS_TOKEN=<discogs_access_token>
+PUSHBULLET_TOKEN=<pushbullet_token>
+LIST_ID=<discogs_list_id>
+...
+```
+The `-d` flag specifies that you want to "detach" from the newly created docker container meaning it will continue running in the
+background.
 
-Each time one of your wanted releases is found, your Pushbullet account will be sent a notification 
-with the `display_title`, and a URL to the marketplace listing. As long as you don't delete the pushbullet
-notification, you will _not_ be sent repeat notifications for the same listing. You can test that the
-notification system is working correctly by adding a release to your wantlist that you know is currently
-for sale.
+### Extras
 
-If you want further customisation, there are a number of optional arguments and flags with which 
-the service can be run. These optional arguments include the global versions of the conditions 
-mentioned above (i.e. the global seller, media, and sleeve conditions) that will be applied to all 
-releases in your wantlist by default.
+Please note that you _can_ add to or change the contents of your wantlist (either Discogs list or local file) while
+the service is running; the updated list of releases will come into effect the next time the service runs.
 
-For any of the following arguments, you can use either the abbreviated argument indicator 
-(prefixed with `-`) or the verbose option (prefixed with `--`). The complete list of options, 
-including options and default values, can be accessed at any time by running:
- 
-```console
+Each time one of your releases is found, your Pushbullet account will be sent a notification with the title and the URL
+to the marketplace listing. As long as you don't delete the pushbullet notification, you will _not_ be sent repeat
+notifications for the same listing. You can test that the notification system is working correctly by adding a release
+to your wantlist that you know is currently for sale.
+
+If you want further customisation, there are a number of optional arguments and flags with which the service can be run.
+These optional arguments include the global versions of the conditions mentioned above (i.e. the global seller, media,
+and sleeve conditions) that will be applied to all releases in your wantlist by default.
+
+For any of the following arguments, you can use either the abbreviated argument indicator (prefixed with `-`) or the
+verbose option (prefixed with `--`). The complete list of options, including options and default values, can be accessed at
+any time by running:
+```bash
 $ python -m discogs_alert --help
 ```
 
@@ -221,36 +264,31 @@ no sleeve (default=`false`)
 ungraded sleeve (default=`false`).
 * `-V` `--verbose`: (bool) use this flag if you want to run the server in verbose mode, meaning 
 it will log updates to the command line as it runs (default=`false`) 
- 
-### Full Example
+
+#### Full Example
 
 To clarify the CLI outlined above, here is a realistic example. In this case, we are replicating a user 
 who has their `wantlist.json` on their Desktop and who wants verbose logs,  no minimum seller rating, and
 a global minimum media condition of `VERY_GOOD`. The command to run the service in this case would be
- 
-```
+```bash
 $ python -m discogs_alert -dt <discogs_access_token> -pt <pushbullet_token> -wp ~/Desktop/wantlist.json --msr None -mmc VERY_GOOD --verbose
 ```
 
-### Running in the background
+#### Running as a `cron` job
 
-Since this is a service that you'll want to leave running all the time, the best thing to do is run it in
-the background. This way you don't need to leave the process active in your terminal. The easiest way to
-do this (on Linux & Mac) is with the [nohup](https://linuxhint.com/nohup_command_linux/) command
-(though setting up something like a [tmux](https://www.ocf.berkeley.edu/~ckuehl/tmux/) session would be better).
+If you aren't running `discogs_alert` in the background using the docker image, another good approach is to
+run the process as a `cron` job. This uses the cron command-line utility to run the service at regular intervals.
 
+Again, assuming you have specified the required environment variables, all you have to do is run `crontab -e` (to open the cronjob
+editing window) and append the following line to the bottom of the file:
+```bash
+* * * * * python -m discogs_alert -T >> <path_to_log_file>.log 2>&1
 ```
-$ nohup python -m discogs_alert -dt <discogs_access_token> -pt <pushbullet_token> &
-```
+Once you save and exit the file, `discogs_alert` will be run every minute and it's logs will be saved to the log file you
+specified. You can then run `tail -f <path_to_log_file>.log` to check the logs of the running process.
 
-As can be seen, you need to put `nohup` before the python command and `&` after it. All console output 
-generated by the service will be saved to a text file named `nohup.out`. When you run this command, it
-will return a PID (process ID). You will need this to stop the process in the future, which you can easily
-do by running `$ kill <PID>`. If you forget the PID, you can still terminate the service by running
+Please refer [here](https://www.hostinger.com/tutorials/cron-job) for more information on cron and how to use `crontab`.
 
-```
-$ kill $(ps aux | grep '[p]ython -m discogs_alert' | awk '{print $2}')
-```
 
 ## Contributing
 
