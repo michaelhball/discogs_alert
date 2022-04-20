@@ -27,10 +27,6 @@ def scrape_listings_from_marketplace(response_content: str) -> da_types.Listings
     for row in rows:
         listing = {}
 
-        # each cell here corresponds to one of the major 'columns'. There are some filler 'td' elements in
-        # between but the important class names are item_description, seller_info, item_price, and item_add_to_cart
-        cells = row.find_all("td")
-
         item_desc_cell = row.find("td", class_="item_description")
         seller_info_cell = row.find("td", class_="seller_info")
         item_price_cell = row.find("td", class_="item_price")
@@ -83,7 +79,6 @@ def scrape_listings_from_marketplace(response_content: str) -> da_types.Listings
             seller_avg_rating_elt = seller_info_cell.find_all("strong")[1].contents[0]
             listing["seller_avg_rating"] = float(seller_avg_rating_elt.strip().split("%")[0])
 
-        # TODO: find the other seller stuff this way using 'text' of the span within the 'li'
         listing["seller_ships_from"] = seller_info_cell.find("span", text="Ships From:").parent.contents[1].strip()
 
         # extract price & shipping information

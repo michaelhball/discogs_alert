@@ -15,16 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 * currency API bug
-* Japanese Yen shipping currency parsing bug
-* Major bug in checking whether `conditions_satisfied`
-* several `scrape.py` bugs
+* several `scrape.py` parsing bugs
+* major bug in checking whether `conditions_satisfied`
 * removed noisy webdriver-manager logs
+* better logging throughout the project + more informative within-loop logs
+* better exception handling in `loop.py`
 
 ### Added
 * Docker support!
-* Documentation for running as a cron job
-* Scraping robustness improvements
-* Better within-loop logging
+* documentation for running package as a `cron` job
+* scraping robustness improvements
 
 ## [0.0.7] — 2022.02.18
 
