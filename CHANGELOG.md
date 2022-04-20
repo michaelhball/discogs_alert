@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+* Different notification options (SMS, Email, Slack)
 * Seller location controls (blacklists & whitelists)
 * Filter options when using a discogs list (equivalent functionality to wantlist.json)
 
