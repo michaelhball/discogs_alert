@@ -9,8 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * Different notification options (SMS, Email, Slack)
 * Seller location controls (blacklists & whitelists)
-* Ability to run service as a daemon service.
-* Ability to run server as a docker image (=> no dependency installation required)
+* Filter options when using a discogs list (equivalent functionality to wantlist.json)
+
+## [0.0.9] — 2022.04.20
+
+### Fixed
+* currency API bug
+* several `scrape.py` parsing bugs
+* major bug in checking whether `conditions_satisfied`
+* removed noisy webdriver-manager logs
+* better logging throughout the project + more informative within-loop logs
+* better exception handling in `loop.py`
+
+### Added
+* Docker support!
+* documentation for running package as a `cron` job
+* scraping robustness improvements
 
 ## [0.0.7] — 2022.02.18
 

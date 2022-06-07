@@ -1,7 +1,11 @@
 from email.message import EmailMessage
 import json
+import logging
 import requests
 import smtplib
+
+logger = logging.getLogger(__name__)
+
 
 def send_pushbullet_push(token: str, message_title: str, message_body: str, verbose: bool = False) -> bool:
     """Sends notification to pushbullet.
@@ -31,19 +35,18 @@ def send_pushbullet_push(token: str, message_title: str, message_body: str, verb
         # if not, send one
         if not have_already_sent:
             if verbose:
-                print("sending notification")
-            resp = requests.post(
-                url, data=json.dumps(message), headers=headers)
+                logger.info("sending notification")
+            resp = requests.post(url, data=json.dumps(message), headers=headers)
             if resp.status_code != 200:
-                print(
-                    f"error {resp.status_code} sending pushbullet notification: {resp.content}")
+                logger.error(f"error {resp.status_code} sending pushbullet notification: {resp.content}")
+
                 return False
             else:
                 return True
         return True
-    except Exception as e:
+    except:
         # TODO: what type of exception is thrown here ?
-        print(f"Exception sending pushbullet push: {e}")
+        logger.error(f"Exception sending pushbullet push", exc_info=True)
         return False
 
 
