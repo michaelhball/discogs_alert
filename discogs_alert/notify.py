@@ -1,7 +1,8 @@
+from email.message import EmailMessage
 import json
 import logging
 import requests
-
+import smtplib
 
 logger = logging.getLogger(__name__)
 
@@ -18,9 +19,10 @@ def send_pushbullet_push(token: str, message_title: str, message_body: str, verb
     Returns: True if successful, False otherwise.
     """
     try:
+
         headers = {"Authorization": "Bearer " + token, "Content-Type": "application/json"}
-        message = {"type": "note", "title": message_title, "body": message_body}
-        url = "https://api.pushbullet.com/v2/pushes"
+        message = {"type": "note",  "title": message_title, "body": message_body}
+        url = 'https://api.pushbullet.com/v2/pushes'
 
         # work out if there is an existing, identical push
         resp = requests.get(url, headers=headers)
@@ -37,6 +39,7 @@ def send_pushbullet_push(token: str, message_title: str, message_body: str, verb
             resp = requests.post(url, data=json.dumps(message), headers=headers)
             if resp.status_code != 200:
                 logger.error(f"error {resp.status_code} sending pushbullet notification: {resp.content}")
+
                 return False
             else:
                 return True
@@ -45,3 +48,20 @@ def send_pushbullet_push(token: str, message_title: str, message_body: str, verb
         # TODO: what type of exception is thrown here ?
         logger.error(f"Exception sending pushbullet push", exc_info=True)
         return False
+
+
+def send_email(email_server_smtp, email_server_port, email_from, email_password, email_to, title, body):
+    server = smtplib.SMTP(email_server_smtp, email_server_port)
+    server.ehlo()
+    server.starttls()
+    server.ehlo()
+    server.login(email_from, email_password)
+    print('sending email')
+
+    msg = EmailMessage()
+    msg['Subject'] = title
+    msg['From'] = email_from
+    msg['To'] = email_to
+    msg.set_content(body)
+    print('email sent')
+    server.quit()

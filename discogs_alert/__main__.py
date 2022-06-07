@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 @click.command()
+
 @click.option(
     "-dt",
     "--discogs-token",
@@ -25,10 +26,55 @@ logger = logging.getLogger(__name__)
 @click.option(
     "-pt",
     "--pushbullet-token",
-    required=True,
+    not_required_if="email-enabled",
     type=str,
     envvar="PUSHBULLET_TOKEN",
     help="token for pushbullet notification service.",
+)
+@click.option(
+    "-ee", 
+    "--email-enabled", 
+    default=False, 
+    is_flag=True, 
+    hidden=True,
+    help="use flag if you want to use email notification instead of pushbullet",
+)
+@click.option(
+    "-es",
+    "--email-server-smtp",
+    not_required_if="email-enabled",
+    type=str,
+    hidden=True,
+    help="use flag to define the smtp server"
+)
+@click.option(
+    "-esp",
+    "--email-server-port", 
+    type=int, 
+    default=587, 
+    hidden=True,
+    help="use flag to define the smtp server"
+)
+@click.option(
+    "-ef", 
+    "--email-from", 
+    type=str, 
+    hidden=True,
+    help="email address to send the notification from"
+)
+@click.option(
+    "-ep", 
+    "--email-password", 
+    type=str, 
+    hidden=True,
+    help="password of the email address to send the notification from"
+)
+@click.option(
+    "-et", 
+    "--email-to", 
+    type=str, 
+    hidden=True,
+    help="destination email address to send the notification to"
 )
 @click.option(
     "-lid",
@@ -48,6 +94,7 @@ logger = logging.getLogger(__name__)
     not_required_if="list-id",
     help="path to your wantlist json file (including filename)",
 )
+
 @click.option(
     "-ua",
     "--user-agent",
@@ -158,6 +205,12 @@ logger = logging.getLogger(__name__)
 def main(
     discogs_token,
     pushbullet_token,
+    email_enabled,
+    email_server_smtp,
+    email_server_port,
+    email_from,
+    email_password,
+    email_to,
     list_id,
     wantlist_path,
     user_agent,
@@ -186,6 +239,12 @@ def main(
     args = [
         discogs_token,
         pushbullet_token,
+        email_enabled,
+        email_server_smtp,
+        email_server_port,
+        email_from,
+        email_password,
+        email_to,
         list_id,
         wantlist_path,
         user_agent,

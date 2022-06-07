@@ -5,6 +5,7 @@ from typing import List, Optional
 
 import dacite
 from pathlib import Path
+
 from requests.exceptions import ConnectionError
 
 from discogs_alert import client as da_client, notify as da_notify, types as da_types, util as da_util
@@ -33,10 +34,15 @@ def load_wantlist(
             wantlist.append(dacite.from_dict(da_types.Release, release_dict))
         return wantlist
 
-
 def loop(
     discogs_token: str,
     pushbullet_token: str,
+    email_enabled: bool: False,
+    email_server_smtp: str, 
+    email_server_port: int, 
+    email_from: str,
+    email_password: str,
+    email_to: str,
     list_id: Optional[int],
     wantlist_path: Optional[str],
     user_agent: str,
@@ -101,12 +107,22 @@ def loop(
 
             # if we found something, send notification
             if len(valid_listings) > 0:
-                # TODO: send a push for _each_ valid listing if there are somehow more than one
-                da_notify.send_pushbullet_push(
-                    token=pushbullet_token,
-                    message_title=f"Now For Sale: {release.display_title}",
-                    message_body=f"Listing available: {valid_listings[0].url}",
-                    verbose=verbose,
+                if (email_enabled):
+                    da_notify.send_email(
+                      email_server_smtp, 
+                      email_server_port,
+                      email_from,
+                      email_password,
+                      email_to,
+                      message_title=f"Now For Sale: {release.display_title}",
+                      message_body=f"Listing available: https://www.discogs.com/sell/item/{valid_listings[0].id}",
+                )
+                else:
+                    da_notify.send_pushbullet_push(
+                      token=pushbullet_token,
+                      message_title=f"Now For Sale: {release.display_title}",
+                      message_body=f"Listing available: {valid_listings[0].url}",
+                      verbose=verbose,
                 )
 
     except ConnectionError:
