@@ -132,5 +132,4 @@ def loop(
     except:
         logger.info("Exception: this might be a real exception, but we're continuing anyway", exc_info=True)
 
-    if verbose:
-        logger.info(f"\t took {time.time() - start_time}")
+    logger.info(f"\t took {time.time() - start_time}")
