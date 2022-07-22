@@ -46,9 +46,11 @@ def scrape_listings_from_marketplace(response_content: str) -> da_types.Listings
 
         item_condition_para = item_desc_cell.find("p", class_="item_condition")
 
-        # extract media condition
-        media_condition_tooltips = item_condition_para.find(class_="media-condition-tooltip")
-        media_condition = media_condition_tooltips.get("data-condition")
+        # extract media condition (via ignoring the context of the new media condition tooltip)
+        media_condition_span = item_condition_para.find_all("span")[2]
+        media_condition_tooltip_span = media_condition_span.find("span", class_="has-tooltip")
+        media_condition_tooltip_span.replace_with("")
+        media_condition = media_condition_span.text.strip()
         listing["media_condition"] = da_types.CONDITION_PARSER[media_condition]
 
         # extract sleeve condition
@@ -57,7 +59,8 @@ def scrape_listings_from_marketplace(response_content: str) -> da_types.Listings
             sleeve_condition = sleeve_condition_spans.contents[0].strip()
             sleeve_condition = da_types.CONDITION_PARSER[sleeve_condition]
         else:
-            sleeve_condition = None
+            # sometimes the sleeve condition isn't listed => ungraded
+            sleeve_condition = da_types.CONDITION.NOT_GRADED
         listing["sleeve_condition"] = sleeve_condition
 
         # the seller's comment is the last paragraph (doesn't have a nice class name)
