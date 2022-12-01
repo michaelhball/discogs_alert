@@ -1,9 +1,12 @@
+import logging
 import re
 
 import dacite
 from bs4 import BeautifulSoup
 
 from discogs_alert import types as da_types
+
+logger = logging.getLogger(__name__)
 
 
 def scrape_listings_from_marketplace(response_content: str) -> da_types.Listings:
@@ -85,13 +88,21 @@ def scrape_listings_from_marketplace(response_content: str) -> da_types.Listings
         listing["seller_ships_from"] = seller_info_cell.find("span", text="Ships From:").parent.contents[1].strip()
 
         # extract price & shipping information
-        currency_regex = ".*?(?:[\£\$\€\¥]{1})"
         price_spans = item_price_cell.find("span", class_="price")
         price_string = (
             [elt for elt in price_spans.contents if elt.name is None][0].strip().replace("+", "").replace(",", "")
         )
-        price_currency = re.findall(currency_regex, price_string)[0]
-        price_string = price_string.replace(price_currency, "")
+        try:
+            currency_regex = ".*?(?:[\£\$\€\¥]{1})"
+            price_currency = re.findall(currency_regex, price_string)[0]
+            price_string = price_string.replace(price_currency, "")
+        except IndexError:
+            if "CHF" in price_string:
+                price_currency = "CHF"
+                price_string = price_string.replace("CHF", "")
+            else:
+                price_currency = "???"
+                logger.warning("Couldn't parse currency from price string")
         listing["price"] = {
             "currency": da_types.CURRENCIES[price_currency],
             "value": float(price_string),
