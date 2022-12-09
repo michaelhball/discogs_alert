@@ -49,7 +49,9 @@ def scrape_listings_from_marketplace(response_content: str) -> da_types.Listings
 
         item_condition_para = item_desc_cell.find("p", class_="item_condition")
 
+        # extract conditions of media (always listed) and sleeve (optional)
         conditions = list(filter(None, map(da_types.CONDITION_PARSER.get, item_condition_para.stripped_strings)))
+        # in case of missing sleeve condition
         conditions.append(da_types.CONDITION.NOT_GRADED)
         listing["media_condition"] = conditions[0]
         listing["sleeve_condition"] = conditions[1]
