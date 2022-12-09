@@ -212,12 +212,11 @@ def main(
     )
 
     da_loop.loop(*args)
-    if test:
-        return
-    schedule.every(int(60 / frequency)).minutes.do(lambda: da_loop.loop(*args))
-    while 1:
-        schedule.run_pending()
-        time.sleep(1)
+    if not test:
+        schedule.every(int(60 / frequency)).minutes.do(lambda: da_loop.loop(*args))
+        while 1:
+            schedule.run_pending()
+            time.sleep(1)
 
 
 if __name__ == "__main__":
