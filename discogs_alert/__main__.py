@@ -211,13 +211,11 @@ def main(
     """
     )
 
-    if test:
-        da_loop.loop(*args)
-    else:
-        schedule.every(int(60 / frequency)).minutes.do(lambda: da_loop.loop(*args))
-        while 1:
-            schedule.run_pending()
-            time.sleep(1)
+    da_loop.loop(*args)
+    schedule.every(int(60 / frequency)).minutes.do(lambda: da_loop.loop(*args))
+    while 1:
+        schedule.run_pending()
+        time.sleep(1)
 
 
 if __name__ == "__main__":
