@@ -211,9 +211,8 @@ def main(
     """
     )
 
-    if test:
-        da_loop.loop(*args)
-    else:
+    da_loop.loop(*args)
+    if not test:
         schedule.every(int(60 / frequency)).minutes.do(lambda: da_loop.loop(*args))
         while 1:
             schedule.run_pending()
