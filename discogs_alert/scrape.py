@@ -1,9 +1,12 @@
+import logging
 import re
 
 import dacite
 from bs4 import BeautifulSoup
 
 from discogs_alert import types as da_types
+
+logger = logging.getLogger(__name__)
 
 
 def scrape_listings_from_marketplace(response_content: str) -> da_types.Listings:
@@ -46,22 +49,13 @@ def scrape_listings_from_marketplace(response_content: str) -> da_types.Listings
 
         item_condition_para = item_desc_cell.find("p", class_="item_condition")
 
-        # extract media condition (via ignoring the context of the new media condition tooltip)
-        media_condition_span = item_condition_para.find_all("span")[2]
-        media_condition_tooltip_span = media_condition_span.find("span", class_="has-tooltip")
-        media_condition_tooltip_span.replace_with("")
-        media_condition = media_condition_span.text.strip()
-        listing["media_condition"] = da_types.CONDITION_PARSER[media_condition]
-
-        # extract sleeve condition
-        sleeve_condition_spans = item_condition_para.find("span", class_="item_sleeve_condition")
-        if sleeve_condition_spans is not None:
-            sleeve_condition = sleeve_condition_spans.contents[0].strip()
-            sleeve_condition = da_types.CONDITION_PARSER[sleeve_condition]
-        else:
-            # sometimes the sleeve condition isn't listed => ungraded
-            sleeve_condition = da_types.CONDITION.NOT_GRADED
-        listing["sleeve_condition"] = sleeve_condition
+        # extract conditions of media (always listed) and sleeve (optional)
+        conditions = (da_types.CONDITION_PARSER.get(s) for s in item_condition_para.stripped_strings)
+        conditions = [c for c in conditions if c is not None]
+        # in case of missing sleeve condition
+        conditions.append(da_types.CONDITION.NOT_GRADED)
+        listing["media_condition"] = conditions[0]
+        listing["sleeve_condition"] = conditions[1]
 
         # the seller's comment is the last paragraph (doesn't have a nice class name)
         seller_comment = paragraphs[-1].contents[0].strip()
@@ -85,13 +79,21 @@ def scrape_listings_from_marketplace(response_content: str) -> da_types.Listings
         listing["seller_ships_from"] = seller_info_cell.find("span", text="Ships From:").parent.contents[1].strip()
 
         # extract price & shipping information
-        currency_regex = ".*?(?:[\£\$\€\¥]{1})"
         price_spans = item_price_cell.find("span", class_="price")
         price_string = (
             [elt for elt in price_spans.contents if elt.name is None][0].strip().replace("+", "").replace(",", "")
         )
-        price_currency = re.findall(currency_regex, price_string)[0]
-        price_string = price_string.replace(price_currency, "")
+        try:
+            currency_regex = ".*?(?:[\£\$\€\¥]{1})"
+            price_currency = re.findall(currency_regex, price_string)[0]
+            price_string = price_string.replace(price_currency, "")
+        except IndexError:
+            if "CHF" in price_string:
+                price_currency = "CHF"
+                price_string = price_string.replace("CHF", "")
+            else:
+                price_currency = "???"
+                logger.warning("Couldn't parse currency from price string")
         listing["price"] = {
             "currency": da_types.CURRENCIES[price_currency],
             "value": float(price_string),

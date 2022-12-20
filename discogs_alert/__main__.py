@@ -154,7 +154,7 @@ logger = logging.getLogger(__name__)
     hidden=True,
     help="use flag if you want to immediately run the program (to test that your wantlist is correct)",
 )
-@click.version_option("0.0.10")
+@click.version_option("0.0.11")
 def main(
     discogs_token,
     pushbullet_token,
@@ -211,9 +211,8 @@ def main(
     """
     )
 
-    if test:
-        da_loop.loop(*args)
-    else:
+    da_loop.loop(*args)
+    if not test:
         schedule.every(int(60 / frequency)).minutes.do(lambda: da_loop.loop(*args))
         while 1:
             schedule.run_pending()

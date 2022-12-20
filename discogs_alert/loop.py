@@ -1,5 +1,6 @@
 import json
 import logging
+import random
 import requests
 import time
 from collections import defaultdict
@@ -36,6 +37,29 @@ def load_wantlist(
         return wantlist
 
 
+def get_all_pushes(pushbullet_token: str) -> List[str]:
+    """"""
+    headers = {"Authorization": "Bearer " + pushbullet_token, "Content-Type": "application/json"}
+    url = "https://api.pushbullet.com/v2/pushes"
+    resp = requests.get(url, headers=headers)
+    rate_limit_remaining = int(resp.headers.get("X-Ratelimit-Remaining"))
+    while rate_limit_remaining < 2:
+        time.sleep(60)
+        resp = requests.get(url, headers=headers)
+        rate_limit_remaining = int(resp.headers.get("X-Ratelimit-Remaining"))
+    resp = resp.json()
+    pushes, cursor = resp.get("pushes"), resp.get("cursor")
+    while cursor is not None:
+        if rate_limit_remaining < 2:
+            time.sleep(60)
+        resp = requests.get(url + f"?cursor={cursor}", headers=headers)
+        rate_limit_remaining = int(resp.headers.get("X-Ratelimit-Remaining"))
+        resp = resp.json()
+        pushes += resp.get("pushes")
+        cursor = resp.get("cursor")
+    return pushes
+
+
 def loop(
     discogs_token: str,
     pushbullet_token: str,
@@ -59,20 +83,19 @@ def loop(
         user_token_client = da_client.UserTokenClient(user_agent, discogs_token)
 
         # get the complete list of previous pushes
-        headers = {"Authorization": "Bearer " + pushbullet_token, "Content-Type": "application/json"}
-        url = "https://api.pushbullet.com/v2/pushes"
-        resp = requests.get(url, headers=headers)
-        pushes_dict = defaultdict(list)
-        for p in resp.json().get("pushes"):
-            pushes_dict[p["title"]].append(p["body"])
+        pushes_dict = defaultdict(set)
+        for p in get_all_pushes(pushbullet_token):
+            if "title" in p and "body" in p:
+                pushes_dict[p["title"]].add(p["body"])
 
-        for release in load_wantlist(list_id, user_token_client, wantlist_path):
+        wantlist_items = load_wantlist(list_id, user_token_client, wantlist_path)
+        random.shuffle(wantlist_items)
+        for idx, release in enumerate(wantlist_items):
             valid_listings: List[da_types.Listing] = []
 
-            # get release stats, & move on to the next release if there are no listings available
-            release_stats = user_token_client.get_release_stats(release.id)
-            if not release_stats or release_stats.num_for_sale == 0 or release_stats.blocked_from_sale:
-                continue
+            # the discogs API has a 60-request-per-minute limit that only resets after 60s of inactivity
+            if user_token_client.rate_limit_remaining == 1:
+                time.sleep(60)
 
             for listing in client_anon.get_marketplace_listings(release.id):
 
@@ -113,10 +136,9 @@ def loop(
                 valid_listings.append(listing)
 
             # if we found something, send notification
-            if len(valid_listings) > 0:
-                # TODO: send a push for _each_ valid listing if there are somehow more than one
-                message_title = f"Now For Sale: {release.display_title}"
-                message_body = f"Listing available: {valid_listings[0].url}"
+            message_title = f"Now For Sale: {release.display_title}"
+            for listing in valid_listings:
+                message_body = f"Listing available: {listing.url}"
                 if message_title not in pushes_dict or message_body not in pushes_dict[message_title]:
                     print(f"{message_title} — {message_body}")
                     da_notify.send_pushbullet_push(

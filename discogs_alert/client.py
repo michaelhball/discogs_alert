@@ -30,11 +30,10 @@ class Client:
 
     def __init__(self, user_agent, *args, **kwargs):
         self.user_agent = user_agent
-        self.verbose = False  # ???
+        self.verbose = False
         self.rate_limit = None
         self.rate_limit_used = None
         self.rate_limit_remaining = None
-        # TODO: use these to notify when limits are close to exceeded
 
     def _request(self, method, url, data=None, headers=None):
         raise NotImplementedError
@@ -91,9 +90,9 @@ class UserTokenClient(Client):
     def _request(self, method: str, url: str, data=None, headers=None):
         params = {"token": self.user_token}
         resp = requests.request(method, url, params=params, data=data, headers=headers)
-        self.rate_limit = resp.headers.get("X-Discogs-Ratelimit")
-        self.rate_limit_used = resp.headers.get("X-Discogs-Ratelimit-Used")
-        self.rate_limit_remaining = resp.headers.get("X-Discogs-Ratelimit-Remaining")
+        self.rate_limit = int(resp.headers.get("X-Discogs-Ratelimit"))
+        self.rate_limit_used = int(resp.headers.get("X-Discogs-Ratelimit-Used"))
+        self.rate_limit_remaining = int(resp.headers.get("X-Discogs-Ratelimit-Remaining"))
         return resp.content, resp.status_code
 
 
@@ -118,7 +117,7 @@ class AnonClient(Client):
         for argument in options_arguments:
             self.options.add_argument(argument)
 
-        self.driver_manager = ChromeDriverManager(log_level=0).install()
+        self.driver_manager = ChromeDriverManager().install()
         unix = {"linux", "linux2", "darwin"}
         self.driver = webdriver.Chrome(
             self.driver_manager, options=self.options, service_log_path="/dev/null" if sys.platform in unix else "NUL"
