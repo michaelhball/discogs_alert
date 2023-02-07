@@ -188,7 +188,7 @@ CURRENCIES = {
     "CA$": "CAD",
     "MX$": "MXN",
     "NZ$": "NZD",
-    "B$": "BRL",
+    "R$": "BRL",
     "CHF": "CHF",
     "SEK": "SEK",
     "ZAR": "ZAR",

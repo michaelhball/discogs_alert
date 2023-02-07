@@ -3,9 +3,8 @@
 __pycache__
 .pytest_cache
 venv
-
+.DS_Store
 wantlist.json
 TODO
 dist
-
 nohup.out

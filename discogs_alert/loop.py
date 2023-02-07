@@ -145,6 +145,8 @@ def loop(
                         token=pushbullet_token, message_title=message_title, message_body=message_body, verbose=verbose
                     )
 
+        client_anon.driver.close()
+
     except ConnectionError:
         logger.info("ConnectionError: looping will continue as usual", exc_info=True)
 
