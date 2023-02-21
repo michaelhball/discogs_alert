@@ -84,7 +84,7 @@ def scrape_listings_from_marketplace(response_content: str) -> da_types.Listings
             [elt for elt in price_spans.contents if elt.name is None][0].strip().replace("+", "").replace(",", "")
         )
         try:
-            currency_regex = ".*?(?:[\£\$\€\¥]{1})"
+            currency_regex = r".*?(?:[\£\$\€\¥]{1})"
             price_currency = re.findall(currency_regex, price_string)[0]
             price_string = price_string.replace(price_currency, "")
         except IndexError:
