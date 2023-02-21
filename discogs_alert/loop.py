@@ -1,17 +1,16 @@
 import json
 import logging
 import random
-import requests
 import time
 from collections import defaultdict
+from pathlib import Path
 from typing import List, Optional
 
 import dacite
-from pathlib import Path
+import requests
 from requests.exceptions import ConnectionError
 
 from discogs_alert import client as da_client, notify as da_notify, types as da_types, util as da_util
-
 
 logger = logging.getLogger(__name__)
 
@@ -153,7 +152,7 @@ def loop(
     except AttributeError:
         logger.info("AttributeError: will continue looping as usual", exc_info=True)
 
-    except:
+    except:  # noqa: E722
         logger.info("Exception: this might be a real exception, but we're continuing anyway", exc_info=True)
 
     logger.info(f"\t took {time.time() - start_time}")

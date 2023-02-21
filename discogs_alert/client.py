@@ -1,3 +1,4 @@
+# ruff: noqa: E402
 import os
 
 # to prevent the webdriver manager from polluting logs
@@ -5,16 +6,15 @@ os.environ["WDM_LOG"] = "0"
 
 import json
 import logging
-import requests
 import sys
 from typing import Union
 
+import requests
 from fake_useragent import UserAgent
 from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
 
 from discogs_alert import scrape as da_scrape, types as da_types
-
 
 logger = logging.getLogger(__name__)
 

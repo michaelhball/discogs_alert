@@ -1,7 +1,7 @@
 import json
 import logging
-import requests
 
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,6 @@ def send_pushbullet_push(token: str, message_title: str, message_body: str, verb
             return False
         else:
             return True
-    except:
-        # TODO: what type of exception is thrown here ?
-        logger.error(f"Exception sending pushbullet push", exc_info=True)
+    except requests.exceptions.RequestException:
+        logger.error("Exception sending pushbullet push", exc_info=True)
         return False

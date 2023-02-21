@@ -1,7 +1,4 @@
 import logging
-
-logging.basicConfig(level=logging.INFO)
-
 import time
 
 import click
@@ -9,7 +6,7 @@ import schedule
 
 from discogs_alert import click as da_click, loop as da_loop, types as da_types
 
-
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -208,7 +205,7 @@ def main(
                             |_____|                                        
 
 *****************************************************************************
-    """
+    """  # noqa: W605
     )
 
     da_loop.loop(*args)
