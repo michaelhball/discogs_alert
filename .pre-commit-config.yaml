@@ -1,5 +1,13 @@
 repos:
+
+# run ruff style, import-order, & general linting checks
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   rev: 'v0.0.249'
   hooks:
     - id: ruff
+
+# check that pyproject.toml is a valid poetry config file
+- repo: https://github.com/python-poetry/poetry
+  rev: '1.3.0'
+  hooks:
+    - id: poetry-check
