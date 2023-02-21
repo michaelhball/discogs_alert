@@ -9,3 +9,5 @@ TODO
 dist
 nohup.out
 poetry.lock
+.tox
+
