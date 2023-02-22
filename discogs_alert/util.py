@@ -97,6 +97,8 @@ def get_currency_rates(base_currency: str) -> Dict[str, float]:
 
     Returns: a dict containing exchange rates _to_ all major currencies _from_ the given base currency
     """
+    if base_currency not in da_types.CURRENCY_CHOICES:
+        raise ValueError("`base_currency` must be one of the supported currencies from `discogs_alert/types.py`")
     return requests.get(f"https://api.exchangerate.host/latest?base={base_currency}").json().get("rates")
 
 
