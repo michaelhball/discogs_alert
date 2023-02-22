@@ -1,6 +1,6 @@
 import enum
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 
 @enum.unique
@@ -97,7 +97,7 @@ class ReleaseStats:
 
 
 @dataclass
-class Shipping:
+class ShippingPrice:
     currency: str
     value: float
 
@@ -106,7 +106,7 @@ class Shipping:
 class ListingPrice:
     currency: str
     value: float
-    shipping: Optional[Shipping] = None
+    shipping: Optional[ShippingPrice] = None
 
 
 @dataclass
@@ -193,3 +193,6 @@ CURRENCIES = {
     "SEK": "SEK",
     "ZAR": "ZAR",
 }
+
+
+CurrencyRates = Dict[str, Union[int, float]]

@@ -1,6 +1,6 @@
+import copy
 import functools
 import time
-from typing import Dict, Union
 
 import requests
 
@@ -87,8 +87,12 @@ def time_cache(seconds: int, maxsize=None, typed=False):
     return _decorator
 
 
+class InvalidCurrencyException(Exception):
+    ...
+
+
 @time_cache(seconds=3600)
-def get_currency_rates(base_currency: str) -> Dict[str, float]:
+def get_currency_rates(base_currency: str) -> da_types.CurrencyRates:
     """Get live currency exchange rates (from one base currency). Cached for one hour at a time,
     per currency.
 
@@ -97,8 +101,9 @@ def get_currency_rates(base_currency: str) -> Dict[str, float]:
 
     Returns: a dict containing exchange rates _to_ all major currencies _from_ the given base currency
     """
+
     if base_currency not in da_types.CURRENCY_CHOICES:
-        raise ValueError("`base_currency` must be one of the supported currencies from `discogs_alert/types.py`")
+        raise InvalidCurrencyException(f"{base_currency} is not a supported currency (see `discogs_alert/types.py`).")
     return requests.get(f"https://api.exchangerate.host/latest?base={base_currency}").json().get("rates")
 
 
@@ -113,32 +118,27 @@ def convert_currency(value: float, old_currency: str, new_currency: str) -> floa
     Returns: value in the new currency.
     """
 
-    rates = get_currency_rates(new_currency)
-    return float(value) / rates.get(old_currency)
+    try:
+        return float(value) / get_currency_rates(new_currency)[old_currency]
+    except KeyError:
+        raise InvalidCurrencyException(f"{old_currency} is not a supported currency (see `discogs_alert/types.py`)")
 
 
-def convert_listing_price_currency(
-    listing_price: da_types.ListingPrice, new_currency: str
-) -> Union[da_types.ListingPrice, bool]:
-    """Converts a `ListingPrice` object from its existing currency to another."""
+def convert_listing_price_currency(listing_price: da_types.ListingPrice, new_currency: str) -> da_types.ListingPrice:
+    """Converts a `ListingPrice` object from its existing currency to another, including the shipping price."""
+
+    listing_price = copy.deepcopy(listing_price)
 
     # convert listing price to new currency
     if listing_price.currency != new_currency:
-        try:
-            converted_price = convert_currency(listing_price.value, listing_price.currency, new_currency)
-        except AttributeError:
-            return False
+        listing_price.value = convert_currency(listing_price.value, listing_price.currency, new_currency)
         listing_price.currency = new_currency
-        listing_price.value = converted_price
 
-    # convert listing price shipping to new currency
+    # convert listing shipping price to new currency
     if listing_price.shipping is not None and listing_price.shipping.currency != new_currency:
-        try:
-            converted_shipping = convert_currency(
-                listing_price.shipping.value, listing_price.shipping.currency, new_currency
-            )
-        except AttributeError:
-            return False
-        listing_price.shipping = da_types.Shipping(currency=new_currency, value=converted_shipping)
+        listing_price.shipping = da_types.ShippingPrice(
+            currency=new_currency,
+            value=convert_currency(listing_price.shipping.value, listing_price.shipping.currency, new_currency),
+        )
 
     return listing_price

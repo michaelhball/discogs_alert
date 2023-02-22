@@ -35,6 +35,11 @@ build-backend = "poetry.core.masonry.api"
 [tool.poetry2conda]
 name = "da"
 
+[tool.pytest.ini_options]
+markers = [
+    "online: marks tests as requiring internet access (select with '--online')",
+]
+
 [tool.black]
 line-length = 120
 
