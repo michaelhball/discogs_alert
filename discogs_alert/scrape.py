@@ -9,12 +9,17 @@ from discogs_alert import types as da_types
 logger = logging.getLogger(__name__)
 
 
-def scrape_listings_from_marketplace(response_content: str) -> da_types.Listings:
+class ParsingException(Exception):
+    ...
+
+
+def scrape_listings_from_marketplace(response_content: str, release_id: int) -> da_types.Listings:
     """Takes response from marketplace get request (for single release) and parses
     the important listing information.
 
     Args:
         response_content: content of response from release marketplace GET request
+        release_id: the ID of the release, used only for informative logging
 
     Returns: List of `Listing` objects containing information about each listing for sale.
     """
@@ -80,7 +85,7 @@ def scrape_listings_from_marketplace(response_content: str) -> da_types.Listings
 
         # extract price & shipping information
         price_spans = item_price_cell.find("span", class_="price")
-        price_string = (
+        price_string: str = (
             [elt for elt in price_spans.contents if elt.name is None][0].strip().replace("+", "").replace(",", "")
         )
         try:
@@ -88,12 +93,15 @@ def scrape_listings_from_marketplace(response_content: str) -> da_types.Listings
             price_currency = re.findall(currency_regex, price_string)[0]
             price_string = price_string.replace(price_currency, "")
         except IndexError:
+            # TODO: make this part of the Regex, + generalise to other unseen currencies
             if "CHF" in price_string:
                 price_currency = "CHF"
                 price_string = price_string.replace("CHF", "")
             else:
-                price_currency = "???"
-                logger.warning("Couldn't parse currency from price string")
+                raise ParsingException(
+                    f"Couldn't parse currency from price_string {price_string} for release {release_id}"
+                )
+
         listing["price"] = {
             "currency": da_types.CURRENCIES[price_currency],
             "value": float(price_string),
