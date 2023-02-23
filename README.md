@@ -244,10 +244,6 @@ And that's it! Until you want to propose your changes as a new PR. When that's t
 
 [**mhsb**](https://github.com/michaelhball)
 
-<a href="https://www.mhsb.me" rel="nofollow">
-<img alt="home icon" src="https://github.com/michaelhball/discogs_alert/blob/main/img/home.png"/>
-</a>
-
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
