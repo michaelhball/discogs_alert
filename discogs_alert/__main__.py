@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
     "--discogs-token",
     required=True,
     type=str,
-    envvar="DISCOGS_TOKEN",
+    envvar="DA_DISCOGS_TOKEN",
     help="unique discogs user access token (enabling sending of requests on your behalf)",
 )
 @click.option(
@@ -24,14 +24,14 @@ logger = logging.getLogger(__name__)
     "--pushbullet-token",
     required=True,
     type=str,
-    envvar="PUSHBULLET_TOKEN",
+    envvar="DA_PUSHBULLET_TOKEN",
     help="token for pushbullet notification service.",
 )
 @click.option(
     "-lid",
     "--list-id",
     type=int,
-    envvar="LIST_ID",
+    envvar="DA_LIST_ID",
     cls=da_click.NotRequiredIf,
     not_required_if="wantlist-path",
     help="ID of Discogs list to use as wantlist",
@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
     "-wp",
     "--wantlist-path",
     type=click.Path(exists=True),
-    envvar="WANTLIST_PATH",
+    envvar="DA_WANTLIST_PATH",
     cls=da_click.NotRequiredIf,
     not_required_if="list-id",
     help="path to your wantlist json file (including filename)",
@@ -50,7 +50,7 @@ logger = logging.getLogger(__name__)
     "--user-agent",
     default="DiscogsAlert/0.0.1 +http://discogsalert.com",
     type=str,
-    envvar="USER_AGENT",
+    envvar="DA_USER_AGENT",
     help="user-agent indicating source of HTTP request",
 )
 @click.option(
@@ -59,7 +59,7 @@ logger = logging.getLogger(__name__)
     default=60,
     show_default=True,
     type=click.IntRange(1, 60),
-    envvar="FREQUENCY",
+    envvar="DA_FREQUENCY",
     help="number of times per hour to check the marketplace",
 )
 @click.option(
@@ -68,7 +68,7 @@ logger = logging.getLogger(__name__)
     default="Germany",
     show_default=True,
     type=str,
-    envvar="COUNTRY",
+    envvar="DA_COUNTRY",
     help="country where you live (e.g. for shipping availability)",
 )
 @click.option(
@@ -76,7 +76,7 @@ logger = logging.getLogger(__name__)
     "--currency",
     default="EUR",
     show_default=True,
-    envvar="CURRENCY",
+    envvar="DA_CURRENCY",
     type=click.Choice(da_types.CURRENCY_CHOICES),
     help="preferred currency (to convert all others to)",
 )
@@ -95,7 +95,7 @@ logger = logging.getLogger(__name__)
     default=None,
     show_default=True,
     type=int,
-    envvar="MIN_SELLER_SALES",
+    envvar="DA_MIN_SELLER_SALES",
     help="minimum number of seller sales you want to allow",
 )
 @click.option(
@@ -103,7 +103,7 @@ logger = logging.getLogger(__name__)
     "--min-media-condition",
     default=da_types.CONDITION.VERY_GOOD,
     show_default=True,
-    envvar="MIN_MEDIA_CONDITION",
+    envvar="DA_MIN_MEDIA_CONDITION",
     type=click.Choice(da_types.CONDITION),
     help="minimum media condition you want to accept",
 )
@@ -112,7 +112,7 @@ logger = logging.getLogger(__name__)
     "--min-sleeve-condition",
     default=da_types.CONDITION.VERY_GOOD,
     show_default=True,
-    envvar="MIN_SLEEVE_CONDITION",
+    envvar="DA_MIN_SLEEVE_CONDITION",
     type=click.Choice(da_types.CONDITION),
     help="minimum sleeve condition you want to accept",
 )
@@ -121,7 +121,7 @@ logger = logging.getLogger(__name__)
     "--accept-generic-sleeve",
     default=True,
     is_flag=True,
-    envvar="ACCEPT_GENERIC_SLEEVE",
+    envvar="DA_ACCEPT_GENERIC_SLEEVE",
     help="use flag if you want to accept generic sleeves (in addition to those of min-sleeve-condition)",
 )
 @click.option(
@@ -129,7 +129,7 @@ logger = logging.getLogger(__name__)
     "--accept_no_sleeve",
     default=False,
     is_flag=True,
-    envvar="ACCEPT_NO_SLEEVE",
+    envvar="DA_ACCEPT_NO_SLEEVE",
     help="use flag if you want to accept a record w no sleeve (in addition to those of min-sleeve-condition)",
 )
 @click.option(
@@ -137,8 +137,22 @@ logger = logging.getLogger(__name__)
     "--accept-ungraded-sleeve",
     default=False,
     is_flag=True,
-    envvar="ACCEPT_UNGRADED_SLEEVE",
+    envvar="DA_ACCEPT_UNGRADED_SLEEVE",
     help="use flag if you want to accept ungraded sleeves (in addition to those of min-sleeve-condition)",
+)
+@click.option(
+    "-wl",
+    "--country-whitelist",
+    multiple=True,
+    default=[],
+    envvar="DA_COUNTRY_WHITELIST",
+    type=click.Choice(da_types.COUNTRY_CHOICES),
+    help=(
+        "If any countries are passed in the whitelist, you'll _only_ be alerted about listings by sellers of those "
+        "countries (e.g. if you live in the USA and only want to consider releases for sale in the USA). To specify a "
+        "whitelist as an environment variable you must use a string with whitespace, for example "
+        '`export DA_COUNTRY_WHITELIST="DE US"`.'
+    ),
 )
 @click.option(
     "-V", "--verbose", default=False, is_flag=True, help="use flag if you want to see logs as the program runs"
@@ -168,6 +182,7 @@ def main(
     accept_generic_sleeve,
     accept_no_sleeve,
     accept_ungraded_sleeve,
+    country_whitelist,
     verbose,
     test,
 ):
@@ -192,6 +207,7 @@ def main(
         da_types.RecordFilters(
             min_media_condition, min_sleeve_condition, accept_generic_sleeve, accept_no_sleeve, accept_ungraded_sleeve
         ),
+        set(da_types.COUNTRIES[c] for c in country_whitelist),
         verbose,
     ]
 

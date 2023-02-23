@@ -4,7 +4,7 @@ import random
 import time
 from collections import defaultdict
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Set
 
 import dacite
 import requests
@@ -69,6 +69,7 @@ def loop(
     currency: str,
     seller_filters: da_types.SellerFilters,
     record_filters: da_types.RecordFilters,
+    country_whitelist: Set[str],
     verbose: bool = False,
 ):
     """Event loop, each time this is called we query the discogs marketplace for all items in wantlist."""
@@ -109,7 +110,9 @@ def loop(
                     continue
 
                 # if seller, sleeve, and media conditions are not satisfied, move to the next listing
-                if not da_util.conditions_satisfied(listing, release, seller_filters, record_filters):
+                if not da_util.conditions_satisfied(
+                    listing, release, seller_filters, record_filters, country_whitelist
+                ):
                     if verbose:
                         logger.info(
                             f"Listing found that doesn't satisfy conditions:\n"
@@ -118,8 +121,7 @@ def loop(
                         )
                     continue
 
-                # if the price is above our threshold (after converting to the base currency),
-                # move to the next listing
+                # if the price is above our threshold (after converting to the base currency), move to the next listing
                 listing.price = da_util.convert_listing_price_currency(listing.price, currency)
                 if (isinstance(listing.price, bool) and not listing.price) or listing.price_is_above_threshold(
                     release.price_threshold
