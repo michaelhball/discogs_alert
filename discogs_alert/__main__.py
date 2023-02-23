@@ -4,7 +4,7 @@ import time
 import click
 import schedule
 
-from discogs_alert import click as da_click, loop as da_loop, types as da_types
+from discogs_alert import __version__, click as da_click, loop as da_loop, types as da_types
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -151,7 +151,7 @@ logger = logging.getLogger(__name__)
     hidden=True,
     help="use flag if you want to immediately run the program (to test that your wantlist is correct)",
 )
-@click.version_option("0.0.13")
+@click.version_option(__version__)
 def main(
     discogs_token,
     pushbullet_token,
