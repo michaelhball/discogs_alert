@@ -1,6 +1,7 @@
 import copy
 import functools
 import time
+from typing import Set
 
 import requests
 
@@ -12,6 +13,7 @@ def conditions_satisfied(
     release: da_types.Release,
     seller_filters: da_types.SellerFilters,
     record_filters: da_types.RecordFilters,
+    country_whitelist: Set[str],
 ):
     """Validates that a given listing satisfies all conditions and filters, including both global filters
     (set via environment variables or via the CLI at runtime) and per-release filters (set in wantlist.json).
@@ -21,9 +23,14 @@ def conditions_satisfied(
         release: the release object, defined by the user, corresponding to the given listing
         seller_filters: the global seller filters
         record_filters: the global record (media & sleeve condition) filters
+        country_whitelist: a list of countries from which we will consider listings as valid
 
     Returns: True if the given listing satisfies all conditions, False otherwise.
     """
+
+    # verify country whitelist (if used)
+    if country_whitelist and listing.seller_ships_from not in country_whitelist:
+        return False
 
     # verify seller conditions
     if (
