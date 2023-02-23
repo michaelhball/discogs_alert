@@ -36,7 +36,7 @@ I'd love to continue making `discogs_alert` as useful as possible!
 
 ## Requirements
 
-- Python >= 3.8
+- Python >= 3.7
 - [Chromedriver](https://chromedriver.chromium.org/) (if you have Google Chrome or any Chromium browser 
 installed on your computer, you'll be fine).
 
