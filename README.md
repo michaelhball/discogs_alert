@@ -2,10 +2,16 @@
 
 <p align="center">
     <a href="https://github.com/michaelhball/discogs_alert/blob/main/LICENSE">
-        <img alt="GitHub" src="https://img.shields.io/badge/license-GPL%203.0-blue">
+        <img alt="GitHub" src="https://img.shields.io/badge/License-MIT-yellow.svg">
     </a>
-    <a href="https://github.com/michaelhball/discogs_alert/releases">
-        <img alt="GitHub release" src="https://img.shields.io/github/v/release/michaelhball/discogs_alert?sort=semver">
+    <a href="https://pypi.org/project/discogs_alert">
+        <img alt="GitHub" src="https://img.shields.io/pypi/v/discogs_alert">
+    </a>
+    <a href="https://pypi.org/project/discogs_alert">
+        <img alt="GitHub" src="https://img.shields.io/pypi/pyversions/tox.svg">
+    </a>
+    <a href="https://github.com/michaelhball/discogs_alert/actions/workflows/pr_checks.yml">
+        <img alt="GitHub" src="https://github.com/michaelhball/discogs_alert/actions/workflows/pr_checks.yml/badge.svg">
     </a>
 </p>
 
