@@ -14,6 +14,7 @@ def conditions_satisfied(
     seller_filters: da_types.SellerFilters,
     record_filters: da_types.RecordFilters,
     country_whitelist: Set[str],
+    country_blacklist: Set[str],
 ):
     """Validates that a given listing satisfies all conditions and filters, including both global filters
     (set via environment variables or via the CLI at runtime) and per-release filters (set in wantlist.json).
@@ -24,12 +25,15 @@ def conditions_satisfied(
         seller_filters: the global seller filters
         record_filters: the global record (media & sleeve condition) filters
         country_whitelist: a list of countries from which we will consider listings as valid
+        country_blacklist: a list of countries from which to consider listings as invalid
 
     Returns: True if the given listing satisfies all conditions, False otherwise.
     """
 
-    # verify country whitelist (if used)
+    # verify country whitelist & blacklist, if used
     if country_whitelist and listing.seller_ships_from not in country_whitelist:
+        return False
+    if country_blacklist and listing.seller_ships_from in country_blacklist:
         return False
 
     # verify seller conditions

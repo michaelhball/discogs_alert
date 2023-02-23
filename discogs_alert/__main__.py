@@ -155,6 +155,21 @@ logger = logging.getLogger(__name__)
     ),
 )
 @click.option(
+    "-bl",
+    "--country-blacklist",
+    multiple=True,
+    default=[],
+    envvar="DA_COUNTRY_BLACKLIST",
+    type=click.Choice(da_types.COUNTRY_CHOICES),
+    help=(
+        "If any countries are passed in the blacklist, you'll be alerted about listings by sellers of all countries "
+        "excluding those excluding those, e.g. if you live in Germany and don't want to consider releases from the UK "
+        "due to import taxes. To specify a blacklist as an environment variable you must use a string with whitespace, "
+        'for example `export DA_COUNTRY_BLACKLIST="UK US"`. If you have a country in both the blacklist and the '
+        "whitelist, the blacklist wins."
+    ),
+)
+@click.option(
     "-V", "--verbose", default=False, is_flag=True, help="use flag if you want to see logs as the program runs"
 )
 @click.option(
@@ -183,6 +198,7 @@ def main(
     accept_no_sleeve,
     accept_ungraded_sleeve,
     country_whitelist,
+    country_blacklist,
     verbose,
     test,
 ):
@@ -208,6 +224,7 @@ def main(
             min_media_condition, min_sleeve_condition, accept_generic_sleeve, accept_no_sleeve, accept_ungraded_sleeve
         ),
         set(da_types.COUNTRIES[c] for c in country_whitelist),
+        set(da_types.COUNTRIES[c] for c in country_blacklist),
         verbose,
     ]
 

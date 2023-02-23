@@ -70,6 +70,7 @@ def loop(
     seller_filters: da_types.SellerFilters,
     record_filters: da_types.RecordFilters,
     country_whitelist: Set[str],
+    country_blacklist: Set[str],
     verbose: bool = False,
 ):
     """Event loop, each time this is called we query the discogs marketplace for all items in wantlist."""
@@ -111,7 +112,7 @@ def loop(
 
                 # if seller, sleeve, and media conditions are not satisfied, move to the next listing
                 if not da_util.conditions_satisfied(
-                    listing, release, seller_filters, record_filters, country_whitelist
+                    listing, release, seller_filters, record_filters, country_whitelist, country_blacklist
                 ):
                     if verbose:
                         logger.info(
