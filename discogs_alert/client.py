@@ -138,5 +138,4 @@ class AnonClient(Client):
         # pull & scrape page content
         url = f"{self._base_url_non_api}/sell/release/{release_id}?ev=rb&sort=price%2Casc"
         self.driver.get(url)
-        response_content = self.driver.page_source
-        return da_scrape.scrape_listings_from_marketplace(response_content)
+        return da_scrape.scrape_listings_from_marketplace(self.driver.page_source, release_id)
