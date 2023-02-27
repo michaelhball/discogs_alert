@@ -2,6 +2,6 @@
 
 set -e
 
-. /venv/bin/activate
+. /home/discogs_alert/venv/bin/activate
 
 exec python -m discogs_alert

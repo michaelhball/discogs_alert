@@ -65,8 +65,8 @@ Assuming you have docker installed, you can pull the latest image via
 docker pull miggleball/discogs_alert:latest
 ```
 
-NB: the `discogs_alert` docker image doesn't yet support M1 macs (those recent models with the ARM64 chip). I hope to make this possible soon.
-
+Calling `docker run discogs_alert:latest` runs the entrypoint `python -m discogs_alert`, so you'll need to pass the
+required arguments, easiest using an environment variable file (`docker run --env-file .env discogs_alert:latest`).
 
 ## Setup
 
