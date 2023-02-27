@@ -106,7 +106,6 @@ class AnonClient(Client):
 
         self.options = webdriver.ChromeOptions()
         options_arguments = [
-            "no-sandbox",
             "--disable-gpu",
             "--disable-dev-shm-usage",
             "--disable-infobars",
@@ -124,18 +123,7 @@ class AnonClient(Client):
         )  # disable logs
 
     def get_marketplace_listings(self, release_id: int) -> da_types.Listings:
-        """Get list of listings currently for sale for particular release.
+        """Get list of listings currently for sale for particular release (by release's discogs ID)"""
 
-        Args:
-            release_id: discogs ID of release whose listings we want.
-
-        Returns: list of Listing objects if successful, False otherwise.
-        """
-
-        # update user_agent (don't need because we choose a new one on instantiation, every loop).
-        # self.driver.execute_cdp_cmd('Network.setUserAgentOverride', {"userAgent": user_agent})
-
-        # pull & scrape page content
-        url = f"{self._base_url_non_api}/sell/release/{release_id}?ev=rb&sort=price%2Casc"
-        self.driver.get(url)
+        self.driver.get(f"{self._base_url_non_api}/sell/release/{release_id}?ev=rb&sort=price%2Casc")
         return da_scrape.scrape_listings_from_marketplace(self.driver.page_source, release_id)
