@@ -148,6 +148,7 @@ def loop(
                     )
 
         client_anon.driver.close()
+        client_anon.driver.quit()
 
     except ConnectionError:
         logger.info("ConnectionError: looping will continue as usual", exc_info=True)
