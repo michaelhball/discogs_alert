@@ -4,7 +4,8 @@ import time
 import click
 import schedule
 
-from discogs_alert import __version__, click as da_click, loop as da_loop, types as da_types
+from discogs_alert import __version__, entities as da_entities, loop as da_loop
+from discogs_alert.util import click as da_click, constants as dac
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -77,7 +78,7 @@ logger = logging.getLogger(__name__)
     default="EUR",
     show_default=True,
     envvar="DA_CURRENCY",
-    type=click.Choice(da_types.CURRENCY_CHOICES),
+    type=click.Choice(dac.CURRENCY_CHOICES),
     help="preferred currency (to convert all others to)",
 )
 @click.option(
@@ -101,19 +102,19 @@ logger = logging.getLogger(__name__)
 @click.option(
     "-mmc",
     "--min-media-condition",
-    default=da_types.CONDITION.VERY_GOOD,
+    default=da_entities.CONDITION.VERY_GOOD,
     show_default=True,
     envvar="DA_MIN_MEDIA_CONDITION",
-    type=click.Choice(da_types.CONDITION),
+    type=click.Choice(da_entities.CONDITION),
     help="minimum media condition you want to accept",
 )
 @click.option(
     "-msc",
     "--min-sleeve-condition",
-    default=da_types.CONDITION.VERY_GOOD,
+    default=da_entities.CONDITION.VERY_GOOD,
     show_default=True,
     envvar="DA_MIN_SLEEVE_CONDITION",
-    type=click.Choice(da_types.CONDITION),
+    type=click.Choice(da_entities.CONDITION),
     help="minimum sleeve condition you want to accept",
 )
 @click.option(
@@ -146,7 +147,7 @@ logger = logging.getLogger(__name__)
     multiple=True,
     default=[],
     envvar="DA_COUNTRY_WHITELIST",
-    type=click.Choice(da_types.COUNTRY_CHOICES),
+    type=click.Choice(dac.COUNTRY_CHOICES),
     help=(
         "If any countries are passed in the whitelist, you'll _only_ be alerted about listings by sellers of those "
         "countries (e.g. if you live in the USA and only want to consider releases for sale in the USA). To specify a "
@@ -160,7 +161,7 @@ logger = logging.getLogger(__name__)
     multiple=True,
     default=[],
     envvar="DA_COUNTRY_BLACKLIST",
-    type=click.Choice(da_types.COUNTRY_CHOICES),
+    type=click.Choice(dac.COUNTRY_CHOICES),
     help=(
         "If any countries are passed in the blacklist, you'll be alerted about listings by sellers of all countries "
         "excluding those excluding those, e.g. if you live in Germany and don't want to consider releases from the UK "
@@ -219,12 +220,12 @@ def main(
         user_agent,
         country,
         currency,
-        da_types.SellerFilters(min_seller_rating, min_seller_sales),
-        da_types.RecordFilters(
+        da_entities.SellerFilters(min_seller_rating, min_seller_sales),
+        da_entities.RecordFilters(
             min_media_condition, min_sleeve_condition, accept_generic_sleeve, accept_no_sleeve, accept_ungraded_sleeve
         ),
-        set(da_types.COUNTRIES[c] for c in country_whitelist),
-        set(da_types.COUNTRIES[c] for c in country_blacklist),
+        set(dac.COUNTRIES[c] for c in country_whitelist),
+        set(dac.COUNTRIES[c] for c in country_blacklist),
         verbose,
     ]
 

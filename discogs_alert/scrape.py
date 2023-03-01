@@ -4,7 +4,8 @@ import re
 import dacite
 from bs4 import BeautifulSoup
 
-from discogs_alert import types as da_types
+from discogs_alert import entities as da_entities
+from discogs_alert.util import constants as dac
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +14,7 @@ class ParsingException(Exception):
     ...
 
 
-def scrape_listings_from_marketplace(response_content: str, release_id: int) -> da_types.Listings:
+def scrape_listings_from_marketplace(response_content: str, release_id: int) -> da_entities.Listings:
     """Takes response from marketplace get request (for single release) and parses
     the important listing information.
 
@@ -55,10 +56,10 @@ def scrape_listings_from_marketplace(response_content: str, release_id: int) -> 
         item_condition_para = item_desc_cell.find("p", class_="item_condition")
 
         # extract conditions of media (always listed) and sleeve (optional)
-        conditions = (da_types.CONDITION_PARSER.get(s) for s in item_condition_para.stripped_strings)
+        conditions = (da_entities.CONDITION_PARSER.get(s) for s in item_condition_para.stripped_strings)
         conditions = [c for c in conditions if c is not None]
         # in case of missing sleeve condition
-        conditions.append(da_types.CONDITION.NOT_GRADED)
+        conditions.append(da_entities.CONDITION.NOT_GRADED)
         listing["media_condition"] = conditions[0]
         listing["sleeve_condition"] = conditions[1]
 
@@ -103,7 +104,7 @@ def scrape_listings_from_marketplace(response_content: str, release_id: int) -> 
                 )
 
         listing["price"] = {
-            "currency": da_types.CURRENCIES[price_currency],
+            "currency": dac.CURRENCIES[price_currency],
             "value": float(price_string),
         }
 
@@ -113,10 +114,10 @@ def scrape_listings_from_marketplace(response_content: str, release_id: int) -> 
         if shipping_currency is not None:
             shipping_string = shipping_string.replace(shipping_currency, "").replace(",", "")
             listing["price"]["shipping"] = {
-                "currency": da_types.CURRENCIES[shipping_currency],
+                "currency": dac.CURRENCIES[shipping_currency],
                 "value": float(shipping_string),
             }
 
-        listings.append(dacite.from_dict(da_types.Listing, listing))
+        listings.append(dacite.from_dict(da_entities.Listing, listing))
 
     return sorted(listings, key=lambda x: x.price.value)
