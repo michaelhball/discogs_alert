@@ -10,7 +10,7 @@ import dacite
 import requests
 from requests.exceptions import ConnectionError
 
-from discogs_alert import client as da_client, notify as da_notify, types as da_types, util as da_util
+from discogs_alert import client as da_client, entities as da_entities, notify as da_notify
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ def load_wantlist(
     list_id: Optional[int] = None,
     user_token_client: Optional[da_client.UserTokenClient] = None,
     wantlist_path: Optional[str] = None,
-) -> List[da_types.Release]:
+) -> List[da_entities.Release]:
     """Loads the user's wantlist from one of two sources, as a list of `Release` objects."""
     assert wantlist_path is not None or (list_id is not None and user_token_client is not None)
     if list_id is not None:
@@ -29,10 +29,10 @@ def load_wantlist(
         wantlist = []
         for release_dict in json.load(Path(wantlist_path).open("r")):
             if (min_media_condition := release_dict.get("min_media_condition")) is not None:
-                release_dict["min_media_condition"] = da_types.CONDITION[min_media_condition]
+                release_dict["min_media_condition"] = da_entities.CONDITION[min_media_condition]
             if (min_sleeve_condition := release_dict.get("min_sleeve_condition")) is not None:
-                release_dict["min_sleeve_condition"] = da_types.CONDITION[min_sleeve_condition]
-            wantlist.append(dacite.from_dict(da_types.Release, release_dict))
+                release_dict["min_sleeve_condition"] = da_entities.CONDITION[min_sleeve_condition]
+            wantlist.append(dacite.from_dict(da_entities.Release, release_dict))
         return wantlist
 
 
@@ -67,8 +67,8 @@ def loop(
     user_agent: str,
     country: str,
     currency: str,
-    seller_filters: da_types.SellerFilters,
-    record_filters: da_types.RecordFilters,
+    seller_filters: da_entities.SellerFilters,
+    record_filters: da_entities.RecordFilters,
     country_whitelist: Set[str],
     country_blacklist: Set[str],
     verbose: bool = False,
@@ -92,13 +92,14 @@ def loop(
         wantlist_items = load_wantlist(list_id, user_token_client, wantlist_path)
         random.shuffle(wantlist_items)
         for idx, release in enumerate(wantlist_items):
-            valid_listings: List[da_types.Listing] = []
+            valid_listings: List[da_entities.Listing] = []
 
             # the discogs API has a 60-request-per-minute limit that only resets after 60s of inactivity
             if user_token_client.rate_limit_remaining == 1:
                 time.sleep(60)
 
             for listing in client_anon.get_marketplace_listings(release.id):
+                listing = listing.convert_currency(currency)  # convert —> the base currency
 
                 # if listing is definitely unavailable, move to the next listing
                 if listing.is_definitely_unavailable(country):
@@ -111,7 +112,7 @@ def loop(
                     continue
 
                 # if seller, sleeve, and media conditions are not satisfied, move to the next listing
-                if not da_util.conditions_satisfied(
+                if not da_entities.conditions_satisfied(
                     listing, release, seller_filters, record_filters, country_whitelist, country_blacklist
                 ):
                     if verbose:
@@ -122,8 +123,7 @@ def loop(
                         )
                     continue
 
-                # if the price is above our threshold (after converting to the base currency), move to the next listing
-                listing.price = da_util.convert_listing_price_currency(listing.price, currency)
+                # if the price is above our threshold, move to the next listing
                 if (isinstance(listing.price, bool) and not listing.price) or listing.price_is_above_threshold(
                     release.price_threshold
                 ):

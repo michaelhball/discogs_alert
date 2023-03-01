@@ -14,7 +14,7 @@ from fake_useragent import UserAgent
 from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
 
-from discogs_alert import scrape as da_scrape, types as da_types
+from discogs_alert import entities as da_entities, scrape as da_scrape
 
 logger = logging.getLogger(__name__)
 
@@ -57,22 +57,22 @@ class Client:
     def _put(self, url: str, data, is_api: bool = True):
         return self._request("PUT", url, data=data)
 
-    def get_list(self, list_id: int) -> da_types.UserList:
+    def get_list(self, list_id: int) -> da_entities.UserList:
         user_list_dict = self._get(f"{self._base_url}/lists/{list_id}")
-        user_list_dict["items"] = [da_types.Release(**item) for item in user_list_dict["items"]]
-        return da_types.UserList(**user_list_dict)
+        user_list_dict["items"] = [da_entities.Release(**item) for item in user_list_dict["items"]]
+        return da_entities.UserList(**user_list_dict)
 
-    def get_listing(self, listing_id: int) -> da_types.Listing:
+    def get_listing(self, listing_id: int) -> da_entities.Listing:
         listing_dict = self._get(f"{self._base_url}/marketplace/listings/{listing_id}")
-        return da_types.Listing(**listing_dict)
+        return da_entities.Listing(**listing_dict)
 
-    def get_release(self, release_id: int) -> da_types.Release:
+    def get_release(self, release_id: int) -> da_entities.Release:
         release_dict = self._get(f"{self._base_url}/releases/{release_id}")
-        return da_types.Release(**release_dict)
+        return da_entities.Release(**release_dict)
 
-    def get_release_stats(self, release_id: int) -> Union[da_types.ReleaseStats, bool]:
+    def get_release_stats(self, release_id: int) -> Union[da_entities.ReleaseStats, bool]:
         release_stats_dict = self._get(f"{self._base_url}/marketplace/stats/{release_id}")
-        return da_types.ReleaseStats(**release_stats_dict) if isinstance(release_stats_dict, dict) else False
+        return da_entities.ReleaseStats(**release_stats_dict) if isinstance(release_stats_dict, dict) else False
 
     def get_wantlist(self, username: str):
         # TODO: add entities to deserialise this correctly
@@ -122,7 +122,7 @@ class AnonClient(Client):
             self.driver_manager, options=self.options, service_log_path="/dev/null" if sys.platform in unix else "NUL"
         )  # disable logs
 
-    def get_marketplace_listings(self, release_id: int) -> da_types.Listings:
+    def get_marketplace_listings(self, release_id: int) -> da_entities.Listings:
         """Get list of listings currently for sale for particular release (by release's discogs ID)"""
 
         self.driver.get(f"{self._base_url_non_api}/sell/release/{release_id}?ev=rb&sort=price%2Casc")

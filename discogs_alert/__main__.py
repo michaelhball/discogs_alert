@@ -4,7 +4,8 @@ import time
 import click
 import schedule
 
-from discogs_alert import __version__, click as da_click, constants as dac, loop as da_loop, types as da_types
+from discogs_alert import __version__, entities as da_entities, loop as da_loop
+from discogs_alert.util import click as da_click, constants as dac
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -101,19 +102,19 @@ logger = logging.getLogger(__name__)
 @click.option(
     "-mmc",
     "--min-media-condition",
-    default=da_types.CONDITION.VERY_GOOD,
+    default=da_entities.CONDITION.VERY_GOOD,
     show_default=True,
     envvar="DA_MIN_MEDIA_CONDITION",
-    type=click.Choice(da_types.CONDITION),
+    type=click.Choice(da_entities.CONDITION),
     help="minimum media condition you want to accept",
 )
 @click.option(
     "-msc",
     "--min-sleeve-condition",
-    default=da_types.CONDITION.VERY_GOOD,
+    default=da_entities.CONDITION.VERY_GOOD,
     show_default=True,
     envvar="DA_MIN_SLEEVE_CONDITION",
-    type=click.Choice(da_types.CONDITION),
+    type=click.Choice(da_entities.CONDITION),
     help="minimum sleeve condition you want to accept",
 )
 @click.option(
@@ -219,8 +220,8 @@ def main(
         user_agent,
         country,
         currency,
-        da_types.SellerFilters(min_seller_rating, min_seller_sales),
-        da_types.RecordFilters(
+        da_entities.SellerFilters(min_seller_rating, min_seller_sales),
+        da_entities.RecordFilters(
             min_media_condition, min_sleeve_condition, accept_generic_sleeve, accept_no_sleeve, accept_ungraded_sleeve
         ),
         set(dac.COUNTRIES[c] for c in country_whitelist),
