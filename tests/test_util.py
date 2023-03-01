@@ -4,7 +4,7 @@ import pathlib
 
 import pytest
 
-from discogs_alert import types as da_types, util as da_util
+from discogs_alert import constants as dac, types as da_types, util as da_util
 
 
 def test_conditions_satisfied():
@@ -37,11 +37,11 @@ def mock_currency_rates(monkeypatch: pytest.MonkeyPatch, rates: da_types.Currenc
 def test_get_currency_rates():
 
     # test that the URL works for all supported currencies (requires internet connection)
-    for currency in da_types.CURRENCY_CHOICES:
+    for currency in dac.CURRENCY_CHOICES:
         rates = da_util.get_currency_rates(currency)
 
         # test that all supported currencies are present in the response
-        assert all([currency_2 in rates for currency_2 in da_types.CURRENCY_CHOICES if currency_2 != currency])
+        assert all([currency_2 in rates for currency_2 in dac.CURRENCY_CHOICES if currency_2 != currency])
 
         # make sure that the rates values returned are all non-negative floats
         assert all((isinstance(v, int) or isinstance(v, float)) and v >= 0 for v in rates.values())

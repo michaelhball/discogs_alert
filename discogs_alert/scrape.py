@@ -4,7 +4,7 @@ import re
 import dacite
 from bs4 import BeautifulSoup
 
-from discogs_alert import types as da_types
+from discogs_alert import constants as dac, types as da_types
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +103,7 @@ def scrape_listings_from_marketplace(response_content: str, release_id: int) -> 
                 )
 
         listing["price"] = {
-            "currency": da_types.CURRENCIES[price_currency],
+            "currency": dac.CURRENCIES[price_currency],
             "value": float(price_string),
         }
 
@@ -113,7 +113,7 @@ def scrape_listings_from_marketplace(response_content: str, release_id: int) -> 
         if shipping_currency is not None:
             shipping_string = shipping_string.replace(shipping_currency, "").replace(",", "")
             listing["price"]["shipping"] = {
-                "currency": da_types.CURRENCIES[shipping_currency],
+                "currency": dac.CURRENCIES[shipping_currency],
                 "value": float(shipping_string),
             }
 

@@ -4,7 +4,7 @@ import time
 import click
 import schedule
 
-from discogs_alert import __version__, click as da_click, loop as da_loop, types as da_types
+from discogs_alert import __version__, click as da_click, constants as dac, loop as da_loop, types as da_types
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -77,7 +77,7 @@ logger = logging.getLogger(__name__)
     default="EUR",
     show_default=True,
     envvar="DA_CURRENCY",
-    type=click.Choice(da_types.CURRENCY_CHOICES),
+    type=click.Choice(dac.CURRENCY_CHOICES),
     help="preferred currency (to convert all others to)",
 )
 @click.option(
@@ -146,7 +146,7 @@ logger = logging.getLogger(__name__)
     multiple=True,
     default=[],
     envvar="DA_COUNTRY_WHITELIST",
-    type=click.Choice(da_types.COUNTRY_CHOICES),
+    type=click.Choice(dac.COUNTRY_CHOICES),
     help=(
         "If any countries are passed in the whitelist, you'll _only_ be alerted about listings by sellers of those "
         "countries (e.g. if you live in the USA and only want to consider releases for sale in the USA). To specify a "
@@ -160,7 +160,7 @@ logger = logging.getLogger(__name__)
     multiple=True,
     default=[],
     envvar="DA_COUNTRY_BLACKLIST",
-    type=click.Choice(da_types.COUNTRY_CHOICES),
+    type=click.Choice(dac.COUNTRY_CHOICES),
     help=(
         "If any countries are passed in the blacklist, you'll be alerted about listings by sellers of all countries "
         "excluding those excluding those, e.g. if you live in Germany and don't want to consider releases from the UK "
@@ -223,8 +223,8 @@ def main(
         da_types.RecordFilters(
             min_media_condition, min_sleeve_condition, accept_generic_sleeve, accept_no_sleeve, accept_ungraded_sleeve
         ),
-        set(da_types.COUNTRIES[c] for c in country_whitelist),
-        set(da_types.COUNTRIES[c] for c in country_blacklist),
+        set(dac.COUNTRIES[c] for c in country_whitelist),
+        set(dac.COUNTRIES[c] for c in country_blacklist),
         verbose,
     ]
 

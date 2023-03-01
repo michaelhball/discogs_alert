@@ -5,7 +5,7 @@ from typing import Set
 
 import requests
 
-from discogs_alert import types as da_types
+from discogs_alert import constants as dac, types as da_types
 
 
 def conditions_satisfied(
@@ -113,7 +113,7 @@ def get_currency_rates(base_currency: str) -> da_types.CurrencyRates:
     Returns: a dict containing exchange rates _to_ all major currencies _from_ the given base currency
     """
 
-    if base_currency not in da_types.CURRENCY_CHOICES:
+    if base_currency not in dac.CURRENCY_CHOICES:
         raise InvalidCurrencyException(f"{base_currency} is not a supported currency (see `discogs_alert/types.py`).")
     return requests.get(f"https://api.exchangerate.host/latest?base={base_currency}").json().get("rates")
 
@@ -137,6 +137,8 @@ def convert_currency(value: float, old_currency: str, new_currency: str) -> floa
 
 def convert_listing_price_currency(listing_price: da_types.ListingPrice, new_currency: str) -> da_types.ListingPrice:
     """Converts a `ListingPrice` object from its existing currency to another, including the shipping price."""
+
+    # TODO: make this a classmethod of a listing...
 
     listing_price = copy.deepcopy(listing_price)
 
