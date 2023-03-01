@@ -7,10 +7,10 @@ from pathlib import Path
 from typing import List, Optional, Set
 
 import dacite
-import requests
 from requests.exceptions import ConnectionError
 
-from discogs_alert import client as da_client, entities as da_entities, notify as da_notify
+from discogs_alert import client as da_client, entities as da_entities
+from discogs_alert.notify import pushbullet
 
 logger = logging.getLogger(__name__)
 
@@ -21,42 +21,20 @@ def load_wantlist(
     wantlist_path: Optional[str] = None,
 ) -> List[da_entities.Release]:
     """Loads the user's wantlist from one of two sources, as a list of `Release` objects."""
+
     assert wantlist_path is not None or (list_id is not None and user_token_client is not None)
     if list_id is not None:
         return user_token_client.get_list(list_id).items
-    else:
-        # TODO: find a way to automatically instantiate these nested Enums based on the strings
-        wantlist = []
-        for release_dict in json.load(Path(wantlist_path).open("r")):
-            if (min_media_condition := release_dict.get("min_media_condition")) is not None:
-                release_dict["min_media_condition"] = da_entities.CONDITION[min_media_condition]
-            if (min_sleeve_condition := release_dict.get("min_sleeve_condition")) is not None:
-                release_dict["min_sleeve_condition"] = da_entities.CONDITION[min_sleeve_condition]
-            wantlist.append(dacite.from_dict(da_entities.Release, release_dict))
-        return wantlist
 
-
-def get_all_pushes(pushbullet_token: str) -> List[str]:
-    """"""
-    headers = {"Authorization": "Bearer " + pushbullet_token, "Content-Type": "application/json"}
-    url = "https://api.pushbullet.com/v2/pushes"
-    resp = requests.get(url, headers=headers)
-    rate_limit_remaining = int(resp.headers.get("X-Ratelimit-Remaining"))
-    while rate_limit_remaining < 2:
-        time.sleep(60)
-        resp = requests.get(url, headers=headers)
-        rate_limit_remaining = int(resp.headers.get("X-Ratelimit-Remaining"))
-    resp = resp.json()
-    pushes, cursor = resp.get("pushes"), resp.get("cursor")
-    while cursor is not None:
-        if rate_limit_remaining < 2:
-            time.sleep(60)
-        resp = requests.get(url + f"?cursor={cursor}", headers=headers)
-        rate_limit_remaining = int(resp.headers.get("X-Ratelimit-Remaining"))
-        resp = resp.json()
-        pushes += resp.get("pushes")
-        cursor = resp.get("cursor")
-    return pushes
+    # TODO: find a way to automatically instantiate these nested Enums based on the strings
+    wantlist = []
+    for release_dict in json.load(Path(wantlist_path).open("r")):
+        if (min_media_condition := release_dict.get("min_media_condition")) is not None:
+            release_dict["min_media_condition"] = da_entities.CONDITION[min_media_condition]
+        if (min_sleeve_condition := release_dict.get("min_sleeve_condition")) is not None:
+            release_dict["min_sleeve_condition"] = da_entities.CONDITION[min_sleeve_condition]
+        wantlist.append(dacite.from_dict(da_entities.Release, release_dict))
+    return wantlist
 
 
 def loop(
@@ -85,7 +63,7 @@ def loop(
 
         # get the complete list of previous pushes
         pushes_dict = defaultdict(set)
-        for p in get_all_pushes(pushbullet_token):
+        for p in pushbullet.get_all_pushes(pushbullet_token):
             if "title" in p and "body" in p:
                 pushes_dict[p["title"]].add(p["body"])
 
@@ -124,9 +102,7 @@ def loop(
                     continue
 
                 # if the price is above our threshold, move to the next listing
-                if (isinstance(listing.price, bool) and not listing.price) or listing.price_is_above_threshold(
-                    release.price_threshold
-                ):
+                if listing.price_is_above_threshold(release.price_threshold):
                     if verbose:
                         logger.info(
                             f"Listing found that's above the price threshold:\n"
@@ -143,7 +119,7 @@ def loop(
                 message_body = f"Listing available: {listing.url}"
                 if message_title not in pushes_dict or message_body not in pushes_dict[message_title]:
                     print(f"{message_title} — {message_body}")
-                    da_notify.send_pushbullet_push(
+                    pushbullet.send_pushbullet_push(
                         token=pushbullet_token, message_title=message_title, message_body=message_body, verbose=verbose
                     )
 

@@ -1,9 +1,34 @@
 import json
 import logging
+import time
+from typing import List
 
 import requests
 
 logger = logging.getLogger(__name__)
+
+
+def get_all_pushes(pushbullet_token: str) -> List[str]:
+    """"""
+    headers = {"Authorization": "Bearer " + pushbullet_token, "Content-Type": "application/json"}
+    url = "https://api.pushbullet.com/v2/pushes"
+    resp = requests.get(url, headers=headers)
+    rate_limit_remaining = int(resp.headers.get("X-Ratelimit-Remaining"))
+    while rate_limit_remaining < 2:
+        time.sleep(60)
+        resp = requests.get(url, headers=headers)
+        rate_limit_remaining = int(resp.headers.get("X-Ratelimit-Remaining"))
+    resp = resp.json()
+    pushes, cursor = resp.get("pushes"), resp.get("cursor")
+    while cursor is not None:
+        if rate_limit_remaining < 2:
+            time.sleep(60)
+        resp = requests.get(url + f"?cursor={cursor}", headers=headers)
+        rate_limit_remaining = int(resp.headers.get("X-Ratelimit-Remaining"))
+        resp = resp.json()
+        pushes += resp.get("pushes")
+        cursor = resp.get("cursor")
+    return pushes
 
 
 def send_pushbullet_push(token: str, message_title: str, message_body: str, verbose: bool = False) -> bool:
