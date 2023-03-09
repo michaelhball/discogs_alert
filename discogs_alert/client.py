@@ -106,7 +106,7 @@ class AnonClient(Client):
 
         self.options = webdriver.ChromeOptions()
         options_arguments = [
-            "--remote-debugging-port=9222"
+            "--remote-debugging-port=9222",
             "--disable-gpu",
             "--disable-dev-shm-usage",
             "--disable-infobars",
