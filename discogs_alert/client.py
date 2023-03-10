@@ -131,7 +131,7 @@ class AnonClient(Client):
         try:
             # to install both chromium binary and the matching chromedriver binary:
             # apt-get install chromium-driver
-            return subprocess.check_output(['which', 'chromedriver'])
+            return subprocess.check_output(['which', 'chromedriver']).decode().strip()
         except subprocess.CalledProcessError:
             # will install latest chromedriver binary regardless of currently installed chromium version
             return ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install()
