@@ -12,7 +12,7 @@ from typing import Union
 
 import requests
 from fake_useragent import UserAgent
-from selenium.chromium.webdriver import ChromiumDriver, Service, ChromeOptions
+from selenium.webdriver.chromium.webdriver import ChromiumDriver, Service, ChromeOptions
 from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.core.utils import ChromeType
 
