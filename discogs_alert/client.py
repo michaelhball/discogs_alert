@@ -12,7 +12,7 @@ from typing import Union
 
 import requests
 from fake_useragent import UserAgent
-from selenium.webdriver.chromium.webdriver import ChromiumDriver
+from selenium import webdriver
 from selenium.webdriver.chromium.service import ChromiumService
 from selenium.webdriver.chromium.options import ChromiumOptions
 from webdriver_manager.chrome import ChromeDriverManager
@@ -125,7 +125,7 @@ class AnonClient(Client):
         for argument in options_arguments:
             options.add_argument(argument)
 
-        self.driver = ChromiumDriver(service=service, options=options)
+        self.driver = webdriver.Chrome(service=service, options=options)
 
     def get_driver_path(self):
         try:
