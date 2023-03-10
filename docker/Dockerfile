@@ -27,22 +27,18 @@ RUN poetry install --no-dev --no-root
 COPY . .
 RUN poetry build
 
-# install chromium
-RUN apt-get update && apt-get install -y chromium
+# install chromium binary and matching chromedriver binary
+RUN apt-get update && apt-get install -y --no-install-recommends chromium-driver
 
 
 # create lightweight 'final' stage with which to run discogs alert
 FROM python-base as final
 
-# Add `discogs_alert` user and setup home dir.
-RUN useradd -ms /bin/bash discogs_alert
-USER discogs_alert
-WORKDIR /home/discogs_alert
-
 # copy everything we need & install `discogs_alert` from whl
 COPY --from=builder /venv /home/discogs_alert/venv
 COPY --from=builder /dist .
 COPY --from=builder /usr/bin/chromium /usr/bin/chromium
+COPY --from=builder /usr/bin/chromedriver /usr/bin/chromedriver
 RUN . /home/discogs_alert/venv/bin/activate && pip install *.whl
 
 # run entrypoint
