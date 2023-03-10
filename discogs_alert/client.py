@@ -12,7 +12,7 @@ from typing import Union
 
 import requests
 from fake_useragent import UserAgent
-from selenium import webdriver
+from webdriver.chromium.webdriver import ChromiumDriver, Service, ChromeOptions
 from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.core.utils import ChromeType
 
@@ -106,7 +106,7 @@ class AnonClient(Client):
 
         self.user_agent = UserAgent()  # can pull up-to-date user agents from any modern browser
 
-        self.options = webdriver.ChromeOptions()
+        options = ChromeOptions()
         options_arguments = [
             "--no-sandbox",
             "--disable-gpu",
@@ -119,9 +119,9 @@ class AnonClient(Client):
         for argument in options_arguments:
             self.options.add_argument(argument)
 
-        service_log_path = "/dev/null" if sys.platform in {"linux", "linux2", "darwin"} else "NUL"
-        self.driver = webdriver.Chrome(
-            self.get_driver_path(), options=self.options, service_log_path=service_log_path
+        log_path = "/dev/null" if sys.platform in {"linux", "linux2", "darwin"} else "NUL"
+        self.driver = ChromiumDriver(
+            service=Service(self.get_driver_path(), log_path=log_path), options=options
         )  # disable logs
 
     def get_driver_path(self):
