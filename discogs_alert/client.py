@@ -6,6 +6,7 @@ os.environ["WDM_LOG"] = "0"
 
 import json
 import logging
+import subprocess
 import sys
 from typing import Union
 
@@ -13,6 +14,7 @@ import requests
 from fake_useragent import UserAgent
 from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
+from webdriver_manager.core.utils import ChromeType
 
 from discogs_alert import entities as da_entities, scrape as da_scrape
 
@@ -117,12 +119,23 @@ class AnonClient(Client):
         for argument in options_arguments:
             self.options.add_argument(argument)
 
-        self.driver_manager = ChromeDriverManager().install()
-        unix = {"linux", "linux2", "darwin"}
+        service_log_path = "/dev/null" if sys.platform in {"linux", "linux2", "darwin"} else "NUL"
         self.driver = webdriver.Chrome(
-            self.driver_manager, options=self.options, service_log_path="/dev/null" if sys.platform in unix else "NUL"
+            self.get_driver_path(), options=self.options, service_log_path=service_log_path
         )  # disable logs
 
+    def get_driver_path(self):
+        try:
+            # to install both chromium binary and the matching chromedriver binary:
+            # debian:
+            # apt-get install chromium-driver
+            # ubuntu:
+            # apt-get install chromium-chromedriver
+            return subprocess.check_output(['which', 'chromedriver'])
+        except subprocess.CalledProcessError:
+            # will install latest chromedriver binary regardless of currently installed chromium version
+            return ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install()
+        
     def get_marketplace_listings(self, release_id: int) -> da_entities.Listings:
         """Get list of listings currently for sale for particular release (by release's discogs ID)"""
 
