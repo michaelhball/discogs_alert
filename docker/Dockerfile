@@ -35,11 +35,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends chromium-driver
 FROM python-base as final
 
 # copy everything we need & install `discogs_alert` from whl
-COPY --from=builder /venv /home/discogs_alert/venv
+COPY --from=builder /venv /venv
 COPY --from=builder /dist .
 COPY --from=builder /usr/bin/chromium /usr/bin/chromium
 COPY --from=builder /usr/bin/chromedriver /usr/bin/chromedriver
-RUN . /home/discogs_alert/venv/bin/activate && pip install *.whl
+RUN . /venv/bin/activate && pip install *.whl
 
 # run entrypoint
 COPY ./docker/docker-entrypoint.sh ./
