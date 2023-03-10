@@ -12,7 +12,7 @@ from typing import Union
 
 import requests
 from fake_useragent import UserAgent
-from webdriver.chromium.webdriver import ChromiumDriver, Service, ChromeOptions
+from selenium.chromium.webdriver import ChromiumDriver, Service, ChromeOptions
 from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.core.utils import ChromeType
 
@@ -108,7 +108,6 @@ class AnonClient(Client):
 
         options = ChromeOptions()
         options_arguments = [
-            "--no-sandbox",
             "--disable-gpu",
             "--disable-dev-shm-usage",
             "--disable-infobars",
@@ -116,6 +115,9 @@ class AnonClient(Client):
             "--incognito",
             f"--user-agent={self.user_agent.random}",  # initialize with random user-agent
         ]
+        if os.geteuid() == 0:
+            # running as root
+            options_arguments.append("--no-sandbox")
         for argument in options_arguments:
             self.options.add_argument(argument)
 
