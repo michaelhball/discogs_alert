@@ -12,7 +12,9 @@ from typing import Union
 
 import requests
 from fake_useragent import UserAgent
-from selenium.webdriver.chromium.webdriver import ChromiumDriver, Service, ChromeOptions
+from selenium.webdriver.chromium.webdriver import ChromiumDriver
+from selenium.webdriver.chromium.service import ChromiumService
+from selenium.webdriver.chromium.options import ChromiumOptions
 from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.core.utils import ChromeType
 
@@ -106,7 +108,9 @@ class AnonClient(Client):
 
         self.user_agent = UserAgent()  # can pull up-to-date user agents from any modern browser
 
-        options = ChromeOptions()
+        log_path = "/dev/null" if sys.platform in {"linux", "linux2", "darwin"} else "NUL"  # disable logs
+        service = ChromiumService(self.get_driver_path(), log_path=log_path)
+        options = ChromiumOptions()
         options_arguments = [
             "--disable-gpu",
             "--disable-dev-shm-usage",
@@ -121,18 +125,12 @@ class AnonClient(Client):
         for argument in options_arguments:
             options.add_argument(argument)
 
-        log_path = "/dev/null" if sys.platform in {"linux", "linux2", "darwin"} else "NUL"
-        self.driver = ChromiumDriver(
-            service=Service(self.get_driver_path(), log_path=log_path), options=options
-        )  # disable logs
+        self.driver = ChromiumDriver(service=service, options=options)
 
     def get_driver_path(self):
         try:
             # to install both chromium binary and the matching chromedriver binary:
-            # debian:
             # apt-get install chromium-driver
-            # ubuntu:
-            # apt-get install chromium-chromedriver
             return subprocess.check_output(['which', 'chromedriver'])
         except subprocess.CalledProcessError:
             # will install latest chromedriver binary regardless of currently installed chromium version
