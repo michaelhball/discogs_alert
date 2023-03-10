@@ -119,7 +119,7 @@ class AnonClient(Client):
             # running as root
             options_arguments.append("--no-sandbox")
         for argument in options_arguments:
-            self.options.add_argument(argument)
+            options.add_argument(argument)
 
         log_path = "/dev/null" if sys.platform in {"linux", "linux2", "darwin"} else "NUL"
         self.driver = ChromiumDriver(
