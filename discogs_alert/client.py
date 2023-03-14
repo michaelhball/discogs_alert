@@ -13,8 +13,8 @@ from typing import Union
 import requests
 from fake_useragent import UserAgent
 from selenium import webdriver
-from selenium.webdriver.chromium.service import ChromiumService
 from selenium.webdriver.chromium.options import ChromiumOptions
+from selenium.webdriver.chromium.service import ChromiumService
 from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.core.utils import ChromeType
 
@@ -135,7 +135,7 @@ class AnonClient(Client):
         except subprocess.CalledProcessError:
             # will install latest chromedriver binary regardless of currently installed chromium version
             return ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install()
-        
+
     def get_marketplace_listings(self, release_id: int) -> da_entities.Listings:
         """Get list of listings currently for sale for particular release (by release's discogs ID)"""
 
