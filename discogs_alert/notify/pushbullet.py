@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 def get_all_pushes(pushbullet_token: str) -> List[str]:
     """"""
     headers = {"Authorization": "Bearer " + pushbullet_token, "Content-Type": "application/json"}
-    url = "https://api.pushbullet.com/v2/pushes"
+    url = "https://api.pushbullet.com/v2/pushes?active=true&limit=500"
     resp = requests.get(url, headers=headers)
     rate_limit_remaining = int(resp.headers.get("X-Ratelimit-Remaining"))
     while rate_limit_remaining < 2:
@@ -20,14 +20,19 @@ def get_all_pushes(pushbullet_token: str) -> List[str]:
         rate_limit_remaining = int(resp.headers.get("X-Ratelimit-Remaining"))
     resp = resp.json()
     pushes, cursor = resp.get("pushes"), resp.get("cursor")
+    if len(pushes) == 0:
+        cursor = None
     while cursor is not None:
         if rate_limit_remaining < 2:
             time.sleep(60)
-        resp = requests.get(url + f"?cursor={cursor}", headers=headers)
+        resp = requests.get(url + f"&cursor={cursor}", headers=headers)
         rate_limit_remaining = int(resp.headers.get("X-Ratelimit-Remaining"))
         resp = resp.json()
-        pushes += resp.get("pushes")
-        cursor = resp.get("cursor")
+        resp_pushes, resp_cursor = resp.get("pushes"), resp.get("cursor")
+        if len(resp_pushes) == 0:
+            resp_cursor = None
+        pushes += resp_pushes
+        cursor = resp_cursor
     return pushes
 
 
