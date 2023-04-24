@@ -6,13 +6,17 @@ os.environ["WDM_LOG"] = "0"
 
 import json
 import logging
+import subprocess
 import sys
 from typing import Union
 
 import requests
 from fake_useragent import UserAgent
 from selenium import webdriver
+from selenium.webdriver.chromium.options import ChromiumOptions
+from selenium.webdriver.chromium.service import ChromiumService
 from webdriver_manager.chrome import ChromeDriverManager
+from webdriver_manager.core.utils import ChromeType
 
 from discogs_alert import entities as da_entities, scrape as da_scrape
 
@@ -104,7 +108,9 @@ class AnonClient(Client):
 
         self.user_agent = UserAgent()  # can pull up-to-date user agents from any modern browser
 
-        self.options = webdriver.ChromeOptions()
+        log_path = "/dev/null" if sys.platform in {"linux", "linux2", "darwin"} else "NUL"  # disable logs
+        service = ChromiumService(self.get_driver_path(), log_path=log_path)
+        options = ChromiumOptions()
         options_arguments = [
             "--disable-gpu",
             "--disable-dev-shm-usage",
@@ -113,14 +119,22 @@ class AnonClient(Client):
             "--incognito",
             f"--user-agent={self.user_agent.random}",  # initialize with random user-agent
         ]
+        if os.geteuid() == 0:
+            # running as root
+            options_arguments.append("--no-sandbox")
         for argument in options_arguments:
-            self.options.add_argument(argument)
+            options.add_argument(argument)
 
-        self.driver_manager = ChromeDriverManager().install()
-        unix = {"linux", "linux2", "darwin"}
-        self.driver = webdriver.Chrome(
-            self.driver_manager, options=self.options, service_log_path="/dev/null" if sys.platform in unix else "NUL"
-        )  # disable logs
+        self.driver = webdriver.Chrome(service=service, options=options)
+
+    def get_driver_path(self):
+        try:
+            # to install both chromium binary and the matching chromedriver binary:
+            # apt-get install chromium-driver
+            return subprocess.check_output(['which', 'chromedriver']).decode().strip()
+        except subprocess.CalledProcessError:
+            # will install latest chromedriver binary regardless of currently installed chromium version
+            return ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install()
 
     def get_marketplace_listings(self, release_id: int) -> da_entities.Listings:
         """Get list of listings currently for sale for particular release (by release's discogs ID)"""
