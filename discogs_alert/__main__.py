@@ -128,7 +128,7 @@ logger = logging.getLogger(__name__)
 @click.option(
     "-ans",
     "--accept_no_sleeve",
-    default=False,
+    default=True,
     is_flag=True,
     envvar="DA_ACCEPT_NO_SLEEVE",
     help="use flag if you want to accept a record w no sleeve (in addition to those of min-sleeve-condition)",
@@ -136,7 +136,7 @@ logger = logging.getLogger(__name__)
 @click.option(
     "-aus",
     "--accept-ungraded-sleeve",
-    default=False,
+    default=True,
     is_flag=True,
     envvar="DA_ACCEPT_UNGRADED_SLEEVE",
     help="use flag if you want to accept ungraded sleeves (in addition to those of min-sleeve-condition)",
