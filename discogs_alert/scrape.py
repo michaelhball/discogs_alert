@@ -14,6 +14,32 @@ class ParsingException(Exception):
     ...
 
 
+class PriceParsingException(ParsingException):
+    ...
+
+
+CURRENCY_REGEX = r".*?(?:[\£\$\€\¥]{1})"
+
+
+def _parse_price_string(price_string: str) -> tuple[dac.CURRENCIES, float]:
+    """TODO: docstring"""
+
+    price_currency, price_value = None, None
+    try:
+        price_currency = re.findall(CURRENCY_REGEX, price_string)[0]
+        price_value = price_string.replace(price_currency, "")
+    except IndexError:
+        for currency in dac.NON_SYMBOL_CURRENCIES:
+            if currency in price_string:
+                price_currency = currency
+                price_value = price_string.replace(currency, "")
+
+    if price_currency is None:
+        raise PriceParsingException(f"Couldn't parse {price_string}")
+
+    return dac.CURRENCIES[price_currency], float(price_value)
+
+
 def scrape_listings_from_marketplace(response_content: str, release_id: int) -> da_entities.Listings:
     """Takes response from marketplace get request (for single release) and parses
     the important listing information.
@@ -82,7 +108,12 @@ def scrape_listings_from_marketplace(response_content: str, release_id: int) -> 
             seller_avg_rating_elt = seller_info_cell.find_all("strong")[1].contents[0]
             listing["seller_avg_rating"] = float(seller_avg_rating_elt.strip().split("%")[0])
 
-        listing["seller_ships_from"] = seller_info_cell.find("span", text="Ships From:").parent.contents[1].strip()
+        try:
+            listing["seller_ships_from"] = seller_info_cell.find("span", text="Ships From:").parent.contents[1].strip()
+        except IndexError:
+            # if we get an IndexError here it means the listing had no "Ships From:" country, => we don't continue
+            # parsing. The only times I've seen such listings in the past were scams...
+            continue
 
         # extract price & shipping information
         price_spans = item_price_cell.find("span", class_="price")
@@ -90,26 +121,13 @@ def scrape_listings_from_marketplace(response_content: str, release_id: int) -> 
             [elt for elt in price_spans.contents if elt.name is None][0].strip().replace("+", "").replace(",", "")
         )
         try:
-            currency_regex = r".*?(?:[\£\$\€\¥]{1})"
-            price_currency = re.findall(currency_regex, price_string)[0]
-            price_string = price_string.replace(price_currency, "")
-        except IndexError:
-            # TODO: make this part of the Regex, + generalise to other unseen currencies
-            if "CHF" in price_string:
-                price_currency = "CHF"
-                price_string = price_string.replace("CHF", "")
-            else:
-                raise ParsingException(
-                    f"Couldn't parse currency from price_string {price_string} for release {release_id}"
-                )
-
-        listing["price"] = {
-            "currency": dac.CURRENCIES[price_currency],
-            "value": float(price_string),
-        }
+            currency, value = _parse_price_string(price_string)
+            listing["price"] = {"currency": currency, "value": value}
+        except PriceParsingException:
+            raise ParsingException(f"Couldn't parse currency from price_string {price_string} for release {release_id}")
 
         shipping_string = item_price_cell.find("span", class_="item_shipping").contents[0].strip().replace("+", "")
-        shipping_currency_matches = re.findall(currency_regex, shipping_string)
+        shipping_currency_matches = re.findall(CURRENCY_REGEX, shipping_string)
         shipping_currency = shipping_currency_matches[0] if len(shipping_currency_matches) > 0 else None
         if shipping_currency is not None:
             shipping_string = shipping_string.replace(shipping_currency, "").replace(",", "")
