@@ -233,20 +233,6 @@ COUNTRIES = {
 }
 COUNTRY_CHOICES = set(COUNTRIES.keys())
 
-CURRENCIES = {
-    "€": "EUR",
-    "£": "GBP",
-    "$": "USD",
-    "¥": "JPY",
-    "A$": "AUD",
-    "CA$": "CAD",
-    "MX$": "MXN",
-    "NZ$": "NZD",
-    "R$": "BRL",
-    "CHF": "CHF",
-    "SEK": "SEK",
-    "ZAR": "ZAR",
-}
 CURRENCY_CHOICES = {
     "EUR",
     "GBP",
@@ -282,3 +268,17 @@ CURRENCY_CHOICES = {
     "HUF",
     "AUD",
 }
+
+SYMBOL_CURRENCIES = {
+    "€": "EUR",
+    "£": "GBP",
+    "$": "USD",
+    "¥": "JPY",
+    "A$": "AUD",
+    "CA$": "CAD",
+    "MX$": "MXN",
+    "NZ$": "NZD",
+    "R$": "BRL",
+}
+NON_SYMBOL_CURRENCIES = {c: c for c in CURRENCY_CHOICES if c not in SYMBOL_CURRENCIES.values()}
+CURRENCIES = {**SYMBOL_CURRENCIES, **NON_SYMBOL_CURRENCIES}
