@@ -11,6 +11,7 @@ from requests.exceptions import ConnectionError
 
 from discogs_alert import client as da_client, entities as da_entities
 from discogs_alert.notify import pushbullet
+from discogs_alert.util import constants as dac
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +119,8 @@ def loop(
             for listing in valid_listings:
                 message_body = f"Listing available: {listing.url}"
                 if message_title not in pushes_dict or message_body not in pushes_dict[message_title]:
-                    print(f"{message_title} — {message_body}")
+                    price_string = f"{dac.CURRENCIES_REVERSED[listing.price.currency]}{listing.total_price:.2f}"
+                    logger.info(f"{message_title} ({price_string}) — {message_body}")
                     pushbullet.send_pushbullet_push(
                         token=pushbullet_token, message_title=message_title, message_body=message_body, verbose=verbose
                     )
