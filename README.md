@@ -78,21 +78,6 @@ A Discogs access token allows `discogs_alert` to send requests to the discogs AP
 
 To create an access token, go to your Discogs settings and click on the [Developer](https://www.discogs.com/settings/developers) tab. There is a button on this page to generate a new token. For now, just copy this token to your computer.
 
-### Pushbullet
-
-This project uses Pushbullet for notifying you once a record you are searching for has gone on sale. You can 
-choose exactly how you want to receive these notifications (i.e. on which device), but you first need to 
-create a [Pushbullet](https://www.pushbullet.com/) account. After signing up, make sure to install Pushbullet 
-on all devices where you would like to receive notifications.
-
-Once you've created an account, simply navigate to your [settings](https://www.pushbullet.com/#settings) page and 
-create an access token. As before, copy this token to your computer.
-
-NB: when using pushbullet, please note that you'll need to open the pushbullet mobile or web app once a month. 
-If you don't, the notification service won't work, as it deems you to have a 'dead' account.
-
-NB: support for more notification options is coming soon! Please bear with me (or open a PR!)
-
 ### Creating your wantlist
 
 There are two different ways you can create a wantlist: 1) by connecting to one of your existing Discogs lists, or 2) by creating a local JSON file. The first option is easier, faster, and fits within your regular Discogs workflow, while the latter enables more expressivity as you can specify fine-grained filters (e.g. price, media/sleeve quality) for each release. I plan to add this level of control to the Discogs list approach shortly, so I intend for that to completely replace the need for a local file.
@@ -135,6 +120,30 @@ The possible optional filters are as follows:
 * `accept_no_sleeve`: boolean indicating whether you want to accept no sleeve
 * `accept_ungraded_sleeve`: boolean indicating whether you want to accept an ungraded sleeve
 
+### Alerting
+
+You can choose from  several different alerting services to notify you once a record you are searching is on sale, each coming with its own setup requirements. The options and their setup are outlined here
+
+#### Pushbullet
+
+As of June 2023, Pushbullet is only available on Android or Desktop. To use Pushbullet, you first need to create an [account](https://www.pushbullet.com/) before installing the app anywhere you wish to receive notifications. Once you've created an account, navigate to your [settings](https://www.pushbullet.com/#settings) page and  create an access token. As before, save this token somewhere on your computer. You'll need to configure it either at the command-line or via an environment variable (see the [usage](#usage) section below).
+
+NB: when using Pushbullet, please be sure to open the app at least once a month. If you don't the notification service will silently stop working as it deams your account to be 'dead'.
+
+#### Telegram
+
+To use Telegram you first need to create a custom bot, the easiest mechanism for which is to use `BotFather`. Search for `@BotFather` on Telegram and send a "/start" message followed by "/newbot", before following the setup instructions. Be sure to save your API token somewhere on your computer, you'll need this to configure `discogs_alert`. Next you need to search for your bot on Telegram (by the username you just created) and send a "/start" message. Open a new tab in your browser and enter `"https://api.telegram.org/bot<yourAPIToken>/getUpdates"` in the URL bar, and you should see a response that looks like the following
+```json
+{"ok":true,"result":[{"update_id":xxxxx,
+"message":{"message_id":2, "from":{"id":xxxxx,"is_bot":false,"first_name":"xxxxx","username":"xxxxx","language_code":"en"},"chat":{"id":<CHAT_ID>,"first_name":"xxxxx","username":"xxxxx","type":"private"},"date":1685860541,"text":"/start","entities":[{"offset":0,"length":6,"type":"bot_command"}]}}]}
+```
+You need to find your `CHAT_ID` as indicated above and save that. You may have to send a few "/start" messages to your bot before you get a response that looks like this. Once you've got your CHAT ID as well as your API token, you're all good to go!
+
+#### More coming soon ...
+
+I plan to add more alerting options as soon as possible! Please feel free to open a PR if you have a particular service
+in mind that you'd like to support.
+
 ## Usage
 
 `discogs_alert` can be run either as a Python process or as a Docker container. Regardless of which command is used, the `discogs_alert` service will regularly pull the releases from your wantlist, check their availability on the Discogs marketplace, and send you a notification if any release (satisfying your filters) is for sale. You should leave the service running in the background at all times to be most effective.
@@ -143,13 +152,13 @@ The possible optional filters are as follows:
 
 The minimal command needed to run the `discogs_alert` Python package is 
 ```bash
-$ python -m discogs_alert
+$ python -m discogs_alert --alerter-type=PUSHBULLET
 ```
-though this assumes that you have previously set a few environment variables: `DISCOGS_TOKEN`, `PUSHBULLET_TOKEN`, and either `LIST_ID` or `WANTLIST_PATH`. The token values should be set to the values of the tokens you created earlier, while the `LIST_ID` should be set to the ID of the Discogs list you want to use as your `discogs_alert` wantlist (or `WANTLIST_PATH` the path to a local `wantlist.json` file). If you specify both a Discogs list ID and a local wantlist path, only the latter will be used.
+though this assumes that you have previously set a few environment variables: `DA_DISCOGS_TOKEN`, either `DA_LIST_ID` or `DA_WANTLIST_PATH`, and in this case `DA_PUSHBULLET_TOKEN` (though the required arguments are different for different alerters). The discogs token should be set to the value of the token you created earlier and the list ID should be set to the ID of the Discogs list you want to use as your `discogs_alert` wantlist (or the wantlist path to a local `wantlist.json` file).
 
 If you aren't sure how to set environment variables, you can pass these values manually using the following command
 ```bash
-$ python -m discogs_alert -dt <discogs_access_token> -pt <pushbullet_token> --list-id <discogs_list_id>
+$ python -m discogs_alert --alerter-type -dt <discogs_access_token> --list-id <discogs_list_id> -pt <pushbullet_token>
 ```
 
 #### Docker
@@ -160,9 +169,9 @@ $ docker run -d --env-file .env miggleball/discogs_alert:latest
 ```
 where it is assumed that you have specified the three minimal environment variables outlined above (as well as any additional customizations) in an `.env` txt file in the current directory. Your env file should simply look as follows:
 ```bash
-DISCOGS_TOKEN=<discogs_access_token>
-PUSHBULLET_TOKEN=<pushbullet_token>
-LIST_ID=<discogs_list_id>
+DA_DISCOGS_TOKEN=<discogs_access_token>
+DA_LIST_ID=<discogs_list_id>
+DA_PUSHBULLET_TOKEN=<pushbullet_token>
 ...
 ```
 The `-d` flag specifies that you want to "detach" from the newly created docker container meaning it will continue running in the background.
@@ -171,7 +180,7 @@ The `-d` flag specifies that you want to "detach" from the newly created docker 
 
 Please note that you _can_ add to or change the contents of your wantlist (either Discogs list or local file) while the service is running; the updated list of releases will come into effect the next time the service runs.
 
-Each time one of your releases is found, your Pushbullet account will be sent a notification with the title and the URL to the marketplace listing. As long as you don't delete the pushbullet notification, you will _not_ be sent repeat notifications for the same listing. You can easily test that the notification system is working by adding a release to your wantlist that you know is currently for sale.
+Each time a listing is found for one of the releases in your wantlist, you will be sent a notification via the alerter service of your choice with the title of the release and the URL to the marketplace listing. If you're using Pushbullet, as long as you don't delete a given notification then you will _not_ be sent repeat notifications for the same listing. I hope to add this functionality for the Telegram alerter in due course. You can test that your alerting is working properly by adding a release to your wantlist that you know is currently for sale.
 
 There are a a number of additional arguments and flags that provide a deeper level of customisation. These optional arguments include the global versions of the conditions mentioned above (i.e. global seller, media, and sleeve conditions), as well as a country whitelist and blacklist. The use of any of these flags will apply to all releases in your wantlist.
 
@@ -183,7 +192,6 @@ $ python -m discogs_alert --help
 Here are the possible arguments:
  
 * `-dt` `--discogs-token`: (str) your discogs user access token
-* `-pt` `--pushbullet-token`: (str) your pushbullet token
 * `-lid` `--list-id`: (int) the ID of your Discogs list (NB: either this or the `-wp` option are required).
 *  `-wp` `--wantlist-path`: (str) the relative or absolute path to your `wantlist.json` file (NB: either this or the `-lid` option are required).
 * `-ua` `--user-agent`: (str) the user agent string to use for anonymous queries to `discogs.com`. Please make some personalised modification to this string before you use this program, otherwise your requests might be blocked.
@@ -196,12 +204,14 @@ Here are the possible arguments:
 * `-msc` `--min-sleeve-condition`: (str) minimum allowable sleeve condition, as outlined above (default=`'VERY_GOOD'`)
 * `-wl` `--country-whitelist`: (str) you can pass this argument any number of times to construct a list of countries. If using a whitelist, you will only be alerted about listings by sellers from those specified countries.
 * `-bl` `--country-blacklist`: (str) you can pass this argument any number of times to construct a list of countries. If using a blacklist, you will be alerted about listings by sellers from all countries except those specified in the list.
+* `-at` `--alerter-type`: (str) one of the valid alerter types: `PUSHBULLET` or `TELEGRAM`
+* `-pt` `--pushbullet-token`: (str) your pushbullet token (only required if `"--alerter-type=PUSHBULLET"`)
+* `-tt` `--telegram-token`: (str) your telegram API token (only required if `"--alerter-type=TELEGRAM"`)
+* `-tci` `--telegram-chat-id`: (str) your telgram chat ID (only required if `"--alerter-type=TELEGRAM"`)
 
 And here are the possible flags:
-* `-ags`, `--accept-generic-sleeve`: (bool) whether or not you want to accept listings with a generic sleeve (default=`true`)
-* `-ans`, `--accept-no-sleeve`: (bool) whether or not you want to accept listings with no sleeve (default=`false`)
-* `-aus`, `--accept-ungraded-sleeve`: (bool) whether or not you want to accept listings with an ungraded sleeve (default=`false`).
 * `-V` `--verbose`: (bool) use this flag if you want to run the server in verbose mode, meaning it will log updates to the command line as it runs (default=`false`)
+* `-T` `--test`: (bool) use this flag if you want to run the script once rather than a fixed number of times per hour. This is useful not only for testing, but also if you're running the service as a cron job (& => cron handles scheduling).
 
 NB: all command-line options & arguments outlined above can be configured using environment variables. Check out `python -m discogs_alert --help` for more info.
 
@@ -209,7 +219,7 @@ NB: all command-line options & arguments outlined above can be configured using 
 
 To clarify the command-line interfact outlined above, here is a realistic example. In this case, we are replicating a user who is using a Discogs list as their wantlist, who wants verbose logs, no minimum seller rating, a global minimum media condition of `"VERY_GOOD"`, and who doesn't want to consider sellers from the UK or US. The command to run the service in this case would be
 ```bash
-$ python -m discogs_alert -dt <discogs_access_token> -pt <pushbullet_token> --list-id <list_id> --msr None -mmc VERY_GOOD -bl UK -bl US --verbose
+$ python -m discogs_alert -dt <discogs_access_token> -at PUSHBULLET -pt <pushbullet_token> --list-id <list_id> --msr None -mmc VERY_GOOD -bl UK -bl US --verbose
 ```
 
 #### Running as a `cron` job

@@ -2,15 +2,14 @@ import json
 import logging
 import random
 import time
-from collections import defaultdict
 from pathlib import Path
-from typing import List, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 
 import dacite
 from requests.exceptions import ConnectionError
 
 from discogs_alert import client as da_client, entities as da_entities
-from discogs_alert.notify import pushbullet
+from discogs_alert.alert import Alerter, get_alerter
 from discogs_alert.util import constants as dac
 
 logger = logging.getLogger(__name__)
@@ -40,7 +39,6 @@ def load_wantlist(
 
 def loop(
     discogs_token: str,
-    pushbullet_token: str,
     list_id: Optional[int],
     wantlist_path: Optional[str],
     user_agent: str,
@@ -50,6 +48,8 @@ def loop(
     record_filters: da_entities.RecordFilters,
     country_whitelist: Set[str],
     country_blacklist: Set[str],
+    alerter_type: Alerter,
+    alerter_kwargs: Dict[str, Any],
     verbose: bool = False,
 ):
     """Event loop, each time this is called we query the discogs marketplace for all items in wantlist."""
@@ -62,11 +62,8 @@ def loop(
         client_anon = da_client.AnonClient(user_agent)
         user_token_client = da_client.UserTokenClient(user_agent, discogs_token)
 
-        # get the complete list of previous pushes
-        pushes_dict = defaultdict(set)
-        for p in pushbullet.get_all_pushes(pushbullet_token):
-            if "title" in p and "body" in p:
-                pushes_dict[p["title"]].add(p["body"])
+        alerter = get_alerter(alerter_type, alerter_kwargs)
+        alerts_dict = alerter.get_all_alerts()  # the list of all previous alerts
 
         wantlist_items = load_wantlist(list_id, user_token_client, wantlist_path)
         random.shuffle(wantlist_items)
@@ -118,12 +115,10 @@ def loop(
             message_title = f"Now For Sale: {release.display_title}"
             for listing in valid_listings:
                 message_body = f"Listing available: {listing.url}"
-                if message_title not in pushes_dict or message_body not in pushes_dict[message_title]:
+                if message_title not in alerts_dict or message_body not in alerts_dict[message_title]:
                     price_string = f"{dac.CURRENCIES_REVERSED[listing.price.currency]}{listing.total_price:.2f}"
                     logger.info(f"{message_title} ({price_string}) — {message_body}")
-                    pushbullet.send_pushbullet_push(
-                        token=pushbullet_token, message_title=message_title, message_body=message_body, verbose=verbose
-                    )
+                    alerter.send_alert(message_title, message_body)
 
         client_anon.driver.close()
         client_anon.driver.quit()
