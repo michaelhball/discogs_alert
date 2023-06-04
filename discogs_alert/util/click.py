@@ -43,6 +43,11 @@ class RequiredIf(click.Option):
         assert (
             self.required_if is not None and self.required_if_str is not None
         ), "Both the `required_if` and the `required_if_str` parameters are required if using the `RequiredIf` class"
+
+        kwargs["help"] = (
+            kwargs.get("help", "") + f" NB: this argument is only required if `{self.required_if_str}`"
+        ).strip()
+
         super().__init__(*args, **kwargs)
 
     def handle_parse_result(

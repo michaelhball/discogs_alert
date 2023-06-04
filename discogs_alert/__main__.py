@@ -4,7 +4,7 @@ import time
 import click
 import schedule
 
-from discogs_alert import __version__, entities as da_entities, loop as da_loop
+from discogs_alert import __version__, alert as da_alert, entities as da_entities, loop as da_loop
 from discogs_alert.util import click as da_click, constants as dac
 
 logging.basicConfig(level=logging.INFO)
@@ -19,14 +19,6 @@ logger = logging.getLogger(__name__)
     type=str,
     envvar="DA_DISCOGS_TOKEN",
     help="unique discogs user access token (enabling sending of requests on your behalf)",
-)
-@click.option(
-    "-pt",
-    "--pushbullet-token",
-    required=True,
-    type=str,
-    envvar="DA_PUSHBULLET_TOKEN",
-    help="token for pushbullet notification service.",
 )
 @click.option(
     "-lid",
@@ -171,6 +163,44 @@ logger = logging.getLogger(__name__)
     ),
 )
 @click.option(
+    "-at",
+    "--alerter-type",
+    required=True,
+    envvar="DA_ALERTER_TYPE",
+    type=click.Choice([at.name for at in da_alert.AlerterType]),
+    help="Your choice of alerting service. Please see the Alerters section in the README for more information",
+)
+@click.option(
+    "-pt",
+    "--pushbullet-token",
+    cls=da_click.RequiredIf,
+    required_if=lambda x: x["alerter_type"] == da_alert.AlerterType.PUSHBULLET.name,
+    required_if_str="alerter_type=AlerterType.PUSHBULLET",
+    type=str,
+    envvar="DA_PUSHBULLET_TOKEN",
+    help="token for pushbullet notification service.",
+)
+@click.option(
+    "-tt",
+    "--telegram-token",
+    cls=da_click.RequiredIf,
+    required_if=lambda x: x["alerter_type"] == da_alert.AlerterType.TELEGRAM.name,
+    required_if_str="alerter_type=AlerterType.TELEGRAM",
+    type=str,
+    envvar="DA_TELEGRAM_TOKEN",
+    help="token for telegram bot notification service.",
+)
+@click.option(
+    "-tci",
+    "--telegram-chat-id",
+    cls=da_click.RequiredIf,
+    required_if=lambda x: x["alerter_type"] == da_alert.AlerterType.TELEGRAM.name,
+    required_if_str="alerter_type=AlerterType.TELEGRAM",
+    type=str,
+    envvar="DA_TELEGRAM_CHAT_ID",
+    help="chat ID for telegram bot notification service.",
+)
+@click.option(
     "-V", "--verbose", default=False, is_flag=True, help="use flag if you want to see logs as the program runs"
 )
 @click.option(
@@ -184,7 +214,6 @@ logger = logging.getLogger(__name__)
 @click.version_option(__version__)
 def main(
     discogs_token,
-    pushbullet_token,
     list_id,
     wantlist_path,
     user_agent,
@@ -200,6 +229,10 @@ def main(
     accept_ungraded_sleeve,
     country_whitelist,
     country_blacklist,
+    alerter_type,
+    pushbullet_token,
+    telegram_token,
+    telegram_chat_id,
     verbose,
     test,
 ):
@@ -212,9 +245,16 @@ def main(
     if list_id is not None and wantlist_path is not None:
         list_id = None
 
+    # organise only those kwargs necessary for the alerter being used
+    if alerter_type == da_alert.AlerterType.PUSHBULLET.name:
+        alerter_kwargs = {"pushbullet_token": pushbullet_token}
+    elif alerter_type == da_alert.AlerterType.TELEGRAM.name:
+        alerter_kwargs = {"telegram_token": telegram_token, "telegram_chat_id": telegram_chat_id}
+    else:
+        raise ValueError("We should never get here")
+
     args = [
         discogs_token,
-        pushbullet_token,
         list_id,
         wantlist_path,
         user_agent,
@@ -226,6 +266,8 @@ def main(
         ),
         set(dac.COUNTRIES[c] for c in country_whitelist),
         set(dac.COUNTRIES[c] for c in country_blacklist),
+        da_alert.AlerterType(alerter_type),
+        alerter_kwargs,
         verbose,
     ]
 
