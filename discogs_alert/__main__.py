@@ -79,7 +79,7 @@ logger = logging.getLogger(__name__)
     default=99,
     show_default=True,
     type=int,
-    envvar="MIN_SELLER_RATING",
+    envvar="DA_MIN_SELLER_RATING",
     help="minimum seller rating you want to allow",
 )
 @click.option(
@@ -94,19 +94,19 @@ logger = logging.getLogger(__name__)
 @click.option(
     "-mmc",
     "--min-media-condition",
-    default=da_entities.CONDITION.VERY_GOOD,
+    default=da_entities.CONDITION.VERY_GOOD.name,
     show_default=True,
     envvar="DA_MIN_MEDIA_CONDITION",
-    type=click.Choice(da_entities.CONDITION),
+    type=da_click.EnumChoice(da_entities.CONDITION),
     help="minimum media condition you want to accept",
 )
 @click.option(
     "-msc",
     "--min-sleeve-condition",
-    default=da_entities.CONDITION.VERY_GOOD,
+    default=da_entities.CONDITION.NOT_GRADED.name,
     show_default=True,
     envvar="DA_MIN_SLEEVE_CONDITION",
-    type=click.Choice(da_entities.CONDITION),
+    type=da_click.EnumChoice(da_entities.CONDITION),
     help="minimum sleeve condition you want to accept",
 )
 @click.option(
@@ -167,14 +167,14 @@ logger = logging.getLogger(__name__)
     "--alerter-type",
     required=True,
     envvar="DA_ALERTER_TYPE",
-    type=click.Choice([at.name for at in da_alert.AlerterType]),
+    type=da_click.EnumChoice(da_alert.AlerterType),
     help="Your choice of alerting service. Please see the Alerters section in the README for more information",
 )
 @click.option(
     "-pt",
     "--pushbullet-token",
     cls=da_click.RequiredIf,
-    required_if=lambda x: x["alerter_type"] == da_alert.AlerterType.PUSHBULLET.name,
+    required_if=lambda x: x["alerter_type"] == da_alert.AlerterType.PUSHBULLET,
     required_if_str="alerter_type=AlerterType.PUSHBULLET",
     type=str,
     envvar="DA_PUSHBULLET_TOKEN",
@@ -184,7 +184,7 @@ logger = logging.getLogger(__name__)
     "-tt",
     "--telegram-token",
     cls=da_click.RequiredIf,
-    required_if=lambda x: x["alerter_type"] == da_alert.AlerterType.TELEGRAM.name,
+    required_if=lambda x: x["alerter_type"] == da_alert.AlerterType.TELEGRAM,
     required_if_str="alerter_type=AlerterType.TELEGRAM",
     type=str,
     envvar="DA_TELEGRAM_TOKEN",
@@ -194,7 +194,7 @@ logger = logging.getLogger(__name__)
     "-tci",
     "--telegram-chat-id",
     cls=da_click.RequiredIf,
-    required_if=lambda x: x["alerter_type"] == da_alert.AlerterType.TELEGRAM.name,
+    required_if=lambda x: x["alerter_type"] == da_alert.AlerterType.TELEGRAM,
     required_if_str="alerter_type=AlerterType.TELEGRAM",
     type=str,
     envvar="DA_TELEGRAM_CHAT_ID",
@@ -246,9 +246,9 @@ def main(
         list_id = None
 
     # organise only those kwargs necessary for the alerter being used
-    if alerter_type == da_alert.AlerterType.PUSHBULLET.name:
+    if alerter_type == da_alert.AlerterType.PUSHBULLET:
         alerter_kwargs = {"pushbullet_token": pushbullet_token}
-    elif alerter_type == da_alert.AlerterType.TELEGRAM.name:
+    elif alerter_type == da_alert.AlerterType.TELEGRAM:
         alerter_kwargs = {"telegram_token": telegram_token, "telegram_chat_id": telegram_chat_id}
     else:
         raise ValueError("We should never get here")
@@ -266,7 +266,7 @@ def main(
         ),
         set(dac.COUNTRIES[c] for c in country_whitelist),
         set(dac.COUNTRIES[c] for c in country_blacklist),
-        da_alert.AlerterType(alerter_type),
+        alerter_type,
         alerter_kwargs,
         verbose,
     ]
