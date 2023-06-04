@@ -130,8 +130,8 @@ NB: when using Pushbullet, please be sure to open the app at least once a month.
 
 To use Telegram you first need to create a custom bot, the easiest mechanism for which is to use `BotFather`. Search for `@BotFather` on Telegram and send a "/start" message followed by "/newbot", before following the setup instructions. Be sure to save your API token somewhere on your computer, you'll need this to configure `discogs_alert`. Next you need to search for your bot on Telegram (by the username you just created) and send a "/start" message. Open a new tab in your browser and enter `"https://api.telegram.org/bot<yourAPIToken>/getUpdates"` in the URL bar, and you should see a response that looks like the following
 ```json
-{"ok":true,"result":[{"update_id":xxxxx,
-"message":{"message_id":2, "from":{"id":xxxxx,"is_bot":false,"first_name":"xxxxx","username":"xxxxx","language_code":"en"},"chat":{"id":<CHAT_ID>,"first_name":"xxxxx","username":"xxxxx","type":"private"},"date":1685860541,"text":"/start","entities":[{"offset":0,"length":6,"type":"bot_command"}]}}]}
+{"ok":true,"result":[{"update_id":"xxxxx",
+"message":{"message_id":2, "from":{"id":"xxxxx","is_bot":false,"first_name":"xxxxx","username":"xxxxx","language_code":"en"},"chat":{"id":"<CHAT_ID>","first_name":"xxxxx","username":"xxxxx","type":"private"},"date":1685860541,"text":"/start","entities":[{"offset":0,"length":6,"type":"bot_command"}]}}]}
 ```
 You need to find your `CHAT_ID` as indicated above and save that. You may have to send a few "/start" messages to your bot before you get a response that looks like this. Once you've got your CHAT ID as well as your API token, you're all good to go!
 
