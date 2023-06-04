@@ -94,7 +94,6 @@ Here is an example `wantlist.json` file:
   {
     "id": 1061046,
     "display_title": "Deep² — Sphere",
-    "accept_generic_sleeve": true,
     "min_media_condition": "VERY_GOOD"
   },
   {
@@ -116,9 +115,6 @@ The possible optional filters are as follows:
 `'VERY_GOOD'`, `'VERY_GOOD_PLUS'`, `'NEAR_MINT'`, or `'MINT'`)
 * `min_sleeve_condition`: minimum allowable sleeve condition (one of `'POOR'`, `'FAIR'`, `'GOOD'`, `'GOOD_PLUS'`,
 `'VERY_GOOD'`, `'VERY_GOOD_PLUS'`, `'NEAR_MINT'`, or `'MINR'`)
-* `accept_generic_sleeve`: boolean indicating whether you want to accept a generic sleeve
-* `accept_no_sleeve`: boolean indicating whether you want to accept no sleeve
-* `accept_ungraded_sleeve`: boolean indicating whether you want to accept an ungraded sleeve
 
 ### Alerting
 

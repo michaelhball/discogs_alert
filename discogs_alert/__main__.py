@@ -110,30 +110,6 @@ logger = logging.getLogger(__name__)
     help="minimum sleeve condition you want to accept",
 )
 @click.option(
-    "-ags",
-    "--accept-generic-sleeve",
-    default=True,
-    is_flag=True,
-    envvar="DA_ACCEPT_GENERIC_SLEEVE",
-    help="use flag if you want to accept generic sleeves (in addition to those of min-sleeve-condition)",
-)
-@click.option(
-    "-ans",
-    "--accept_no_sleeve",
-    default=True,
-    is_flag=True,
-    envvar="DA_ACCEPT_NO_SLEEVE",
-    help="use flag if you want to accept a record w no sleeve (in addition to those of min-sleeve-condition)",
-)
-@click.option(
-    "-aus",
-    "--accept-ungraded-sleeve",
-    default=True,
-    is_flag=True,
-    envvar="DA_ACCEPT_UNGRADED_SLEEVE",
-    help="use flag if you want to accept ungraded sleeves (in addition to those of min-sleeve-condition)",
-)
-@click.option(
     "-wl",
     "--country-whitelist",
     multiple=True,
@@ -224,9 +200,6 @@ def main(
     min_seller_sales,
     min_media_condition,
     min_sleeve_condition,
-    accept_generic_sleeve,
-    accept_no_sleeve,
-    accept_ungraded_sleeve,
     country_whitelist,
     country_blacklist,
     alerter_type,
@@ -261,9 +234,7 @@ def main(
         country,
         currency,
         da_entities.SellerFilters(min_seller_rating, min_seller_sales),
-        da_entities.RecordFilters(
-            min_media_condition, min_sleeve_condition, accept_generic_sleeve, accept_no_sleeve, accept_ungraded_sleeve
-        ),
+        da_entities.RecordFilters(min_media_condition, min_sleeve_condition),
         set(dac.COUNTRIES[c] for c in country_whitelist),
         set(dac.COUNTRIES[c] for c in country_blacklist),
         alerter_type,

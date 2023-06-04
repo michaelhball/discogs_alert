@@ -45,9 +45,6 @@ class SellerFilters:
 class RecordFilters:
     min_media_condition: Optional[CONDITION] = None
     min_sleeve_condition: Optional[CONDITION] = None
-    accept_generic_sleeve: Optional[bool] = None
-    accept_no_sleeve: Optional[bool] = None
-    accept_ungraded_sleeve: Optional[bool] = None
 
 
 @dataclass
@@ -62,9 +59,6 @@ class Release:
     # optional args from from `wantlist.json`
     min_media_condition: Optional[CONDITION] = None
     min_sleeve_condition: Optional[CONDITION] = None
-    accept_generic_sleeve: Optional[bool] = None
-    accept_no_sleeve: Optional[bool] = None
-    accept_ungraded_sleeve: Optional[bool] = None
     price_threshold: Optional[int] = None
 
     # optional args from Discogs list
@@ -207,21 +201,8 @@ def conditions_satisfied(
     if listing.media_condition < (release.min_media_condition or record_filters.min_media_condition):
         return False
 
-    # optionally verify all sleeve conditions, either globally or for this specific release
-    # NB: we have to check all conditions before we know whether they're satisfied
-    we_good = (listing.sleeve_condition == CONDITION.GENERIC) and (
-        release.accept_generic_sleeve or record_filters.accept_generic_sleeve
-    )
-    we_good = we_good or (
-        (listing.sleeve_condition == CONDITION.NO_COVER)
-        and (release.accept_no_sleeve or record_filters.accept_no_sleeve)
-    )
-    we_good = we_good or (
-        (listing.sleeve_condition == CONDITION.NOT_GRADED)
-        and (release.accept_ungraded_sleeve and record_filters.accept_ungraded_sleeve)
-    )
-    we_good = we_good or (
-        listing.sleeve_condition >= (release.min_sleeve_condition or record_filters.min_sleeve_condition)
-    )
+    # optionally sleeve condition, either globally or for this specific release
+    if listing.sleeve_condition < (release.min_sleeve_condition or record_filters.min_sleeve_condition):
+        return False
 
-    return we_good
+    return True
