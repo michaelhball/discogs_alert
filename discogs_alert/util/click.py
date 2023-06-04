@@ -1,4 +1,5 @@
-from typing import Any, List, Mapping, Tuple
+import enum
+from typing import Any, List, Mapping, Optional, Tuple, Type
 
 import click
 
@@ -61,3 +62,17 @@ class RequiredIf(click.Option):
 
         self.prompt = None
         return super().handle_parse_result(ctx, opts, args)
+
+
+class EnumChoice(click.Choice):
+    """Thanks to https://github.com/pallets/click/pull/2210 🙏"""
+
+    def __init__(self, enum_type: Type[enum.Enum], case_sensitive: bool = True):
+        super().__init__(choices=[element.name for element in enum_type], case_sensitive=case_sensitive)
+        self.enum_type = enum_type
+
+    def convert(self, value: Any, param: Optional[click.Parameter], ctx: Optional[click.Context]) -> Any:
+        value = super().convert(value=value, param=param, ctx=ctx)
+        if value is None:
+            return None
+        return self.enum_type[value]
