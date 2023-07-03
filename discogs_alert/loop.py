@@ -120,9 +120,6 @@ def loop(
                     logger.info(f"{message_title} ({price_string}) — {message_body}")
                     alerter.send_alert(message_title, message_body)
 
-        client_anon.driver.close()
-        client_anon.driver.quit()
-
     except ConnectionError:
         logger.info("ConnectionError: looping will continue as usual", exc_info=True)
 
@@ -133,3 +130,7 @@ def loop(
         logger.info("Exception: this might be a real exception, but we're continuing anyway", exc_info=True)
 
     logger.info(f"\t took {time.time() - start_time}")
+
+    # clean up Chrome clients
+    client_anon.driver.close()
+    client_anon.driver.quit()
