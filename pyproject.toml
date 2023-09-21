@@ -25,7 +25,7 @@ tox = [
     {version = "^3", python = "<3.8"},  # because fake-useragent has a importlib-metadata constraint that conflicts
     {version = "^4.4.5", python = ">=3.8"}
 ]
-webdriver-manager = "^3.8.5"
+webdriver-manager = "~4"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.2.1"
