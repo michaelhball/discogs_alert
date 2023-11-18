@@ -20,7 +20,7 @@ pre-commit = "^2.20.0"
 requests = "^2.28.2"
 ruff = "^0.0.253"
 schedule = "^1.1.0"
-selenium = "^4.8.2"
+selenium = "^4.14.2"
 tox = [
     {version = "^3", python = "<3.8"},  # because fake-useragent has a importlib-metadata constraint that conflicts
     {version = "^4.4.5", python = ">=3.8"}
