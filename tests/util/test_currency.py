@@ -27,9 +27,8 @@ def test_convert_currency(mock_currency_rates, rates: da_currency.CurrencyRates)
     assert da_currency.get_currency_rates("SGD") == da_currency.get_currency_rates("EUR")
 
     # make sure the currency conversion is working correctly
-    assert da_currency.convert_currency(1, "GBP", "EUR") == 1 / rates.get("GBP")
-    assert da_currency.convert_currency(1, "CHF", "EUR") == 1 / rates.get("CHF")
-    assert da_currency.convert_currency(1, "EUR", "GBP") == 1  # doesn't make sense given that our mocked rates are EUR
+    assert da_currency.convert_currency(1, "GBP", "EUR") == 1 / rates.get("EURGBP")
+    assert da_currency.convert_currency(1, "CHF", "EUR") == 1 / rates.get("EURCHF")
 
     # make sure invalid currencies are handled
     with pytest.raises(da_currency.InvalidCurrencyException):

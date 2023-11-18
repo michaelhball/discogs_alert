@@ -13,19 +13,19 @@ def test_convert_listing_price_currency(mock_currency_rates, rates: da_currency.
     # full listing price
     lp1 = da_entities.ListingPrice("GBP", 10, shipping=da_entities.ShippingPrice("GBP", 5))
     lp1_target = da_entities.ListingPrice(
-        "EUR", 10 / rates["GBP"], shipping=da_entities.ShippingPrice("EUR", 5 / rates["GBP"])
+        "EUR", 10 / rates["EURGBP"], shipping=da_entities.ShippingPrice("EUR", 5 / rates["EURGBP"])
     )
     assert lp1.convert_currency("EUR") == lp1_target
 
     # no shipping
     lp2 = da_entities.ListingPrice("GBP", 10, shipping=None)
-    lp2_target = da_entities.ListingPrice("EUR", 10 / rates["GBP"], shipping=None)
+    lp2_target = da_entities.ListingPrice("EUR", 10 / rates["EURGBP"], shipping=None)
     assert lp2.convert_currency("EUR") == lp2_target
 
     # different currencies
     lp3 = da_entities.ListingPrice("GBP", 10, shipping=da_entities.ShippingPrice("AUD", 5))
     lp3_target = da_entities.ListingPrice(
-        "EUR", 10 / rates["GBP"], shipping=da_entities.ShippingPrice("EUR", 5 / rates["AUD"])
+        "EUR", 10 / rates["EURGBP"], shipping=da_entities.ShippingPrice("EUR", 5 / rates["EURAUD"])
     )
     assert lp3.convert_currency("EUR") == lp3_target
 

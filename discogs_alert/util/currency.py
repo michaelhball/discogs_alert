@@ -1,3 +1,4 @@
+import os
 from typing import Dict, Union
 
 import requests
@@ -12,10 +13,9 @@ class InvalidCurrencyException(Exception):
     ...
 
 
-@time_cache(seconds=3600)
+@time_cache(seconds=86400)
 def get_currency_rates(base_currency: str) -> CurrencyRates:
-    """Get live currency exchange rates (from one base currency). Cached for one hour at a time,
-    per currency.
+    """Get live currency exchange rates (from one base currency). Cached for one day at a time, per currency.
 
     Args:
         base_currency: one of the 3-character currency identifiers from above.
@@ -25,7 +25,13 @@ def get_currency_rates(base_currency: str) -> CurrencyRates:
 
     if base_currency not in CURRENCY_CHOICES:
         raise InvalidCurrencyException(f"{base_currency} is not a supported currency (see `discogs_alert/types.py`).")
-    return requests.get(f"https://api.exchangerate.host/latest?base={base_currency}").json().get("rates")
+
+    access_key = os.getenv("DA_CURRENCY_TOKEN")
+    return (
+        requests.get(f"http://api.exchangerate.host/live?access_key={access_key}&source={base_currency}")
+        .json()
+        .get("quotes")
+    )
 
 
 def convert_currency(value: float, old_currency: str, new_currency: str) -> float:
@@ -40,6 +46,6 @@ def convert_currency(value: float, old_currency: str, new_currency: str) -> floa
     """
 
     try:
-        return float(value) / get_currency_rates(new_currency)[old_currency]
+        return float(value) / get_currency_rates(new_currency)[f"{new_currency}{old_currency}"]
     except KeyError:
         raise InvalidCurrencyException(f"{old_currency} is not a supported currency (see `discogs_alert/types.py`)")
