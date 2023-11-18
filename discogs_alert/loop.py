@@ -58,6 +58,7 @@ def loop(
     if verbose:
         logger.info("\nrunning loop")
 
+    client_anon = None
     try:
         client_anon = da_client.AnonClient(user_agent)
         user_token_client = da_client.UserTokenClient(user_agent, discogs_token)
@@ -132,5 +133,6 @@ def loop(
     logger.info(f"\t took {time.time() - start_time}")
 
     # clean up Chrome clients
-    client_anon.driver.close()
-    client_anon.driver.quit()
+    if client_anon is not None:
+        client_anon.driver.close()
+        client_anon.driver.quit()
