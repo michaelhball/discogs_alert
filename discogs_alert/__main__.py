@@ -1,4 +1,5 @@
 import logging
+import os
 import time
 
 import click
@@ -37,6 +38,14 @@ logger = logging.getLogger(__name__)
     cls=da_click.NotRequiredIf,
     not_required_if="list-id",
     help="path to your wantlist json file (including filename)",
+)
+@click.option(
+    "-ct",
+    "--currency-token",
+    required=True,
+    type=str,
+    envvar="DA_CURRENCY_TOKEN",
+    help="A token for the currency conversion API (api.exchangerate.host)",
 )
 @click.option(
     "-ua",
@@ -192,6 +201,7 @@ def main(
     discogs_token,
     list_id,
     wantlist_path,
+    currency_token,
     user_agent,
     frequency,
     country,
@@ -209,9 +219,11 @@ def main(
     verbose,
     test,
 ):
-    """This loop queries in your watchlist at regular intervals, sending alerts if a release satisfying
-    your criteria is found.
     """
+    This loop queries your watchlist at regular intervals, alerting you if a release satisfying your criteria is found.
+    """
+
+    os.environ["DA_CURRENCY_TOKEN"] = currency_token
 
     # if both a list ID and a local wantlist path are provided, use the wantlist (to force-enable local testing)
     # TODO: combine them?
