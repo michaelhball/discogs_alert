@@ -13,10 +13,9 @@ from typing import Union
 import requests
 from fake_useragent import UserAgent
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service as ChromiumService
 from selenium.webdriver.chromium.options import ChromiumOptions
-from selenium.webdriver.chromium.service import ChromiumService
 from webdriver_manager.chrome import ChromeDriverManager
-from webdriver_manager.core.os_manager import ChromeType
 
 from discogs_alert import entities as da_entities, scrape as da_scrape
 
@@ -131,10 +130,10 @@ class AnonClient(Client):
         try:
             # to install both chromium binary and the matching chromedriver binary:
             # apt-get install chromium-driver
-            return subprocess.check_output(['which', 'chromedriver']).decode().strip()
+            return subprocess.check_output(["which", "chromedriver"]).decode().strip()
         except subprocess.CalledProcessError:
             # will install latest chromedriver binary regardless of currently installed chromium version
-            return ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install()
+            return ChromeDriverManager().install()
 
     def get_marketplace_listings(self, release_id: int) -> da_entities.Listings:
         """Get list of listings currently for sale for particular release (by release's discogs ID)"""
