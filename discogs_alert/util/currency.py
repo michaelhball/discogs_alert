@@ -12,7 +12,9 @@ from discogs_alert.util.constants import CURRENCY_CHOICES
 CurrencyRates = Dict[str, float]
 
 # Directory in which to store weekly CurrencyRates JSON caches
-CACHE_DIR = pathlib.Path(__file__).parent.parent.parent.resolve() / ".currency_cache"
+CACHE_DIR = os.getenv(
+    "DA_CURRENCY_CACHE_DIR", pathlib.Path(__file__).parent.parent.parent.resolve() / ".currency_cache"
+)
 
 
 class InvalidCurrencyException(Exception):

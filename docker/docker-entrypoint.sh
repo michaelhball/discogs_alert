@@ -1,7 +1,6 @@
 #!/bin/sh
 
 set -e
-
-. /home/discogs_alert/venv/bin/activate
-
-exec python -m discogs_alert
+. /venv/bin/activate
+echo Your container args are "$@"
+python -m discogs_alert "$@"
