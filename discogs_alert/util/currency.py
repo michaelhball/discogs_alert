@@ -1,24 +1,31 @@
+import json
 import os
-from typing import Dict, Union
+import pathlib
+from datetime import datetime
+from typing import Dict
 
-import requests
+import freecurrencyapi
 
 from discogs_alert.util.constants import CURRENCY_CHOICES
-from discogs_alert.util.system import time_cache
 
-CurrencyRates = Dict[str, Union[int, float]]
+# Dict containing currency conversions for all currencies with respect to a given base currency
+CurrencyRates = Dict[str, float]
+
+# Directory in which to store weekly CurrencyRates JSON caches
+CACHE_DIR = pathlib.Path(__file__).parent.parent.parent.resolve() / ".currency_cache"
 
 
 class InvalidCurrencyException(Exception):
     ...
 
 
-@time_cache(seconds=86400)
 def get_currency_rates(base_currency: str) -> CurrencyRates:
-    """Get live currency exchange rates (from one base currency). Cached for one day at a time, per currency.
+    """
+    Get live currency exchange rates (from one base currency). Cached for one week at a time, per currency (to avoid
+    API limits, and because small fluctuations in currency rates are really not important).
 
     Args:
-        base_currency: one of the 3-character currency identifiers from above.
+        base_currency: one of the valid 3-character currency identifiers.
 
     Returns: a dict containing exchange rates _to_ all major currencies _from_ the given base currency
     """
@@ -26,12 +33,18 @@ def get_currency_rates(base_currency: str) -> CurrencyRates:
     if base_currency not in CURRENCY_CHOICES:
         raise InvalidCurrencyException(f"{base_currency} is not a supported currency (see `discogs_alert/types.py`).")
 
-    access_key = os.getenv("DA_CURRENCY_TOKEN")
-    return (
-        requests.get(f"http://api.exchangerate.host/live?access_key={access_key}&source={base_currency}")
-        .json()
-        .get("quotes")
-    )
+    # See whether we've already cached currency rates for the current week
+    now = datetime.now().isocalendar()
+    cache_file = f"{CACHE_DIR}/{now.year}-{now.week}-{base_currency}"
+    if os.path.exists(cache_file):
+        return json.load(pathlib.Path(cache_file).open("r"))
+
+    # Else query & cache them before returning
+    client = freecurrencyapi.Client(os.getenv("DA_CURRENCY_TOKEN"))
+    currency_rates = client.latest(base_currency="EUR")["data"]
+    json.dump(currency_rates, pathlib.Path(cache_file).open("w"))
+
+    return currency_rates
 
 
 def convert_currency(value: float, old_currency: str, new_currency: str) -> float:
@@ -46,6 +59,6 @@ def convert_currency(value: float, old_currency: str, new_currency: str) -> floa
     """
 
     try:
-        return float(value) / get_currency_rates(new_currency)[f"{new_currency}{old_currency}"]
+        return float(value) / get_currency_rates(new_currency)[old_currency]
     except KeyError:
         raise InvalidCurrencyException(f"{old_currency} is not a supported currency (see `discogs_alert/types.py`)")
