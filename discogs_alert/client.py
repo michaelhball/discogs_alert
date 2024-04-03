@@ -10,9 +10,11 @@ import subprocess
 import sys
 from typing import Union
 
+import psutil
 import requests
 from fake_useragent import UserAgent
 from selenium import webdriver
+from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.chrome.service import Service as ChromiumService
 from selenium.webdriver.chromium.options import ChromiumOptions
 from webdriver_manager.chrome import ChromeDriverManager
@@ -20,6 +22,15 @@ from webdriver_manager.chrome import ChromeDriverManager
 from discogs_alert import entities as da_entities, scrape as da_scrape
 
 logger = logging.getLogger(__name__)
+
+
+def kill_chromedriver_processes():
+    for process in psutil.process_iter(["pid", "name", "cmdline"]):
+        pinfo = process.info
+        if pinfo["name"] == "chromedriver" or (pinfo["cmdline"] is not None and "chromedriver" in pinfo["cmdline"]):
+            if process.status() != "zombie":
+                print(f"Terminating chromedriver process (PID {pinfo['pid']})")
+                process.terminate()
 
 
 class Client:
@@ -124,7 +135,12 @@ class AnonClient(Client):
         for argument in options_arguments:
             options.add_argument(argument)
 
-        self.driver = webdriver.Chrome(service=service, options=options)
+        # If we get an exception because some previous chromedriver instance is still running, we kill it
+        try:
+            self.driver = webdriver.Chrome(service=service, options=options)
+        except WebDriverException as we:
+            kill_chromedriver_processes()
+            raise we("We have killed the running chromedriver processes; DA should work next time it is called.")
 
     def get_driver_path(self):
         try:
