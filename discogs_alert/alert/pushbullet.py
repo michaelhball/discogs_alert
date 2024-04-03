@@ -20,6 +20,7 @@ class PushbulletAlerter(Alerter):
         resp = requests.get(url, headers=headers)
         rate_limit_remaining = int(resp.headers.get("X-Ratelimit-Remaining"))
         while rate_limit_remaining < 2:
+            logger.info("About to hit pushbullet's rate limit, waiting 60s")
             time.sleep(60)
             resp = requests.get(url, headers=headers)
             rate_limit_remaining = int(resp.headers.get("X-Ratelimit-Remaining"))
@@ -29,6 +30,7 @@ class PushbulletAlerter(Alerter):
             cursor = None
         while cursor is not None:
             if rate_limit_remaining < 2:
+                logger.info("About to hit pushbullet's rate limit, waiting 60s")
                 time.sleep(60)
             resp = requests.get(url + f"&cursor={cursor}", headers=headers)
             rate_limit_remaining = int(resp.headers.get("X-Ratelimit-Remaining"))
