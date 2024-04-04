@@ -18,17 +18,17 @@ RUN python -m venv /venv
 RUN . /venv/bin/activate
 
 # install Poetry (respects $POETRY_VERSION & $POETRY_HOME)
-ENV POETRY_VERSION=1.3.2
+ENV POETRY_VERSION=1.8.0
 RUN pip install "poetry==$POETRY_VERSION"
+
+# install chromium binary and matching chromedriver binary (+ gcc for installing e.g. psutil)
+RUN apt-get update && apt-get install -y --no-install-recommends chromium-driver gcc python3-dev
 
 # install dependences & create build version of package
 COPY pyproject.toml poetry.lock ./
 RUN poetry install --no-dev --no-root
 COPY . .
 RUN poetry build
-
-# install chromium binary and matching chromedriver binary
-RUN apt-get update && apt-get install -y --no-install-recommends chromium-driver
 
 
 # create lightweight 'final' stage with which to run discogs alert
@@ -37,10 +37,22 @@ FROM python-base as final
 # copy everything we need & install `discogs_alert` from whl
 COPY --from=builder /venv /venv
 COPY --from=builder /dist .
-COPY --from=builder /usr/bin/chromium /usr/bin/chromium
-COPY --from=builder /usr/bin/chromedriver /usr/bin/chromedriver
+
+# install chromium-driver, gcc, python3-dev (the latter two so that psutil can be installed)
+# ideally we'd just copy the builds over (that are already installed above), but that doesn't seem to work ...
+# COPY --from=builder /usr/bin/chromium /usr/bin/chromium
+# COPY --from=builder /usr/bin/chromedriver /usr/bin/chromedriver
+# COPY --from=builder /usr/bin/gcc /usr/bin/gcc
+# COPY --from=builder /usr/bin/python3-config /usr/bin/python3-config
+RUN apt-get update && apt-get install -y --no-install-recommends chromium-driver gcc python3-dev \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
 RUN . /venv/bin/activate && pip install *.whl
+
+# Create a directory in which to cache current conversion dicts
+ENV DA_CURRENCY_CACHE_DIR=/.currency_cache
+RUN mkdir $DA_CURRENCY_CACHE_DIR
 
 # run entrypoint
 COPY ./docker/docker-entrypoint.sh ./
-CMD ["./docker-entrypoint.sh"]
+ENTRYPOINT ["./docker-entrypoint.sh"]
