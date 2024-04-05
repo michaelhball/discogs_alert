@@ -53,6 +53,9 @@ RUN . /venv/bin/activate && pip install *.whl
 ENV DA_CURRENCY_CACHE_DIR=/.currency_cache
 RUN mkdir $DA_CURRENCY_CACHE_DIR
 
+# Set env variable so we can distinguish whether or not we're running in Docker
+ENV IN_DA_DOCKER="true"
+
 # run entrypoint
 COPY ./docker/docker-entrypoint.sh ./
 ENTRYPOINT ["./docker-entrypoint.sh"]

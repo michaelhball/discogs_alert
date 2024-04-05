@@ -129,8 +129,7 @@ class AnonClient(Client):
             "--incognito",
             f"--user-agent={self.user_agent.random}",  # initialize with random user-agent
         ]
-        if os.geteuid() == 0:
-            # running as root
+        if os.getenv("IN_DA_DOCKER") == "true":
             options_arguments.append("--no-sandbox")
         for argument in options_arguments:
             options.add_argument(argument)
@@ -142,11 +141,23 @@ class AnonClient(Client):
             kill_chromedriver_processes()
             raise we("We have killed the running chromedriver processes; DA should work next time it is called.")
 
+    @staticmethod
+    def find_chromedriver_path() -> str:
+        if os.name == "posix":  # macOS and Linux
+            return subprocess.check_output(["which", "chromedriver"]).decode().strip()
+        elif os.name == "nt":  # Windows
+            for path in os.environ["PATH"].split(os.pathsep):
+                chromedriver_path = os.path.join(path, "chromedriver.exe")
+                if os.path.exists(chromedriver_path):
+                    return chromedriver_path
+        else:
+            raise NotImplementedError("Unsupported operating system")
+
     def get_driver_path(self):
         try:
             # to install both chromium binary and the matching chromedriver binary:
             # apt-get install chromium-driver
-            return subprocess.check_output(["which", "chromedriver"]).decode().strip()
+            return self.find_chromedriver_path()
         except subprocess.CalledProcessError:
             # will install latest chromedriver binary regardless of currently installed chromium version
             return ChromeDriverManager().install()
