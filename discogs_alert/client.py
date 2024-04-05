@@ -129,7 +129,7 @@ class AnonClient(Client):
             "--incognito",
             f"--user-agent={self.user_agent.random}",  # initialize with random user-agent
         ]
-        if os.getenv("DOCKER_ENV") == "true":
+        if os.getenv("IN_DA_DOCKER") == "true":
             options_arguments.append("--no-sandbox")
         for argument in options_arguments:
             options.add_argument(argument)
