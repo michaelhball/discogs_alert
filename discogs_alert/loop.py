@@ -76,7 +76,10 @@ def loop(
                 time.sleep(60)
 
             for listing in client_anon.get_marketplace_listings(release.id):
-                listing = listing.convert_currency(currency)  # convert —> the base currency
+                try:
+                    listing = listing.convert_currency(currency)  # convert —> the base currency
+                except:  # noqa: E722
+                    logger.warning("Currency conversion failed, => continuing without.", exc_info=True)
 
                 # if listing is definitely unavailable, move to the next listing
                 if listing.is_definitely_unavailable(country):
@@ -101,14 +104,15 @@ def loop(
                     continue
 
                 # if the price is above our threshold, move to the next listing
-                if listing.price_is_above_threshold(release.price_threshold):
-                    if verbose:
-                        logger.info(
-                            f"Listing found that's above the price threshold:\n"
-                            f"\tRelease: {release.display_title}\n"
-                            f"\tListing: {listing.url}"
-                        )
-                    continue
+                if listing.price.currency == currency:
+                    if listing.price_is_above_threshold(release.price_threshold):
+                        if verbose:
+                            logger.info(
+                                f"Listing found that's above the price threshold:\n"
+                                f"\tRelease: {release.display_title}\n"
+                                f"\tListing: {listing.url}"
+                            )
+                        continue
 
                 valid_listings.append(listing)
 
