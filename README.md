@@ -135,6 +135,19 @@ To use Telegram you first need to create a custom bot, the easiest mechanism for
 ```
 You need to find your `CHAT_ID` as indicated above and save that. You may have to send a few "/start" messages to your bot before you get a response that looks like this. Once you've got your CHAT ID as well as your API token, you're all good to go!
 
+#### Email (SMTP)
+
+You will need an account on an SMTP server.
+
+* `hostname`: server domain/ip
+* `port`: server port, usually will be `587`
+* `username`: account username, usually (_but not always_) the same as your email address
+* `password`: account password
+* `email_from`: email address to send alerts **from**, usually the same as your username
+* `email_to`: email address to send alerts **to**
+
+If your account has MFA (multi-factor authentication) you will need to refer to your provider's instructions to generate a security token to use instead of your normal password.
+
 #### More coming soon ...
 
 I plan to add more alerting options as soon as possible! Please feel free to open a PR if you have a particular service
@@ -204,6 +217,12 @@ Here are the possible arguments:
 * `-pt` `--pushbullet-token`: (str) your pushbullet token (only required if `"--alerter-type=PUSHBULLET"`)
 * `-tt` `--telegram-token`: (str) your telegram API token (only required if `"--alerter-type=TELEGRAM"`)
 * `-tci` `--telegram-chat-id`: (str) your telgram chat ID (only required if `"--alerter-type=TELEGRAM"`)
+* `-eh` `--email-host`: (str) your email server's hostname (only required if `"--alerter-type=EMAIL"`)
+* `-ep` `--email-port`: (int) your email server's port (only required if `"--alerter-type=EMAIL"`)
+* `-eu` `--email-username`: (str) username of your SMTP account (only required if `"--alerter-type=EMAIL"`)
+* `-ep` `--email-password`: (str) password of your SMTP account (only required if `"--alerter-type=EMAIL"`)
+* `-ef` `--email-from`: (str) email address to send notifications from (only required if `"--alerter-type=EMAIL"`)
+* `-et` `--email-to`: (str) email address to send notifications to (only required if `"--alerter-type=EMAIL"`)
 
 And here are the possible flags:
 * `-V` `--verbose`: (bool) use this flag if you want to run the server in verbose mode, meaning it will log updates to the command line as it runs (default=`false`)

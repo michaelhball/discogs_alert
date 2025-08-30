@@ -186,6 +186,66 @@ logger = logging.getLogger(__name__)
     help="chat ID for telegram bot notification service.",
 )
 @click.option(
+    "-eh",
+    "--email-host",
+    cls=da_click.RequiredIf,
+    required_if=lambda x: x["alerter_type"] == da_alert.AlerterType.EMAIL,
+    required_if_str="alerter_type=AlerterType.EMAIL",
+    type=str,
+    envvar="DA_EMAIL_HOSTNAME",
+    help="hostname of SMTP server used for email notification service.",
+)
+@click.option(
+    "-ep",
+    "--email-port",
+    cls=da_click.RequiredIf,
+    required_if=lambda x: x["alerter_type"] == da_alert.AlerterType.EMAIL,
+    required_if_str="alerter_type=AlerterType.EMAIL",
+    type=int,
+    envvar="DA_EMAIL_PORT",
+    help="port of SMTP server used for email notification service.",
+)
+@click.option(
+    "-eu",
+    "--email-username",
+    cls=da_click.RequiredIf,
+    required_if=lambda x: x["alerter_type"] == da_alert.AlerterType.EMAIL,
+    required_if_str="alerter_type=AlerterType.EMAIL",
+    type=str,
+    envvar="DA_EMAIL_USERNAME",
+    help="username of SMTP account for email notification service.",
+)
+@click.option(
+    "-ep",
+    "--email-password",
+    cls=da_click.RequiredIf,
+    required_if=lambda x: x["alerter_type"] == da_alert.AlerterType.EMAIL,
+    required_if_str="alerter_type=AlerterType.EMAIL",
+    type=str,
+    envvar="DA_EMAIL_PASSWORD",
+    help="password of SMTP account for email notification service.",
+)
+@click.option(
+    "-ef",
+    "--email-from",
+    cls=da_click.RequiredIf,
+    required_if=lambda x: x["alerter_type"] == da_alert.AlerterType.EMAIL,
+    required_if_str="alerter_type=AlerterType.EMAIL",
+    type=str,
+    envvar="DA_EMAIL_FROM",
+    help="email address to mail from for email notification service.",
+)
+@click.option(
+    "-et",
+    "--email-to",
+    cls=da_click.RequiredIf,
+    required_if=lambda x: x["alerter_type"] == da_alert.AlerterType.EMAIL,
+    required_if_str="alerter_type=AlerterType.EMAIL",
+    type=str,
+    envvar="DA_EMAIL_TO",
+    help="email address to send to for email notification service.",
+)
+@click.option(
     "-V", "--verbose", default=False, is_flag=True, help="use flag if you want to see logs as the program runs"
 )
 @click.option(
@@ -216,6 +276,12 @@ def main(
     pushbullet_token,
     telegram_token,
     telegram_chat_id,
+    email_hostname,
+    email_port,
+    email_username,
+    email_password,
+    email_from,
+    email_to,
     verbose,
     test,
 ):
@@ -235,6 +301,15 @@ def main(
         alerter_kwargs = {"pushbullet_token": pushbullet_token}
     elif alerter_type == da_alert.AlerterType.TELEGRAM:
         alerter_kwargs = {"telegram_token": telegram_token, "telegram_chat_id": telegram_chat_id}
+    elif alerter_type == da_alert.AlerterType.EMAIL:
+        alerter_kwargs = {
+            "email_hostname": email_hostname,
+            "email_port": email_port,
+            "email_username": email_username,
+            "email_password": email_password,
+            "email_from": email_from,
+            "email_to": email_to
+        }
     else:
         raise ValueError("We should never get here")
 
