@@ -165,5 +165,9 @@ class AnonClient(Client):
     def get_marketplace_listings(self, release_id: int) -> da_entities.Listings:
         """Get list of listings currently for sale for particular release (by release's discogs ID)"""
 
-        self.driver.get(f"{self._base_url_non_api}/sell/release/{release_id}?ev=rb&sort=price%2Casc")
-        return da_scrape.scrape_listings_from_marketplace(self.driver.page_source, release_id)
+        self.driver.get(f"{self._base_url_non_api}/sell/release/{release_id}?sort=price%2Casc")
+        try:
+            return da_scrape.scrape_listings_from_marketplace(self.driver.page_source, release_id)
+        except:
+            print(self.driver.page_source)
+            raise

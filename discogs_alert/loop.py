@@ -68,6 +68,8 @@ def loop(
 
         wantlist_items = load_wantlist(list_id, user_token_client, wantlist_path)
         random.shuffle(wantlist_items)
+
+        logger.info("We are loopin' !")
         for idx, release in enumerate(wantlist_items):
             valid_listings: List[da_entities.Listing] = []
 

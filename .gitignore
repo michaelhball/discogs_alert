@@ -10,4 +10,5 @@ dist
 nohup.out
 poetry.lock
 .tox
-
+.telegram_alerts.pklz
+.currency_cache
