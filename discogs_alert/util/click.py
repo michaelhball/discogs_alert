@@ -19,8 +19,12 @@ class NotRequiredIf(click.Option):
     def handle_parse_result(
         self, ctx: click.Context, opts: Mapping[str, Any], args: List[str]
     ) -> Tuple[Any, List[str]]:
-        we_are_present = self.name in opts
-        other_present = self.not_required_if in opts
+        # Click stores option names in `opts` with underscores; users pass hyphens to
+        # `not_required_if` to mirror the CLI flag style. Normalise to underscores so
+        # the comparison actually fires.
+        other_name = self.not_required_if.replace("-", "_")
+        we_are_present = self.name in opts and opts.get(self.name) is not None
+        other_present = other_name in opts and opts.get(other_name) is not None
         if other_present:
             if we_are_present:
                 raise click.UsageError(
