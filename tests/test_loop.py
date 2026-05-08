@@ -275,39 +275,9 @@ def test_loop_tears_down_driver_on_exception(tmp_path: Path, monkeypatch: pytest
     fake_anon.driver.quit.assert_called_once()
 
 
-def test_loop_sleeps_when_rate_limit_low(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    wl = tmp_path / "wl.json"
-    wl.write_text(json.dumps([{"id": 1, "display_title": "A"}]))
-
-    fake_anon = MagicMock()
-    fake_anon.driver = MagicMock()
-    fake_user_client = MagicMock()
-    fake_user_client.rate_limit_remaining = 1  # below the threshold of 2
-    fake_user_client.get_release_stats.return_value = False  # bypass the stats gate
-
-    monkeypatch.setattr(da_client, "AnonClient", lambda *_a, **_kw: fake_anon)
-    monkeypatch.setattr(da_client, "UserTokenClient", lambda *_a, **_kw: fake_user_client)
-    monkeypatch.setattr(da_loop, "process_release", lambda *a, **k: 0)
-    sleep_calls = []
-    monkeypatch.setattr(da_loop.time, "sleep", lambda s: sleep_calls.append(s))
-
-    da_loop.loop(
-        discogs_token="X",
-        list_id=None,
-        wantlist_path=str(wl),
-        user_agent="UA",
-        country="Germany",
-        currency="EUR",
-        seller_filters=da_entities.SellerFilters(),
-        record_filters=da_entities.RecordFilters(),
-        country_whitelist=set(),
-        country_blacklist=set(),
-        alerter_type=AlerterType.PUSHBULLET,
-        alerter_kwargs={"pushbullet_token": "T"},
-        state_path=tmp_path / "state.db",
-    )
-
-    assert 60 in sleep_calls
+# Note: previously there was a test here verifying that `loop()` sleeps when
+# `rate_limit_remaining` is low. That responsibility moved to
+# `RateLimitGuard` inside `UserTokenClient` — see `tests/util/test_rate_limit.py`.
 
 
 # -- stats_skip_reason ------------------------------------------------------
