@@ -208,7 +208,6 @@ def test_loop_runs_and_calls_process_release(tmp_path: Path, monkeypatch: pytest
     wl.write_text(json.dumps([{"id": 1, "display_title": "A"}, {"id": 2, "display_title": "B"}]))
 
     fake_anon = MagicMock()
-    fake_anon.driver = MagicMock()
     fake_user_client = MagicMock()
     fake_user_client.rate_limit_remaining = 50
     fake_user_client.get_release_stats.return_value = False  # bypass the stats gate
@@ -240,13 +239,11 @@ def test_loop_runs_and_calls_process_release(tmp_path: Path, monkeypatch: pytest
     )
 
     assert sorted(process_calls) == [1, 2]
-    fake_anon.driver.close.assert_called_once()
-    fake_anon.driver.quit.assert_called_once()
+    fake_anon.close.assert_called_once()
 
 
-def test_loop_tears_down_driver_on_exception(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_loop_tears_down_client_on_exception(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     fake_anon = MagicMock()
-    fake_anon.driver = MagicMock()
     fake_user_client = MagicMock()
     fake_user_client.rate_limit_remaining = 50
 
@@ -271,8 +268,7 @@ def test_loop_tears_down_driver_on_exception(tmp_path: Path, monkeypatch: pytest
         state_path=tmp_path / "state.db",
     )
 
-    fake_anon.driver.close.assert_called_once()
-    fake_anon.driver.quit.assert_called_once()
+    fake_anon.close.assert_called_once()
 
 
 # Note: previously there was a test here verifying that `loop()` sleeps when
@@ -365,7 +361,6 @@ def test_loop_skips_scrape_when_stats_say_no_listings(tmp_path: Path, monkeypatc
     wl.write_text(json.dumps([{"id": 1, "display_title": "A"}]))
 
     fake_anon = MagicMock()
-    fake_anon.driver = MagicMock()
     fake_user_client = MagicMock()
     fake_user_client.rate_limit_remaining = 50
     fake_user_client.get_release_stats.return_value = da_entities.ReleaseStats(
@@ -403,7 +398,6 @@ def test_loop_no_stats_gate_flag_disables_gate(tmp_path: Path, monkeypatch: pyte
     wl.write_text(json.dumps([{"id": 1, "display_title": "A"}]))
 
     fake_anon = MagicMock()
-    fake_anon.driver = MagicMock()
     fake_user_client = MagicMock()
     fake_user_client.rate_limit_remaining = 50
     fake_user_client.get_release_stats.side_effect = AssertionError("should not be called")

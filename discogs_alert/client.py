@@ -1,38 +1,31 @@
-# ruff: noqa: E402
-import os
+"""Discogs API + marketplace HTTP clients.
 
-# to prevent the webdriver manager from polluting logs
-os.environ["WDM_LOG"] = "0"
+Two clients live here:
+
+- `UserTokenClient`: hits `api.discogs.com` with the user's auth token, used for
+  /lists, /marketplace/stats, etc. Plain `requests` is enough; no anti-bot
+  protection on the API.
+- `AnonClient`: hits `www.discogs.com/sell/release/{id}` for marketplace HTML.
+  This endpoint sits behind Cloudflare which checks TLS fingerprints — vanilla
+  `requests` (and even Selenium with default Chrome) gets a 403 "Just a
+  moment…" challenge. We use `curl_cffi` to impersonate a real Chrome's TLS/JA3
+  fingerprint so the challenge passes; this replaced a heavyweight Selenium /
+  webdriver-manager / Chromium / fake-useragent / psutil stack that was the
+  source of recurring chromedriver-leak bugs.
+"""
 
 import json
 import logging
-import subprocess
-import sys
 from typing import Union
 
 import dacite
-import psutil
 import requests
-from fake_useragent import UserAgent
-from selenium import webdriver
-from selenium.common.exceptions import WebDriverException
-from selenium.webdriver.chrome.service import Service as ChromiumService
-from selenium.webdriver.chromium.options import ChromiumOptions
-from webdriver_manager.chrome import ChromeDriverManager
+from curl_cffi import requests as curl_requests
 
 from discogs_alert import entities as da_entities, scrape as da_scrape
 from discogs_alert.util.rate_limit import RateLimitGuard
 
 logger = logging.getLogger(__name__)
-
-
-def kill_chromedriver_processes():
-    for process in psutil.process_iter(["pid", "name", "cmdline"]):
-        pinfo = process.info
-        if pinfo["name"] == "chromedriver" or (pinfo["cmdline"] is not None and "chromedriver" in pinfo["cmdline"]):
-            if process.status() != "zombie":
-                print(f"Terminating chromedriver process (PID {pinfo['pid']})")
-                process.terminate()
 
 
 class Client:
@@ -139,59 +132,50 @@ class UserTokenClient(Client):
 
 
 class AnonClient(Client):
-    """A Client for anonymous scraping requests (when not using the Discogs API, i.e. for the marketplace)."""
+    """An HTTP client for anonymous Discogs marketplace scraping.
 
-    def __init__(self, user_agent: str, *args, **kwargs):
+    Uses `curl_cffi` impersonating a real Chrome's TLS/JA3 fingerprint so we can
+    bypass Cloudflare's bot challenge on `www.discogs.com/sell/...`. Replaces a
+    Selenium + webdriver-manager + Chromium + fake-useragent + psutil stack that
+    used to leak chromedriver processes and added ~5s startup per loop iteration.
+
+    Args:
+        user_agent: a user-agent string. The TLS fingerprint comes from the
+            `impersonate` setting; the User-Agent header is mostly cosmetic but
+            should match a real browser of the same era.
+        impersonate: which browser fingerprint to impersonate. Defaults to a
+            recent Chrome release; `curl_cffi` keeps these up to date.
+    """
+
+    HTTP_TIMEOUT_SECONDS = 20
+    DEFAULT_IMPERSONATE = "chrome131"
+
+    def __init__(self, user_agent: str, *args, impersonate: str = DEFAULT_IMPERSONATE, **kwargs):
         super().__init__(user_agent, *args, **kwargs)
+        self.impersonate = impersonate
+        self._session = curl_requests.Session(impersonate=impersonate)
+        self._session.headers["User-Agent"] = user_agent
 
-        self.user_agent = UserAgent()  # can pull up-to-date user agents from any modern browser
-
-        log_output = "/dev/null" if sys.platform in {"linux", "linux2", "darwin"} else "NUL"  # disable logs
-        service = ChromiumService(self.get_driver_path(), log_output=log_output)
-        options = ChromiumOptions()
-        options_arguments = [
-            "--disable-gpu",
-            "--disable-dev-shm-usage",
-            "--disable-infobars",
-            "--headless=new",
-            "--incognito",
-            f"--user-agent={self.user_agent.random}",  # initialize with random user-agent
-        ]
-        if os.getenv("IN_DA_DOCKER") == "true":
-            options_arguments.append("--no-sandbox")
-        for argument in options_arguments:
-            options.add_argument(argument)
-
-        # If we get an exception because some previous chromedriver instance is still running, we kill it
+    def close(self) -> None:
         try:
-            self.driver = webdriver.Chrome(service=service, options=options)
-        except WebDriverException as we:
-            kill_chromedriver_processes()
-            raise we("We have killed the running chromedriver processes; DA should work next time it is called.")
+            self._session.close()
+        except Exception:
+            logger.warning("error closing curl_cffi session", exc_info=True)
 
-    @staticmethod
-    def find_chromedriver_path() -> str:
-        if os.name == "posix":  # macOS and Linux
-            return subprocess.check_output(["which", "chromedriver"]).decode().strip()
-        elif os.name == "nt":  # Windows
-            for path in os.environ["PATH"].split(os.pathsep):
-                chromedriver_path = os.path.join(path, "chromedriver.exe")
-                if os.path.exists(chromedriver_path):
-                    return chromedriver_path
-        else:
-            raise NotImplementedError("Unsupported operating system")
+    def __enter__(self) -> "AnonClient":
+        return self
 
-    def get_driver_path(self):
-        try:
-            # to install both chromium binary and the matching chromedriver binary:
-            # apt-get install chromium-driver
-            return self.find_chromedriver_path()
-        except subprocess.CalledProcessError:
-            # will install latest chromedriver binary regardless of currently installed chromium version
-            return ChromeDriverManager().install()
+    def __exit__(self, *_exc: object) -> None:
+        self.close()
 
     def get_marketplace_listings(self, release_id: int) -> da_entities.Listings:
-        """Get list of listings currently for sale for particular release (by release's discogs ID)"""
+        """Fetch the marketplace HTML for a release and parse the listings."""
 
-        self.driver.get(f"{self._base_url_non_api}/sell/release/{release_id}?ev=rb&sort=price%2Casc")
-        return da_scrape.scrape_listings_from_marketplace(self.driver.page_source, release_id)
+        url = f"{self._base_url_non_api}/sell/release/{release_id}?ev=rb&sort=price%2Casc"
+        resp = self._session.get(url, timeout=self.HTTP_TIMEOUT_SECONDS)
+        if resp.status_code != 200:
+            logger.warning(
+                "Marketplace fetch for release %s failed with status %s", release_id, resp.status_code
+            )
+            return []
+        return da_scrape.scrape_listings_from_marketplace(resp.text, release_id)

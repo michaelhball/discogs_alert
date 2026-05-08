@@ -17,3 +17,4 @@ poetry.lock
 .tox
 
 .currency_cache
+.claude

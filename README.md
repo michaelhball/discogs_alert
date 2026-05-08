@@ -31,7 +31,6 @@ If you have suggestions or ideas, please reach out! So far I've bought more than
 ## Requirements
 
 - Python >= 3.10
-- [Chromedriver](https://chromedriver.chromium.org/). If you have Google Chrome or any Chromium browser installed on your computer, you'll be fine.
 
 ## Installation & Setup
 
