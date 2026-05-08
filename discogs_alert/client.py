@@ -116,6 +116,8 @@ class UserTokenClient(Client):
     headers and proactively sleeps when we're close to the per-minute floor.
     """
 
+    HTTP_TIMEOUT_SECONDS = 15
+
     def __init__(self, user_agent: str, user_token: str, *args, **kwargs):
         super().__init__(user_agent, *args, **kwargs)
         self.user_token = user_token
@@ -124,7 +126,9 @@ class UserTokenClient(Client):
     def _request(self, method: str, url: str, data=None, headers=None):
         self.rate_limit_guard.before_request()
         params = {"token": self.user_token}
-        resp = requests.request(method, url, params=params, data=data, headers=headers)
+        resp = requests.request(
+            method, url, params=params, data=data, headers=headers, timeout=self.HTTP_TIMEOUT_SECONDS
+        )
         self.rate_limit_guard.update_from_headers(resp.headers)
         # Mirror the guard's view onto the legacy attributes — kept for callers
         # that read them directly (e.g. older `loop.py` versions).
