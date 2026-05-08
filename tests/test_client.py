@@ -23,11 +23,11 @@ def _fake_response(status: int = 200, body: bytes = b'{"ok":true}', headers=None
     return resp
 
 
-def test_user_token_client_attaches_token_param(monkeypatch: pytest.MonkeyPatch):
+def test_user_token_client_attaches_token_param_and_timeout(monkeypatch: pytest.MonkeyPatch):
     captured = {}
 
-    def fake_request(method, url, params=None, data=None, headers=None):
-        captured.update({"method": method, "url": url, "params": params})
+    def fake_request(method, url, params=None, data=None, headers=None, timeout=None):
+        captured.update({"method": method, "url": url, "params": params, "timeout": timeout})
         return _fake_response()
 
     monkeypatch.setattr(requests, "request", fake_request)
@@ -38,6 +38,7 @@ def test_user_token_client_attaches_token_param(monkeypatch: pytest.MonkeyPatch)
     assert captured["method"] == "GET"
     assert captured["url"] == "https://api.discogs.com/lists/1"
     assert captured["params"] == {"token": "TOKEN"}
+    assert captured["timeout"] == da_client.UserTokenClient.HTTP_TIMEOUT_SECONDS
 
 
 def test_user_token_client_tracks_rate_limit_headers(monkeypatch: pytest.MonkeyPatch):
