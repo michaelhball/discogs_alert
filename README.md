@@ -176,7 +176,7 @@ The `-d` flag specifies that you want to "detach" from the newly created docker 
 
 Please note that you _can_ add to or change the contents of your wantlist (either Discogs list or local file) while the service is running; the updated list of releases will come into effect the next time the service runs.
 
-Each time a listing is found for one of the releases in your wantlist, you will be sent a notification via the alerter service of your choice with the title of the release and the URL to the marketplace listing. If you're using Pushbullet, as long as you don't delete a given notification then you will _not_ be sent repeat notifications for the same listing. I hope to add this functionality for the Telegram alerter in due course. You can test that your alerting is working properly by adding a release to your wantlist that you know is currently for sale.
+Each time a listing is found for one of the releases in your wantlist, you will be sent a notification via the alerter service of your choice with the title of the release and the URL to the marketplace listing. Deduplication is handled locally — `discogs_alert` records every successful alert in a small SQLite database (default `~/.discogs_alert/state.db`, configurable via `--state-path`), and won't re-alert on the same listing across loop iterations regardless of which alerter you use. You can test that your alerting is working properly by adding a release to your wantlist that you know is currently for sale.
 
 There are a a number of additional arguments and flags that provide a deeper level of customisation. These optional arguments include the global versions of the conditions mentioned above (i.e. global seller, media, and sleeve conditions), as well as a country whitelist and blacklist. The use of any of these flags will apply to all releases in your wantlist.
 
@@ -204,6 +204,7 @@ Here are the possible arguments:
 * `-pt` `--pushbullet-token`: (str) your pushbullet token (only required if `"--alerter-type=PUSHBULLET"`)
 * `-tt` `--telegram-token`: (str) your telegram API token (only required if `"--alerter-type=TELEGRAM"`)
 * `-tci` `--telegram-chat-id`: (str) your telgram chat ID (only required if `"--alerter-type=TELEGRAM"`)
+* `-sp` `--state-path`: (str) path to the local SQLite database used to deduplicate alerts (default=`~/.discogs_alert/state.db`).
 
 And here are the possible flags:
 * `-V` `--verbose`: (bool) use this flag if you want to run the server in verbose mode, meaning it will log updates to the command line as it runs (default=`false`)

@@ -177,6 +177,17 @@ logger = logging.getLogger(__name__)
     help="chat ID for telegram bot notification service.",
 )
 @click.option(
+    "-sp",
+    "--state-path",
+    default=None,
+    type=click.Path(dir_okay=False, file_okay=True),
+    envvar="DA_STATE_PATH",
+    help=(
+        "Path to the local SQLite database used to deduplicate alerts. "
+        "Defaults to `~/.discogs_alert/state.db`."
+    ),
+)
+@click.option(
     "-V", "--verbose", default=False, is_flag=True, help="use flag if you want to see logs as the program runs"
 )
 @click.option(
@@ -206,6 +217,7 @@ def main(
     pushbullet_token,
     telegram_token,
     telegram_chat_id,
+    state_path,
     verbose,
     test,
 ):
@@ -226,21 +238,22 @@ def main(
     else:
         raise ValueError("We should never get here")
 
-    args = [
-        discogs_token,
-        list_id,
-        wantlist_path,
-        user_agent,
-        country,
-        currency,
-        da_entities.SellerFilters(min_seller_rating, min_seller_sales),
-        da_entities.RecordFilters(min_media_condition, min_sleeve_condition),
-        set(dac.COUNTRIES[c] for c in country_whitelist),
-        set(dac.COUNTRIES[c] for c in country_blacklist),
-        alerter_type,
-        alerter_kwargs,
-        verbose,
-    ]
+    loop_kwargs = dict(
+        discogs_token=discogs_token,
+        list_id=list_id,
+        wantlist_path=wantlist_path,
+        user_agent=user_agent,
+        country=country,
+        currency=currency,
+        seller_filters=da_entities.SellerFilters(min_seller_rating, min_seller_sales),
+        record_filters=da_entities.RecordFilters(min_media_condition, min_sleeve_condition),
+        country_whitelist=set(dac.COUNTRIES[c] for c in country_whitelist),
+        country_blacklist=set(dac.COUNTRIES[c] for c in country_blacklist),
+        alerter_type=alerter_type,
+        alerter_kwargs=alerter_kwargs,
+        state_path=state_path,
+        verbose=verbose,
+    )
 
     logger.info(
         r"""
@@ -255,9 +268,9 @@ def main(
 """
     )
 
-    da_loop.loop(*args)
+    da_loop.loop(**loop_kwargs)
     if not test:
-        schedule.every(int(60 / frequency)).minutes.do(lambda: da_loop.loop(*args))
+        schedule.every(int(60 / frequency)).minutes.do(lambda: da_loop.loop(**loop_kwargs))
         while 1:
             schedule.run_pending()
             time.sleep(1)
