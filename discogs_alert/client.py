@@ -142,14 +142,14 @@ class AnonClient(Client):
 
         self.user_agent = UserAgent()  # can pull up-to-date user agents from any modern browser
 
-        log_path = "/dev/null" if sys.platform in {"linux", "linux2", "darwin"} else "NUL"  # disable logs
-        service = ChromiumService(self.get_driver_path(), log_path=log_path)
+        log_output = "/dev/null" if sys.platform in {"linux", "linux2", "darwin"} else "NUL"  # disable logs
+        service = ChromiumService(self.get_driver_path(), log_output=log_output)
         options = ChromiumOptions()
         options_arguments = [
             "--disable-gpu",
             "--disable-dev-shm-usage",
             "--disable-infobars",
-            "--headless",
+            "--headless=new",
             "--incognito",
             f"--user-agent={self.user_agent.random}",  # initialize with random user-agent
         ]
