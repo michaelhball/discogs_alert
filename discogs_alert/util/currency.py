@@ -1,66 +1,147 @@
+"""Currency conversion using Frankfurter (https://www.frankfurter.app).
+
+Frankfurter is free, key-less, ECB-backed. We swapped to it from
+`freecurrencyapi` (which required a `DA_CURRENCY_TOKEN` API key) to keep the
+project deployable with zero account/token setup beyond the Discogs token
+itself.
+
+Two layers of caching:
+
+1. In-memory `time_cache` (one hour) — eliminates duplicate API hits within a
+   single process.
+2. On-disk weekly cache under `CACHE_DIR` — survives process restarts (cron
+   deployments, container restarts) and keeps the rate of upstream calls down
+   to roughly one per (currency, week).
+"""
+
 import json
+import logging
 import os
 import pathlib
 from datetime import datetime
-from typing import Dict
+from typing import Union
 
-import freecurrencyapi
+import requests
 
 from discogs_alert.util.constants import CURRENCY_CHOICES
+from discogs_alert.util.system import time_cache
 
-# Dict containing currency conversions for all currencies with respect to a given base currency
-CurrencyRates = Dict[str, float]
+CurrencyRates = dict[str, Union[int, float]]
 
-# Directory in which to store weekly CurrencyRates JSON caches
-CACHE_DIR = os.getenv(
-    "DA_CURRENCY_CACHE_DIR", pathlib.Path(__file__).parent.parent.parent.resolve() / ".currency_cache"
+FRANKFURTER_BASE_URL = "https://api.frankfurter.app"
+HTTP_TIMEOUT_SECONDS = 10
+
+# Directory in which to store weekly CurrencyRates JSON caches. Same env-var name
+# as the previous freecurrencyapi-based implementation, for ergonomic continuity.
+CACHE_DIR = pathlib.Path(
+    os.getenv("DA_CURRENCY_CACHE_DIR", pathlib.Path(__file__).parent.parent.parent.resolve() / ".currency_cache")
 )
+
+logger = logging.getLogger(__name__)
 
 
 class InvalidCurrencyException(Exception):
-    ...
+    """Raised when a currency code we're asked about isn't in our supported set."""
 
 
+class CurrencyProviderError(Exception):
+    """Raised when the upstream currency provider is unreachable or returns an unexpected payload."""
+
+
+def _disk_cache_path(base_currency: str) -> pathlib.Path:
+    now = datetime.now().isocalendar()
+    return CACHE_DIR / f"{now.year}-{now.week}-{base_currency}.json"
+
+
+@time_cache(seconds=3600)
 def get_currency_rates(base_currency: str) -> CurrencyRates:
-    """
-    Get live currency exchange rates (from one base currency). Cached for one week at a time, per currency (to avoid
-    API limits, and because small fluctuations in currency rates are really not important).
+    """Fetch live currency exchange rates from Frankfurter.
+
+    Cached at two levels: an in-process LRU+TTL cache (1h) and an on-disk
+    weekly cache. Small currency fluctuations don't matter for our use case
+    (price-threshold checks against vinyl listings), so weekly resolution is
+    plenty.
 
     Args:
-        base_currency: one of the valid 3-character currency identifiers.
+        base_currency: a 3-letter ISO 4217 currency code, present in
+            `CURRENCY_CHOICES`.
 
-    Returns: a dict containing exchange rates _to_ all major currencies _from_ the given base currency
+    Returns:
+        Mapping of currency code -> rate (units of `currency` per 1 unit of
+        `base_currency`). The base currency itself is included with rate 1.0.
+
+    Raises:
+        InvalidCurrencyException: if `base_currency` isn't supported locally.
+        CurrencyProviderError: if the upstream request fails or returns a
+            malformed payload.
     """
 
     if base_currency not in CURRENCY_CHOICES:
-        raise InvalidCurrencyException(f"{base_currency} is not a supported currency (see `discogs_alert/types.py`).")
+        raise InvalidCurrencyException(
+            f"{base_currency} is not a supported currency (see `discogs_alert/util/constants.py`)."
+        )
 
-    # See whether we've already cached currency rates for the current week
-    now = datetime.now().isocalendar()
-    cache_file = f"{CACHE_DIR}/{now.year}-{now.week}-{base_currency}"
-    if os.path.exists(cache_file):
-        return json.load(pathlib.Path(cache_file).open("r"))
+    cache_file = _disk_cache_path(base_currency)
+    if cache_file.exists():
+        try:
+            return json.load(cache_file.open("r"))
+        except (json.JSONDecodeError, OSError):
+            logger.warning("Failed to read currency cache %s; refetching", cache_file, exc_info=True)
 
-    # Else query & cache them before returning
-    client = freecurrencyapi.Client(os.getenv("DA_CURRENCY_TOKEN"))
-    currency_rates = client.latest(base_currency="EUR")["data"]
-    json.dump(currency_rates, pathlib.Path(cache_file).open("w"))
+    try:
+        response = requests.get(
+            f"{FRANKFURTER_BASE_URL}/latest", params={"base": base_currency}, timeout=HTTP_TIMEOUT_SECONDS
+        )
+    except requests.RequestException as exc:
+        raise CurrencyProviderError(f"Failed to reach Frankfurter for base {base_currency}: {exc}") from exc
 
-    return currency_rates
+    if response.status_code != 200:
+        raise CurrencyProviderError(
+            f"Frankfurter returned {response.status_code} for base {base_currency}: {response.text[:200]}"
+        )
+
+    payload = response.json()
+    rates = payload.get("rates")
+    if not isinstance(rates, dict):
+        raise CurrencyProviderError(f"Frankfurter response missing 'rates': {payload!r}")
+
+    # Frankfurter omits the base currency from `rates`; include it so callers
+    # may safely look it up.
+    rates[base_currency] = 1.0
+
+    try:
+        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        json.dump(rates, cache_file.open("w"))
+    except OSError:
+        # Caching is best-effort; don't fail the whole request just because we
+        # can't write to disk.
+        logger.warning("Failed to write currency cache %s", cache_file, exc_info=True)
+
+    return rates
 
 
 def convert_currency(value: float, old_currency: str, new_currency: str) -> float:
-    """Convert `value` from old_currency to new_currency
+    """Convert `value` from `old_currency` to `new_currency`.
 
     Args:
-        value: the value in the old currency
-        old_currency: the existing currency
-        new_currency: the currency to convert to
+        value: the amount in `old_currency`.
+        old_currency: the source 3-letter currency code.
+        new_currency: the target 3-letter currency code.
 
-    Returns: value in the new currency.
+    Returns:
+        `value` expressed in `new_currency`.
+
+    Raises:
+        InvalidCurrencyException: if either currency is unknown.
+        CurrencyProviderError: if the upstream provider request fails.
     """
 
+    if old_currency == new_currency:
+        return float(value)
+    rates = get_currency_rates(new_currency)
     try:
-        return float(value) / get_currency_rates(new_currency)[old_currency]
+        return float(value) / rates[old_currency]
     except KeyError:
-        raise InvalidCurrencyException(f"{old_currency} is not a supported currency (see `discogs_alert/types.py`)")
+        raise InvalidCurrencyException(
+            f"{old_currency} is not a supported currency (see `discogs_alert/util/constants.py`)."
+        )
