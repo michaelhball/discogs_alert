@@ -109,7 +109,9 @@ def scrape_listings_from_marketplace(response_content: str, release_id: int) -> 
             listing["seller_avg_rating"] = float(seller_avg_rating_elt.strip().split("%")[0])
 
         try:
-            listing["seller_ships_from"] = seller_info_cell.find("span", text="Ships From:").parent.contents[1].strip()
+            listing["seller_ships_from"] = (
+                seller_info_cell.find("span", string="Ships From:").parent.contents[1].strip()
+            )
         except IndexError:
             # if we get an IndexError here it means the listing had no "Ships From:" country, => we don't continue
             # parsing. The only times I've seen such listings in the past were scams...
