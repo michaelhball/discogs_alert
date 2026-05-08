@@ -211,6 +211,7 @@ def test_loop_runs_and_calls_process_release(tmp_path: Path, monkeypatch: pytest
     fake_anon.driver = MagicMock()
     fake_user_client = MagicMock()
     fake_user_client.rate_limit_remaining = 50
+    fake_user_client.get_release_stats.return_value = False  # bypass the stats gate
 
     process_calls = []
 
@@ -282,6 +283,7 @@ def test_loop_sleeps_when_rate_limit_low(tmp_path: Path, monkeypatch: pytest.Mon
     fake_anon.driver = MagicMock()
     fake_user_client = MagicMock()
     fake_user_client.rate_limit_remaining = 1  # below the threshold of 2
+    fake_user_client.get_release_stats.return_value = False  # bypass the stats gate
 
     monkeypatch.setattr(da_client, "AnonClient", lambda *_a, **_kw: fake_anon)
     monkeypatch.setattr(da_client, "UserTokenClient", lambda *_a, **_kw: fake_user_client)
@@ -306,3 +308,158 @@ def test_loop_sleeps_when_rate_limit_low(tmp_path: Path, monkeypatch: pytest.Mon
     )
 
     assert 60 in sleep_calls
+
+
+# -- stats_skip_reason ------------------------------------------------------
+
+
+def _release_with_threshold(price_threshold=None):
+    return da_entities.Release(id=1, display_title="X", price_threshold=price_threshold)
+
+
+def test_stats_skip_reason_no_listings():
+    stats = da_entities.ReleaseStats(num_for_sale=0, lowest_price=None)
+    assert da_loop.stats_skip_reason(stats, _release_with_threshold(), "EUR") == "no listings for sale"
+
+
+def test_stats_skip_reason_blocked_from_sale():
+    stats = da_entities.ReleaseStats(num_for_sale=5, blocked_from_sale=True)
+    assert da_loop.stats_skip_reason(stats, _release_with_threshold(), "EUR") == "release is blocked from sale"
+
+
+def test_stats_skip_reason_no_threshold_means_proceed():
+    stats = da_entities.ReleaseStats(
+        num_for_sale=3, lowest_price=da_entities.ShippingPrice(currency="EUR", value=999)
+    )
+    assert da_loop.stats_skip_reason(stats, _release_with_threshold(price_threshold=None), "EUR") is None
+
+
+def test_stats_skip_reason_no_lowest_price_means_proceed():
+    stats = da_entities.ReleaseStats(num_for_sale=3, lowest_price=None)
+    assert da_loop.stats_skip_reason(stats, _release_with_threshold(price_threshold=10), "EUR") is None
+
+
+def test_stats_skip_reason_above_threshold_skips(mock_currency_rates):
+    """Lowest listing is €100 but threshold is €20 → skip."""
+
+    stats = da_entities.ReleaseStats(
+        num_for_sale=2, lowest_price=da_entities.ShippingPrice(currency="EUR", value=100)
+    )
+    reason = da_loop.stats_skip_reason(stats, _release_with_threshold(price_threshold=20), "EUR")
+    assert reason is not None and "lowest price" in reason
+
+
+def test_stats_skip_reason_below_threshold_proceeds(mock_currency_rates):
+    stats = da_entities.ReleaseStats(
+        num_for_sale=2, lowest_price=da_entities.ShippingPrice(currency="EUR", value=15)
+    )
+    assert da_loop.stats_skip_reason(stats, _release_with_threshold(price_threshold=20), "EUR") is None
+
+
+def test_stats_skip_reason_currency_conversion(mock_currency_rates, rates):
+    """Lowest price quoted in GBP, threshold in EUR — convert before comparing."""
+
+    stats = da_entities.ReleaseStats(
+        num_for_sale=2, lowest_price=da_entities.ShippingPrice(currency="GBP", value=10)
+    )
+    eur_equiv = 10 / rates["GBP"]
+    just_below_threshold = eur_equiv + 1
+    just_above_threshold = eur_equiv - 1
+    assert (
+        da_loop.stats_skip_reason(
+            stats, _release_with_threshold(price_threshold=just_below_threshold), "EUR"
+        )
+        is None
+    )
+    assert (
+        da_loop.stats_skip_reason(
+            stats, _release_with_threshold(price_threshold=just_above_threshold), "EUR"
+        )
+        is not None
+    )
+
+
+def test_stats_skip_reason_unknown_currency_does_not_gate():
+    """If we can't convert, fall back to scraping rather than guessing."""
+
+    stats = da_entities.ReleaseStats(
+        num_for_sale=2, lowest_price=da_entities.ShippingPrice(currency="DOOT", value=10)
+    )
+    assert da_loop.stats_skip_reason(stats, _release_with_threshold(price_threshold=5), "EUR") is None
+
+
+def test_loop_skips_scrape_when_stats_say_no_listings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """When stats says no listings, `process_release` is never called."""
+
+    wl = tmp_path / "wl.json"
+    wl.write_text(json.dumps([{"id": 1, "display_title": "A"}]))
+
+    fake_anon = MagicMock()
+    fake_anon.driver = MagicMock()
+    fake_user_client = MagicMock()
+    fake_user_client.rate_limit_remaining = 50
+    fake_user_client.get_release_stats.return_value = da_entities.ReleaseStats(
+        num_for_sale=0, lowest_price=None
+    )
+
+    process_calls = []
+    monkeypatch.setattr(da_client, "AnonClient", lambda *_a, **_kw: fake_anon)
+    monkeypatch.setattr(da_client, "UserTokenClient", lambda *_a, **_kw: fake_user_client)
+    monkeypatch.setattr(
+        da_loop, "process_release", lambda release, *a, **k: process_calls.append(release.id) or 0
+    )
+
+    da_loop.loop(
+        discogs_token="X",
+        list_id=None,
+        wantlist_path=str(wl),
+        user_agent="UA",
+        country="Germany",
+        currency="EUR",
+        seller_filters=da_entities.SellerFilters(),
+        record_filters=da_entities.RecordFilters(),
+        country_whitelist=set(),
+        country_blacklist=set(),
+        alerter_type=AlerterType.PUSHBULLET,
+        alerter_kwargs={"pushbullet_token": "T"},
+        state_path=tmp_path / "state.db",
+    )
+
+    assert process_calls == []  # gate fired, no scrape attempted
+
+
+def test_loop_no_stats_gate_flag_disables_gate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    wl = tmp_path / "wl.json"
+    wl.write_text(json.dumps([{"id": 1, "display_title": "A"}]))
+
+    fake_anon = MagicMock()
+    fake_anon.driver = MagicMock()
+    fake_user_client = MagicMock()
+    fake_user_client.rate_limit_remaining = 50
+    fake_user_client.get_release_stats.side_effect = AssertionError("should not be called")
+
+    process_calls = []
+    monkeypatch.setattr(da_client, "AnonClient", lambda *_a, **_kw: fake_anon)
+    monkeypatch.setattr(da_client, "UserTokenClient", lambda *_a, **_kw: fake_user_client)
+    monkeypatch.setattr(
+        da_loop, "process_release", lambda release, *a, **k: process_calls.append(release.id) or 0
+    )
+
+    da_loop.loop(
+        discogs_token="X",
+        list_id=None,
+        wantlist_path=str(wl),
+        user_agent="UA",
+        country="Germany",
+        currency="EUR",
+        seller_filters=da_entities.SellerFilters(),
+        record_filters=da_entities.RecordFilters(),
+        country_whitelist=set(),
+        country_blacklist=set(),
+        alerter_type=AlerterType.PUSHBULLET,
+        alerter_kwargs={"pushbullet_token": "T"},
+        state_path=tmp_path / "state.db",
+        use_stats_gate=False,
+    )
+
+    assert process_calls == [1]
