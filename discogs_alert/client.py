@@ -16,7 +16,7 @@ from selenium import webdriver
 from selenium.webdriver.chromium.options import ChromiumOptions
 from selenium.webdriver.chromium.service import ChromiumService
 from webdriver_manager.chrome import ChromeDriverManager
-from webdriver_manager.core.utils import ChromeType
+from webdriver_manager.core.os_manager import ChromeType
 
 from discogs_alert import entities as da_entities, scrape as da_scrape
 
@@ -108,18 +108,18 @@ class AnonClient(Client):
 
         self.user_agent = UserAgent()  # can pull up-to-date user agents from any modern browser
 
-        log_path = "/dev/null" if sys.platform in {"linux", "linux2", "darwin"} else "NUL"  # disable logs
-        service = ChromiumService(self.get_driver_path(), log_path=log_path)
+        log_output = "/dev/null" if sys.platform in {"linux", "linux2", "darwin"} else "NUL"  # disable logs
+        service = ChromiumService(self.get_driver_path(), log_output=log_output)
         options = ChromiumOptions()
         options_arguments = [
             "--disable-gpu",
             "--disable-dev-shm-usage",
             "--disable-infobars",
-            "--headless",
+            "--headless=new",
             "--incognito",
             f"--user-agent={self.user_agent.random}",  # initialize with random user-agent
         ]
-        if os.geteuid() == 0:
+        if hasattr(os, "geteuid") and os.geteuid() == 0:
             # running as root
             options_arguments.append("--no-sandbox")
         for argument in options_arguments:
