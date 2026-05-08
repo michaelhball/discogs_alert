@@ -3,32 +3,37 @@ on: [pull_request]
 
 jobs:
   ruff:
-    runs-on: ubuntu-latest  # [macos-latest, windows-latest]
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.7", "3.8", "3.9", "3.10", "3.11", "pypy-3.9"]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
     name: "ruff (Python ${{ matrix.python-version }})"
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
       - run: pip3 install ruff
-      - run: ruff check discogs_alert
+      - run: ruff check discogs_alert tests
 
   tox:
-    runs-on: ubuntu-latest  # [macos-latest, windows-latest]
+    runs-on: ubuntu-latest
     name: "tox"
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-      - run: pip3 install tox==4.4.5
-      - run: tox run-parallel
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip3 install tox
+      - run: tox -e py$(echo ${{ matrix.python-version }} | tr -d .)
 
   lfs-warning:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actionsdesk/lfs-warning@v3.2
         with:
           filesizelimit: 1MB
