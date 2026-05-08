@@ -1,11 +1,17 @@
 """Tests for `discogs_alert.scrape`.
 
-We don't have a way to fetch a fresh Discogs marketplace HTML response from CI
-(Cloudflare blocks anonymous HTTP requests, see CLAUDE.md), so we exercise the
-parser against a synthetic fixture that mirrors the structure the parser expects.
-This is good enough to catch regressions in our own logic; structural drift on
-Discogs's side will be caught the next time we capture a real fixture (planned
-for the curl_cffi swap).
+We exercise the parser against two HTML fixtures:
+
+- `marketplace_listing.html`: a synthetic 5-listing fixture covering all the
+  branches the parser handles (new vs experienced sellers, missing sleeve,
+  unavailable, mixed currencies, etc.). Stable, version-controlled, easy to
+  reason about.
+- `marketplace_listing_real.html`: a real Discogs marketplace response
+  captured via `curl_cffi` for release 2247646 (Charanjit Singh — Ten Ragas).
+  This catches Discogs HTML drift the synthetic fixture can't.
+
+Re-capture the real fixture (and update the assertions) the next time the
+parser surfaces drift in production.
 """
 
 from pathlib import Path
@@ -17,6 +23,7 @@ from discogs_alert.util import constants as dac
 
 FIXTURES = Path(__file__).parent / "data"
 MARKETPLACE_HTML = (FIXTURES / "marketplace_listing.html").read_text()
+REAL_MARKETPLACE_HTML = (FIXTURES / "marketplace_listing_real.html").read_text()
 
 
 # -- _parse_price_string ----------------------------------------------------
@@ -183,3 +190,27 @@ def test_url_is_constructed_from_id(parsed_listings):
 def test_currency_constants_are_iso_codes_we_know(parsed_listings):
     for listing in parsed_listings:
         assert listing.price.currency in dac.CURRENCY_CHOICES
+
+
+# -- Real Discogs HTML fixture ---------------------------------------------
+
+
+def test_real_marketplace_html_parses_to_listings():
+    """Sanity check against a real Discogs marketplace response captured via
+    `curl_cffi` for release 2247646. If Discogs restructures the page badly
+    enough to break the parser, this test will fail before users do.
+
+    We don't assert specific prices (rare records' prices fluctuate) — only
+    that we get *something* sensible out: at least one listing, all with
+    supported currencies, IDs that look like Discogs listing IDs, etc.
+    """
+
+    listings = da_scrape.scrape_listings_from_marketplace(REAL_MARKETPLACE_HTML, release_id=2247646)
+    assert len(listings) >= 1
+    for listing in listings:
+        assert listing.id > 0
+        assert listing.price.currency in dac.CURRENCY_CHOICES
+        assert listing.price.value > 0
+        assert listing.seller_ships_from
+        assert isinstance(listing.media_condition, da_entities.CONDITION)
+        assert isinstance(listing.sleeve_condition, da_entities.CONDITION)

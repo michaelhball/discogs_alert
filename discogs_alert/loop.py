@@ -229,10 +229,6 @@ def loop(
         logger.exception("Unexpected exception in loop; continuing")
     finally:
         if client_anon is not None:
-            try:
-                client_anon.driver.close()
-                client_anon.driver.quit()
-            except Exception:
-                logger.warning("error tearing down anonymous client driver", exc_info=True)
+            client_anon.close()
 
     logger.info("\t took %.2fs", time.time() - start_time)
