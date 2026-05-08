@@ -21,6 +21,7 @@ from selenium.webdriver.chromium.options import ChromiumOptions
 from webdriver_manager.chrome import ChromeDriverManager
 
 from discogs_alert import entities as da_entities, scrape as da_scrape
+from discogs_alert.util.rate_limit import RateLimitGuard
 
 logger = logging.getLogger(__name__)
 
@@ -109,18 +110,27 @@ class Client:
 
 
 class UserTokenClient(Client):
-    """A client for sending requests with a user token (for non-oauth authentication)."""
+    """A client for sending requests with a user token (for non-oauth authentication).
+
+    Wraps each request in a `RateLimitGuard` that watches Discogs's rate-limit
+    headers and proactively sleeps when we're close to the per-minute floor.
+    """
 
     def __init__(self, user_agent: str, user_token: str, *args, **kwargs):
         super().__init__(user_agent, *args, **kwargs)
         self.user_token = user_token
+        self.rate_limit_guard = RateLimitGuard()
 
     def _request(self, method: str, url: str, data=None, headers=None):
+        self.rate_limit_guard.before_request()
         params = {"token": self.user_token}
         resp = requests.request(method, url, params=params, data=data, headers=headers)
-        self.rate_limit = int(resp.headers.get("X-Discogs-Ratelimit"))
-        self.rate_limit_used = int(resp.headers.get("X-Discogs-Ratelimit-Used"))
-        self.rate_limit_remaining = int(resp.headers.get("X-Discogs-Ratelimit-Remaining"))
+        self.rate_limit_guard.update_from_headers(resp.headers)
+        # Mirror the guard's view onto the legacy attributes — kept for callers
+        # that read them directly (e.g. older `loop.py` versions).
+        self.rate_limit = self.rate_limit_guard.limit
+        self.rate_limit_used = self.rate_limit_guard.used
+        self.rate_limit_remaining = self.rate_limit_guard.remaining
         return resp.content, resp.status_code
 
 

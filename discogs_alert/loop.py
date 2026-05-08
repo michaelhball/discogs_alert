@@ -190,14 +190,8 @@ def loop(
             wantlist_items = load_wantlist(list_id, user_token_client, wantlist_path)
             random.shuffle(wantlist_items)
             for release in wantlist_items:
-                # The Discogs API has a 60-req/min limit that only resets after 60s of
-                # inactivity. Sleep proactively if we're close to the floor.
-                if (
-                    user_token_client.rate_limit_remaining is not None
-                    and user_token_client.rate_limit_remaining <= 2
-                ):
-                    logger.info("approaching Discogs API rate limit; sleeping 60s")
-                    time.sleep(60)
+                # Rate-limit protection is now handled inside `UserTokenClient`
+                # via `RateLimitGuard` — we don't need an explicit sleep here.
 
                 if use_stats_gate:
                     stats = user_token_client.get_release_stats(release.id)
