@@ -30,7 +30,7 @@ If you have suggestions or ideas, please reach out! So far I've bought more than
 
 ## Requirements
 
-- Python >= 3.7
+- Python >= 3.10
 - [Chromedriver](https://chromedriver.chromium.org/). If you have Google Chrome or any Chromium browser installed on your computer, you'll be fine.
 
 ## Installation & Setup
@@ -53,7 +53,7 @@ You can then  install it by doing the following:
 ```
 $ tar xvfz discogs_alert-0.0.x.tar.gz
 $ cd discogs_alert-0.0.x
-$ python setup.by build
+$ python setup.py build
 $ python setup.py install 
 ```
 The last command must be executed as a privileged user if you aren't currently using a virtualenv.
@@ -114,7 +114,7 @@ The possible optional filters are as follows:
 * `min_media_condition`: minimum allowable media condition (one of `'POOR'`, `'FAIR'`, `'GOOD'`, `'GOOD_PLUS'`,
 `'VERY_GOOD'`, `'VERY_GOOD_PLUS'`, `'NEAR_MINT'`, or `'MINT'`)
 * `min_sleeve_condition`: minimum allowable sleeve condition (one of `'POOR'`, `'FAIR'`, `'GOOD'`, `'GOOD_PLUS'`,
-`'VERY_GOOD'`, `'VERY_GOOD_PLUS'`, `'NEAR_MINT'`, or `'MINR'`)
+`'VERY_GOOD'`, `'VERY_GOOD_PLUS'`, `'NEAR_MINT'`, or `'MINT'`)
 
 ### Alerting
 
@@ -197,7 +197,7 @@ Here are the possible arguments:
 * `-msr` `--min-seller-rating`: (float) the minimum seller rating you want to accept (default=`99`)
 * `-mss` `--min-seller-sales`: (float) the minimum number of sales your accept a seller to have (default=`None`)
 * `-mmc` `--min-media-condition`: (str) minimum allowable media condition, as outlined above (default=`'VERY_GOOD'`)
-* `-msc` `--min-sleeve-condition`: (str) minimum allowable sleeve condition, as outlined above (default=`'VERY_GOOD'`)
+* `-msc` `--min-sleeve-condition`: (str) minimum allowable sleeve condition, as outlined above (default=`'NOT_GRADED'`)
 * `-wl` `--country-whitelist`: (str) you can pass this argument any number of times to construct a list of countries. If using a whitelist, you will only be alerted about listings by sellers from those specified countries.
 * `-bl` `--country-blacklist`: (str) you can pass this argument any number of times to construct a list of countries. If using a blacklist, you will be alerted about listings by sellers from all countries except those specified in the list.
 * `-at` `--alerter-type`: (str) one of the valid alerter types: `PUSHBULLET` or `TELEGRAM`
