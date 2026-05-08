@@ -1,16 +1,21 @@
-from typing import Dict, Set
+"""Alerter base class.
 
-AlertDict = Dict[str, Set[str]]
+An `Alerter` is the thinnest possible delivery primitive: given a title and a body,
+push a notification through some external service. Deduplication has been moved to
+the `discogs_alert.state.AlertStore`, so alerters no longer need to query their own
+history.
+"""
+
+from __future__ import annotations
 
 
 class Alerter:
-    def __init__(self):
-        ...
+    """Base class for notification providers.
 
-    def get_all_alerts(self) -> AlertDict:
-        """Returns a list of all alerts previously sent s.t. they can be searched to avoid duplicates."""
-        raise NotImplementedError
+    Subclasses implement `send_alert`. Returning `True` indicates a successful send
+    (the loop will then record the alert in the local store). Returning `False`
+    means we should *not* mark the alert as sent — the loop will retry next iteration.
+    """
 
-    def send_alert(self, message_title: str, message_body: str):
-        """Returns a list of all alerts previously sent s.t. they can be searched to avoid duplicates."""
+    def send_alert(self, message_title: str, message_body: str) -> bool:
         raise NotImplementedError
