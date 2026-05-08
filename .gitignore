@@ -2,6 +2,11 @@
 .idea
 __pycache__
 .pytest_cache
+.coverage
+.coverage.*
+.history
+htmlcov
+.venv
 venv
 .DS_Store
 wantlist.json
