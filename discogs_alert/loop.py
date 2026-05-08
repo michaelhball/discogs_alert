@@ -10,7 +10,7 @@ from requests.exceptions import ConnectionError
 
 from discogs_alert import client as da_client, entities as da_entities, state as da_state
 from discogs_alert.alert import Alerter, get_alerter
-from discogs_alert.util import constants as dac
+from discogs_alert.util import constants as dac, currency as da_currency
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +35,42 @@ def load_wantlist(
             release_dict["min_sleeve_condition"] = da_entities.CONDITION[min_sleeve_condition]
         wantlist.append(dacite.from_dict(da_entities.Release, release_dict))
     return wantlist
+
+
+def stats_skip_reason(
+    stats: da_entities.ReleaseStats, release: da_entities.Release, currency: str
+) -> Optional[str]:
+    """Return a human-readable reason to skip the marketplace scrape for a release based
+    on its lightweight `/marketplace/stats/{release_id}` summary. ``None`` means "don't
+    skip — go scrape the marketplace page".
+
+    Skipping rules:
+    * No listings at all → skip.
+    * Release is blocked from sale → skip.
+    * Release has a `price_threshold` and the lowest listed price (converted into the
+      user's preferred currency) is above it → skip. We don't bother converting if the
+      stats currency is missing or unsupported.
+
+    The point of this gate is to avoid the expensive marketplace scrape (and the
+    Cloudflare risk that comes with it) when we already know it can't yield an alert.
+    """
+
+    if stats.num_for_sale == 0:
+        return "no listings for sale"
+    if stats.blocked_from_sale:
+        return "release is blocked from sale"
+    if release.price_threshold is None or stats.lowest_price is None:
+        return None
+    try:
+        lowest = da_currency.convert_currency(
+            stats.lowest_price.value, stats.lowest_price.currency, currency
+        )
+    except da_currency.InvalidCurrencyException:
+        # Unknown stats currency: don't gate on price.
+        return None
+    if lowest > release.price_threshold:
+        return f"lowest price {lowest:.2f} {currency} > threshold {release.price_threshold}"
+    return None
 
 
 def process_release(
@@ -124,6 +160,7 @@ def loop(
     alerter_type: Alerter,
     alerter_kwargs: Dict[str, Any],
     state_path: Optional[Path] = None,
+    use_stats_gate: bool = True,
     verbose: bool = False,
 ):
     """Event loop. One iteration: pull the wantlist, query the marketplace for each
@@ -131,6 +168,12 @@ def loop(
 
     Alert dedup is local — backed by `discogs_alert.state.AlertStore`. The alerter
     itself is now stateless from the loop's point of view.
+
+    When `use_stats_gate` is True (the default), each release is first checked
+    against the cheap `/marketplace/stats` API; releases with no listings, blocked
+    from sale, or above the user's price threshold are skipped without scraping
+    the marketplace page. This is the single largest rate-limit win for users
+    with large wantlists.
     """
 
     start_time = time.time()
@@ -155,6 +198,22 @@ def loop(
                 ):
                     logger.info("approaching Discogs API rate limit; sleeping 60s")
                     time.sleep(60)
+
+                if use_stats_gate:
+                    stats = user_token_client.get_release_stats(release.id)
+                    if stats is False:
+                        if verbose:
+                            logger.info("stats lookup failed for release %s; scraping anyway", release.id)
+                    else:
+                        skip_reason = stats_skip_reason(stats, release, currency)
+                        if skip_reason is not None:
+                            if verbose:
+                                logger.info(
+                                    "Skipping marketplace scrape for %s: %s",
+                                    release.display_title,
+                                    skip_reason,
+                                )
+                            continue
 
                 process_release(
                     release,

@@ -93,8 +93,14 @@ class Client:
         )
 
     def get_release_stats(self, release_id: int) -> Union[da_entities.ReleaseStats, bool]:
+        """Fetch the marketplace stats for a release. Returns False if the API call
+        fails (e.g. a 404 on a non-existent release), otherwise a `ReleaseStats`.
+        """
+
         release_stats_dict = self._get(f"{self._base_url}/marketplace/stats/{release_id}")
-        return da_entities.ReleaseStats(**release_stats_dict) if isinstance(release_stats_dict, dict) else False
+        if not isinstance(release_stats_dict, dict):
+            return False
+        return dacite.from_dict(da_entities.ReleaseStats, release_stats_dict)
 
     def get_wantlist(self, username: str):
         # TODO: add entities to deserialise this correctly

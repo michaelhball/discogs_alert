@@ -188,6 +188,17 @@ logger = logging.getLogger(__name__)
     ),
 )
 @click.option(
+    "--stats-gate/--no-stats-gate",
+    default=True,
+    show_default=True,
+    envvar="DA_STATS_GATE",
+    help=(
+        "Use the cheap `/marketplace/stats` API to skip the expensive marketplace "
+        "scrape for releases with no listings or above your price threshold. "
+        "Recommended; disable only for debugging."
+    ),
+)
+@click.option(
     "-V", "--verbose", default=False, is_flag=True, help="use flag if you want to see logs as the program runs"
 )
 @click.option(
@@ -218,6 +229,7 @@ def main(
     telegram_token,
     telegram_chat_id,
     state_path,
+    stats_gate,
     verbose,
     test,
 ):
@@ -252,6 +264,7 @@ def main(
         alerter_type=alerter_type,
         alerter_kwargs=alerter_kwargs,
         state_path=state_path,
+        use_stats_gate=stats_gate,
         verbose=verbose,
     )
 

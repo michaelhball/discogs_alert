@@ -87,8 +87,16 @@ class UserList:
 
 @dataclass
 class ReleaseStats:
+    """Lightweight summary of a release on the marketplace, returned by
+    ``GET /marketplace/stats/{release_id}``.
+
+    `lowest_price` is the cheapest listing currently for sale, in the user's
+    Discogs-account currency setting. We only get a value when the release has
+    listings (i.e. `num_for_sale > 0`).
+    """
+
     num_for_sale: int
-    lowest_price: Optional[float] = None
+    lowest_price: Optional["ShippingPrice"] = None
     blocked_from_sale: bool = False
 
 

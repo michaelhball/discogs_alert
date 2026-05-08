@@ -16,3 +16,4 @@ nohup.out
 poetry.lock
 .tox
 
+.currency_cache
