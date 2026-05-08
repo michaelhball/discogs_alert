@@ -21,8 +21,24 @@ class PriceParsingException(ParsingException):
 CURRENCY_REGEX = r".*?(?:[\£\$\€\¥]{1})"
 
 
-def _parse_price_string(price_string: str) -> tuple[dac.CURRENCIES, float]:
-    """TODO: docstring"""
+def _parse_price_string(price_string: str) -> tuple[str, float]:
+    """Split a Discogs price string like ``"€10.50"`` or ``"USD 12.00"`` into
+    ``(currency_code, value)``.
+
+    Discogs renders prices either with a symbol prefix (`€`, `£`, `$`, `¥`, plus
+    qualified variants like `A$`, `CA$`, `R$`) or with a 3-letter ISO code prefix
+    (e.g. `SEK 100.00`) when the symbol is ambiguous. We try the symbol form
+    first via `CURRENCY_REGEX`, then fall back to scanning for a known ISO code.
+
+    Args:
+        price_string: a stripped, comma-free price representation.
+
+    Returns:
+        ``(iso_code, numeric_value)``.
+
+    Raises:
+        PriceParsingException: if neither a known symbol nor an ISO code is found.
+    """
 
     price_currency, price_value = None, None
     try:

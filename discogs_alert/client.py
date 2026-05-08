@@ -10,6 +10,7 @@ import subprocess
 import sys
 from typing import Union
 
+import dacite
 import psutil
 import requests
 from fake_useragent import UserAgent
@@ -77,12 +78,19 @@ class Client:
         return da_entities.UserList(**user_list_dict)
 
     def get_listing(self, listing_id: int) -> da_entities.Listing:
+        # Use dacite so the nested `price` (and its optional `shipping`) become
+        # `ListingPrice` / `ShippingPrice` instances, not raw dicts. `cast=[CONDITION]`
+        # lets dacite coerce raw ints into the IntEnum members.
         listing_dict = self._get(f"{self._base_url}/marketplace/listings/{listing_id}")
-        return da_entities.Listing(**listing_dict)
+        return dacite.from_dict(
+            da_entities.Listing, listing_dict, config=dacite.Config(cast=[da_entities.CONDITION])
+        )
 
     def get_release(self, release_id: int) -> da_entities.Release:
         release_dict = self._get(f"{self._base_url}/releases/{release_id}")
-        return da_entities.Release(**release_dict)
+        return dacite.from_dict(
+            da_entities.Release, release_dict, config=dacite.Config(cast=[da_entities.CONDITION])
+        )
 
     def get_release_stats(self, release_id: int) -> Union[da_entities.ReleaseStats, bool]:
         release_stats_dict = self._get(f"{self._base_url}/marketplace/stats/{release_id}")

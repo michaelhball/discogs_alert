@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head><title>Marketplace - Test</title></head>
+<body>
+<table class="mpitems">
+  <thead><tr><th>Item</th><th>Seller</th><th>Price</th></tr></thead>
+  <tbody>
+
+    <!-- Listing 1: classic 3-paragraph layout, experienced seller, EUR price + EUR shipping -->
+    <tr>
+      <td class="item_description">
+        <p><a href="/sell/item/100000001?ev=rb">Test Release - VG+ copy</a></p>
+        <p class="item_condition">
+          Media: <span>Very Good Plus (VG+)</span>
+          Sleeve: <span>Very Good (VG)</span>
+        </p>
+        <p>Plays nicely. Light surface marks.</p>
+      </td>
+      <td class="seller_info">
+        <ul>
+          <li>
+            <span><a href="/seller/coolseller"><strong>CoolSeller</strong></a></span>
+            <span><strong>99.5%</strong>, <a href="/seller/coolseller/feedback">1,234 ratings</a></span>
+          </li>
+          <li><span>Ships From:</span>Germany</li>
+        </ul>
+      </td>
+      <td class="item_price">
+        <span class="price">€25.00</span>
+        <span class="item_shipping">+€4.50</span>
+      </td>
+    </tr>
+
+    <!-- Listing 2: unavailable in Germany (4 paragraphs, hidden first), top-rated UK seller -->
+    <tr>
+      <td class="item_description">
+        <p>Unavailable in Germany</p>
+        <p><a href="/sell/item/100000002?ev=rb">Test Release - NM copy</a></p>
+        <p class="item_condition">
+          Media: <span>Near Mint (NM or M-)</span>
+          Sleeve: <span>Near Mint (NM or M-)</span>
+        </p>
+        <p>Original pressing. Mint condition.</p>
+      </td>
+      <td class="seller_info">
+        <ul>
+          <li>
+            <span><a href="/seller/topshop"><strong>TopShop</strong></a></span>
+            <span><strong>100.0%</strong>, <a href="/seller/topshop/feedback">5,678 ratings</a></span>
+          </li>
+          <li><span>Ships From:</span>United Kingdom</li>
+        </ul>
+      </td>
+      <td class="item_price">
+        <span class="price">£40.00</span>
+        <span class="item_shipping">+£8.00</span>
+      </td>
+    </tr>
+
+    <!-- Listing 3: new seller (no rating/feedback yet), USD price, free-shipping span (no currency) -->
+    <tr>
+      <td class="item_description">
+        <p><a href="/sell/item/100000003?ev=rb">Test Release - rough copy</a></p>
+        <p class="item_condition">
+          Media: <span>Good (G)</span>
+          Sleeve: <span>Generic</span>
+        </p>
+        <p>Honest player copy.</p>
+      </td>
+      <td class="seller_info">
+        <ul>
+          <li>
+            <span><a href="/seller/firsttimer"><strong>FirstTimer</strong></a></span>
+            <span>New seller</span>
+          </li>
+          <li><span>Ships From:</span>United States</li>
+        </ul>
+      </td>
+      <td class="item_price">
+        <span class="price">$15.00</span>
+        <span class="item_shipping">+free shipping</span>
+      </td>
+    </tr>
+
+    <!-- Listing 4: missing sleeve grade, ISO-coded shipping currency (parser drops it; documented limitation) -->
+    <tr>
+      <td class="item_description">
+        <p><a href="/sell/item/100000004?ev=rb">Test Release - VG copy</a></p>
+        <p class="item_condition">
+          Media: <span>Very Good (VG)</span>
+        </p>
+        <p>No sleeve grading provided by seller.</p>
+      </td>
+      <td class="seller_info">
+        <ul>
+          <li>
+            <span><a href="/seller/swedishshop"><strong>SwedishShop</strong></a></span>
+            <span><strong>98.7%</strong>, <a href="/seller/swedishshop/feedback">42 ratings</a></span>
+          </li>
+          <li><span>Ships From:</span>Sweden</li>
+        </ul>
+      </td>
+      <td class="item_price">
+        <span class="price">€18.00</span>
+        <span class="item_shipping">+SEK 50.00</span>
+      </td>
+    </tr>
+
+    <!-- Listing 5: cheapest, will sort to the front -->
+    <tr>
+      <td class="item_description">
+        <p><a href="/sell/item/100000005?ev=rb">Test Release - cheap copy</a></p>
+        <p class="item_condition">
+          Media: <span>Good Plus (G+)</span>
+          Sleeve: <span>Good (G)</span>
+        </p>
+        <p>Cheapest available.</p>
+      </td>
+      <td class="seller_info">
+        <ul>
+          <li>
+            <span><a href="/seller/budget"><strong>BudgetBin</strong></a></span>
+            <span><strong>95.0%</strong>, <a href="/seller/budget/feedback">300 ratings</a></span>
+          </li>
+          <li><span>Ships From:</span>France</li>
+        </ul>
+      </td>
+      <td class="item_price">
+        <span class="price">€8.00</span>
+        <span class="item_shipping">+€3.00</span>
+      </td>
+    </tr>
+
+  </tbody>
+</table>
+</body>
+</html>
