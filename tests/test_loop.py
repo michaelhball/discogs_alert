@@ -427,3 +427,87 @@ def test_loop_no_stats_gate_flag_disables_gate(tmp_path: Path, monkeypatch: pyte
     )
 
     assert process_calls == [1]
+
+
+# -- inter_release_delay --------------------------------------------------
+
+
+def test_loop_sleeps_between_releases_when_delay_set(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    wl = tmp_path / "wl.json"
+    wl.write_text(
+        json.dumps(
+            [
+                {"id": 1, "display_title": "A"},
+                {"id": 2, "display_title": "B"},
+                {"id": 3, "display_title": "C"},
+            ]
+        )
+    )
+
+    fake_anon = MagicMock()
+    fake_user_client = MagicMock()
+    fake_user_client.rate_limit_remaining = 50
+    fake_user_client.get_release_stats.return_value = False
+    monkeypatch.setattr(da_client, "AnonClient", lambda *_a, **_kw: fake_anon)
+    monkeypatch.setattr(da_client, "UserTokenClient", lambda *_a, **_kw: fake_user_client)
+    monkeypatch.setattr(da_loop, "process_release", lambda *a, **k: 0)
+
+    sleeps = []
+    monkeypatch.setattr(da_loop.time, "sleep", lambda s: sleeps.append(s))
+
+    da_loop.loop(
+        discogs_token="X",
+        list_id=None,
+        wantlist_path=str(wl),
+        user_agent="UA",
+        country="Germany",
+        currency="EUR",
+        seller_filters=da_entities.SellerFilters(),
+        record_filters=da_entities.RecordFilters(),
+        country_whitelist=set(),
+        country_blacklist=set(),
+        alerter_type=AlerterType.PUSHBULLET,
+        alerter_kwargs={"pushbullet_token": "T"},
+        state_path=tmp_path / "state.db",
+        inter_release_delay_seconds=2.0,
+    )
+
+    # 3 releases → 2 inter-release gaps (no sleep after the last one).
+    assert len(sleeps) == 2
+    # With ±25% jitter on a 2.0s base, every sleep is in [1.5, 2.5].
+    for s in sleeps:
+        assert 1.5 <= s <= 2.5
+
+
+def test_loop_does_not_sleep_with_default_zero_delay(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    wl = tmp_path / "wl.json"
+    wl.write_text(json.dumps([{"id": 1, "display_title": "A"}, {"id": 2, "display_title": "B"}]))
+
+    fake_anon = MagicMock()
+    fake_user_client = MagicMock()
+    fake_user_client.rate_limit_remaining = 50
+    fake_user_client.get_release_stats.return_value = False
+    monkeypatch.setattr(da_client, "AnonClient", lambda *_a, **_kw: fake_anon)
+    monkeypatch.setattr(da_client, "UserTokenClient", lambda *_a, **_kw: fake_user_client)
+    monkeypatch.setattr(da_loop, "process_release", lambda *a, **k: 0)
+
+    sleeps = []
+    monkeypatch.setattr(da_loop.time, "sleep", lambda s: sleeps.append(s))
+
+    da_loop.loop(
+        discogs_token="X",
+        list_id=None,
+        wantlist_path=str(wl),
+        user_agent="UA",
+        country="Germany",
+        currency="EUR",
+        seller_filters=da_entities.SellerFilters(),
+        record_filters=da_entities.RecordFilters(),
+        country_whitelist=set(),
+        country_blacklist=set(),
+        alerter_type=AlerterType.PUSHBULLET,
+        alerter_kwargs={"pushbullet_token": "T"},
+        state_path=tmp_path / "state.db",
+    )
+
+    assert sleeps == []
