@@ -23,9 +23,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from discogs_alert import client as da_client, entities as da_entities, loop as da_loop, state as da_state
-from discogs_alert.alert import AlerterType, get_alerter
-from discogs_alert.alert import pushbullet as da_pushbullet
-
+from discogs_alert.alert import AlerterType
 
 FIXTURES = Path(__file__).parent / "data"
 REAL_MARKETPLACE_HTML = (FIXTURES / "marketplace_listing_real.html").read_text()
