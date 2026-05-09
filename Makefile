@@ -48,7 +48,7 @@ RELEASE_DIR := $(HOME)/.discogs_alert_release
 PRIV_KEY := $(RELEASE_DIR)/eddsa_priv.key
 PUB_KEY := $(RELEASE_DIR)/eddsa_pub.key
 
-.PHONY: all app dmg sparkle keys sign appcast clean clean-build clean-venv clean-vendor
+.PHONY: all app dmg sparkle keys sign appcast secrets clean clean-build clean-venv clean-vendor
 
 all: dmg
 
@@ -166,3 +166,20 @@ clean-venv:
 
 clean-vendor:
 	rm -rf $(VENDOR)
+
+# ---- CI release secrets ----------------------------------------------------
+#
+# Push the Sparkle EdDSA keys into GitHub Actions secrets so the
+# tag-triggered release workflow can build + sign on a macOS runner.
+# Only the maintainer ever runs this; it just calls `gh secret set` for
+# each key. Idempotent — re-running overwrites the secret in place.
+secrets: $(PUB_KEY) $(PRIV_KEY)
+	@echo "Pushing Sparkle keys to GitHub repo secrets…"
+	@gh secret set SPARKLE_PUBLIC_KEY < $(PUB_KEY)
+	@gh secret set SPARKLE_PRIVATE_KEY < $(PRIV_KEY)
+	@echo
+	@echo "✅ Secrets installed:"
+	@echo "   SPARKLE_PUBLIC_KEY"
+	@echo "   SPARKLE_PRIVATE_KEY"
+	@echo
+	@echo "Next: 'git tag vX.Y.Z && git push --tags' to trigger an automated release."

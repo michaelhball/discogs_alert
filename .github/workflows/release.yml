@@ -107,3 +107,100 @@ jobs:
           tags: |
             miggleball/discogs_alert:${{ github.ref_name }}
             miggleball/discogs_alert:latest
+
+  build-macos-app:
+    name: Build macOS .app + .dmg, sign, append to appcast
+    needs: github-release
+    runs-on: macos-latest
+    # Skip if Sparkle signing keys aren't configured. The job is
+    # otherwise unconditional on tag pushes.
+    if: ${{ vars.SPARKLE_PUBLIC_KEY != '' || secrets.SPARKLE_PUBLIC_KEY != '' }}
+    permissions:
+      contents: write  # to push the appcast update back to main
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # need full history to push back to main later
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build deps
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e '.[menubar]' py2app
+
+      - name: Download Sparkle.framework
+        run: make sparkle
+
+      - name: Stage public key
+        # The build reads the public key from this file via DA_SPARKLE_PUBLIC_KEY.
+        # `printf %s` (no newline) keeps the base64 clean.
+        run: |
+          mkdir -p ~/.discogs_alert_release
+          chmod 700 ~/.discogs_alert_release
+          printf '%s' "${{ secrets.SPARKLE_PUBLIC_KEY }}" > ~/.discogs_alert_release/eddsa_pub.key
+          chmod 600 ~/.discogs_alert_release/eddsa_pub.key
+
+      - name: Build .app
+        run: make app
+
+      - name: Build .dmg
+        run: make dmg
+
+      - name: Sign DMG with EdDSA
+        id: sign
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          DMG="dist/discogs_alert-${VERSION}.dmg"
+          # `sign_update` reads the private key from stdin via `-f -` and
+          # prints `sparkle:edSignature="…" length="…"` to stdout.
+          SIG_LINE=$(printf '%s' "$SPARKLE_PRIVATE_KEY" | vendor/bin/sign_update --ed-key-file - "$DMG")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "dmg=$DMG" >> "$GITHUB_OUTPUT"
+          # Multi-line-safe output capture (the line itself is single-line
+          # but defensive against future format changes).
+          {
+            echo "signature<<SIGEOF"
+            echo "$SIG_LINE"
+            echo "SIGEOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Upload DMG to the GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "$GITHUB_REF_NAME" "${{ steps.sign.outputs.dmg }}" --clobber
+
+      - name: Append <item> to docs/appcast.xml on main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Switch to main so the appcast change lands there (the build
+          # ran on the tag's checkout). Stash anything that could collide.
+          git stash --include-untracked --quiet || true
+          git fetch origin main
+          git checkout main
+          git pull --ff-only
+
+          DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/$(basename '${{ steps.sign.outputs.dmg }}')"
+          python scripts/append_to_appcast.py \
+              --version "${{ steps.sign.outputs.version }}" \
+              --signature '${{ steps.sign.outputs.signature }}' \
+              --download-url "$DOWNLOAD_URL" \
+              --notes "<h2>${{ github.ref_name }}</h2>"
+
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add docs/appcast.xml
+          if git diff --cached --quiet; then
+            echo "::notice::appcast already contains ${{ github.ref_name }}; nothing to push."
+            exit 0
+          fi
+          git commit -m "Append ${{ github.ref_name }} to appcast"
+          git push origin main
