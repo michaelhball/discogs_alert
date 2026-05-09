@@ -11,8 +11,7 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from discogs_alert import __main__ as da_main
-from discogs_alert import alert as da_alert, entities as da_entities, loop as da_loop
+from discogs_alert import __main__ as da_main, alert as da_alert, entities as da_entities, loop as da_loop
 
 
 @pytest.fixture
