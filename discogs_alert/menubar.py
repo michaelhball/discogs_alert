@@ -319,6 +319,11 @@ class MenubarApp:  # pragma: no cover — wired up to AppKit at runtime, not uni
 
     def run(self) -> None:
         self.controller.start()
+        # Start Sparkle's auto-updater. No-op when running from source
+        # (Sparkle.framework only exists inside the py2app bundle), so this
+        # is safe to call unconditionally.
+        from discogs_alert import _sparkle
+        _sparkle.start_updater()
         self.app.run()
 
 

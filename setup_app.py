@@ -29,6 +29,7 @@ dist/discogs_alert.app/Contents/Frameworks/...`` to see whether the
 ``libcurl-impersonate-chrome`` dylibs were bundled.
 """
 
+import os
 import sys
 
 # py2app's modulegraph traversal recurses through every dep's AST. With
@@ -40,12 +41,54 @@ sys.setrecursionlimit(50000)
 
 from setuptools import setup  # noqa: E402 — must come after the bump above
 
+# ---- Sparkle ---------------------------------------------------------------
+# Sparkle.framework lives at vendor/Sparkle.framework after `make sparkle`
+# downloads it. If you haven't downloaded it, the build still works — just
+# without auto-update support — but the bundle won't be release-ready.
+SPARKLE_FRAMEWORK = "vendor/Sparkle.framework"
+HAVE_SPARKLE = os.path.isdir(SPARKLE_FRAMEWORK)
+
+# Public EdDSA key the bundle uses to verify update signatures. The matching
+# private key lives at ~/.discogs_alert_release/eddsa_priv.key (gitignored)
+# and is used by `make release` to sign each new DMG. See docs/release.md.
+#
+# Override this env var when you generate your own keypair; the placeholder
+# below is enough to make the .app build succeed but won't accept any
+# updates (signature verification will reject them all).
+SPARKLE_PUBLIC_KEY = os.environ.get(
+    "DA_SPARKLE_PUBLIC_KEY",
+    "PLACEHOLDER_REPLACE_WITH_OUTPUT_OF_generate_keys",
+)
+APPCAST_URL = os.environ.get(
+    "DA_APPCAST_URL",
+    "https://michaelhball.github.io/discogs_alert/appcast.xml",
+)
+
 APP = ["discogs_alert/menubar.py"]
 DATA_FILES = [
     # The example config gets bundled inside the .app so a first-run
     # user can find a template without poking around in the repo.
     ("examples", ["examples/config.example.toml"]),
 ]
+PLIST = {
+    "CFBundleName": "discogs_alert",
+    "CFBundleDisplayName": "discogs_alert",
+    "CFBundleIdentifier": "com.discogsalert.menubar",
+    "CFBundleShortVersionString": "0.1.0",
+    "CFBundleVersion": "0.1.0",
+    "LSUIElement": True,  # menu-bar app, no dock icon
+    "NSHumanReadableCopyright": "MIT",
+}
+
+if HAVE_SPARKLE:
+    # Tell Sparkle where to look for updates and which public key to use to
+    # verify the update signatures. Without these keys in Info.plist, the
+    # SPUStandardUpdaterController fails to start.
+    PLIST["SUFeedURL"] = APPCAST_URL
+    PLIST["SUPublicEDKey"] = SPARKLE_PUBLIC_KEY
+    PLIST["SUEnableAutomaticChecks"] = True
+    PLIST["SUScheduledCheckInterval"] = 86400  # check once a day
+
 OPTIONS = {
     # No ``argv_emulation`` because we don't need to receive
     # double-clicked file paths; the app starts on its own.
@@ -69,22 +112,20 @@ OPTIONS = {
         # at startup without them.
         "charset_normalizer",
         "idna",
+        # PyObjC — needed for the Sparkle bridge (discogs_alert/_sparkle.py).
+        # rumps depends on PyObjC anyway, but listing the umbrella package
+        # explicitly makes sure objc.lookUpClass works at runtime.
+        "objc",
+        "Foundation",
     ],
 
-    # Hide the dock icon — this is a menu-bar-only app.
-    "plist": {
-        "CFBundleName": "discogs_alert",
-        "CFBundleDisplayName": "discogs_alert",
-        "CFBundleIdentifier": "com.discogsalert.menubar",
-        "CFBundleShortVersionString": "0.1.0",
-        "CFBundleVersion": "0.1.0",
-        "LSUIElement": True,
-        "NSHumanReadableCopyright": "MIT",
-        # Network access — none of these strictly require entitlements
-        # under standard user-installed apps, but documenting intent is
-        # useful if someone later wants to notarize.
-    },
+    "plist": PLIST,
 }
+
+# Bundle Sparkle.framework if the user has downloaded it (`make sparkle`).
+# Without it, auto-update is disabled but the .app still builds and runs.
+if HAVE_SPARKLE:
+    OPTIONS["frameworks"] = [SPARKLE_FRAMEWORK]
 
 setup(
     name="discogs_alert-menubar",
