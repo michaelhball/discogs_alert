@@ -7,7 +7,7 @@ authors = ["mhsb <michael.h.s.ball@gmail.com>"]
 homepage = 'https://github.com/michaelhball/discogs_alert'
 repository = 'https://github.com/michaelhball/discogs_alert'
 keywords = ['discogs', 'dig', 'digger']
-include = ["LICENSE"]
+include = ["LICENSE", "discogs_alert/py.typed"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
@@ -41,9 +41,6 @@ build-backend = "poetry.core.masonry.api"
 [tool.poetry.plugins."discogs_alert.alerters"]
 PUSHBULLET = "discogs_alert.alert.pushbullet:PushbulletAlerter"
 TELEGRAM = "discogs_alert.alert.telegram:TelegramAlerter"
-
-[tool.poetry2conda]
-name = "da"
 
 [tool.pytest.ini_options]
 markers = [
