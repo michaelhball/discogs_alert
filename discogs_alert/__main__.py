@@ -219,12 +219,39 @@ logger = logging.getLogger(__name__)
     "-V", "--verbose", default=False, is_flag=True, help="use flag if you want to see logs as the program runs"
 )
 @click.option(
+    "-l",
+    "--log-level",
+    default=None,
+    envvar="DA_LOG_LEVEL",
+    type=click.Choice(["DEBUG", "INFO", "WARNING", "ERROR"], case_sensitive=False),
+    help=(
+        "Override the root log level. Useful for quieting `INFO` chatter under cron "
+        "(`--log-level=WARNING`) or capturing extra detail when debugging "
+        "(`--log-level=DEBUG`). When omitted, defaults to INFO (or whatever your "
+        "environment's basicConfig resolved to)."
+    ),
+)
+@click.option(
+    "-O",
+    "--once",
+    "once",
+    default=False,
+    is_flag=True,
+    envvar="DA_ONCE",
+    help=(
+        "Run the loop exactly once and exit, instead of scheduling it to repeat. "
+        "Useful when you're driving discogs_alert from cron / systemd-timer / "
+        "launchd and want the schedule managed externally."
+    ),
+)
+@click.option(
     "-T",
     "--test",
+    "test",
     default=False,
     is_flag=True,
     hidden=True,
-    help="use flag if you want to immediately run the program (to test that your wantlist is correct)",
+    help="Deprecated alias for --once; kept for backward compatibility.",
 )
 @click.version_option(__version__)
 def main(
@@ -249,11 +276,20 @@ def main(
     stats_gate,
     inter_release_delay,
     verbose,
+    log_level,
+    once,
     test,
 ):
     """
     This loop queries your watchlist at regular intervals, alerting you if a release satisfying your criteria is found.
     """
+
+    # `--once` is the canonical name; `--test` is the legacy alias.
+    one_shot = once or test
+
+    # Apply log-level override after `basicConfig` already ran (at module import).
+    if log_level is not None:
+        logging.getLogger().setLevel(log_level.upper())
 
     # if both a list ID and a local wantlist path are provided, use the wantlist (to force-enable local testing)
     # TODO: combine them?
@@ -310,7 +346,7 @@ def main(
     )
 
     da_loop.loop(**loop_kwargs)
-    if not test:
+    if not one_shot:
         schedule.every(int(60 / frequency)).minutes.do(lambda: da_loop.loop(**loop_kwargs))
         while 1:
             schedule.run_pending()

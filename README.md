@@ -231,7 +231,8 @@ Here are the possible arguments:
 
 And here are the possible flags:
 * `-V` `--verbose`: (bool) use this flag if you want to run the server in verbose mode, meaning it will log updates to the command line as it runs (default=`false`)
-* `-T` `--test`: (bool) use this flag if you want to run the script once rather than a fixed number of times per hour. This is useful not only for testing, but also if you're running the service as a cron job (& => cron handles scheduling).
+* `-O` `--once`: (bool) run the loop exactly once and exit instead of repeating on a schedule. Useful when you're driving `discogs_alert` from cron / systemd-timer / launchd and want the schedule managed externally. (`-T`/`--test` is a deprecated alias for the same thing.)
+* `-l` `--log-level`: (str) override the root log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`). Useful for quieting INFO chatter under cron (`--log-level=WARNING`) or capturing extra detail when debugging.
 
 NB: all command-line options & arguments outlined above can be configured using environment variables. Check out `python -m discogs_alert --help` for more info.
 
@@ -246,7 +247,7 @@ $ python -m discogs_alert -dt <discogs_access_token> -at PUSHBULLET -pt <pushbul
 
 If you aren't running `discogs_alert` as a background docker container, another good approach (and my preference) is to run the process as a `cron` job. This method uses the cron command-line utility to run `discogs_alert` at regular intervals. Assuming you have specified the required environment variables, all you have to do is run `crontab -e` to open the cronjob editing window before appending the following line to the bottom of the file
 ```bash
-*/10 * * * * source ~/.bash_profile; python -m discogs_alert -T >> <path_to_log_file>.log 2>&1
+*/10 * * * * source ~/.bash_profile; python -m discogs_alert --once >> <path_to_log_file>.log 2>&1
 ```
 Upon saving & existing the file, `discogs_alert` will be run every 10 minutes and its logs will be output to the specified log file. You can then `tail -f <path_to_log_file>.log` at any point to make sure that things are running as expected.
 
