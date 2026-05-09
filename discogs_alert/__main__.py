@@ -1,10 +1,15 @@
+import asyncio
 import logging
-import time
 
 import click
-import schedule
 
-from discogs_alert import __version__, alert as da_alert, entities as da_entities, loop as da_loop
+from discogs_alert import (
+    __version__,
+    alert as da_alert,
+    client as da_client,
+    entities as da_entities,
+    loop as da_loop,
+)
 from discogs_alert.util import click as da_click, constants as dac
 
 logger = logging.getLogger(__name__)
@@ -142,9 +147,6 @@ logger = logging.getLogger(__name__)
     "--alerter-type",
     required=True,
     envvar="DA_ALERTER_TYPE",
-    # Dynamic Choice — built-in names plus any plugin alerters registered via
-    # the `discogs_alert.alerters` entry-point group. Always shows the current
-    # registered set in `--help`.
     type=click.Choice(da_alert.alerter_names(), case_sensitive=False),
     help="Your choice of alerting service. Please see the Alerters section in the README for more information",
 )
@@ -232,17 +234,15 @@ logger = logging.getLogger(__name__)
     ),
 )
 @click.option(
-    "-d",
-    "--inter-release-delay",
-    default=0.0,
+    "--max-concurrency",
+    default=da_loop.DEFAULT_MAX_CONCURRENCY,
     show_default=True,
-    type=click.FloatRange(min=0.0, max=60.0),
-    envvar="DA_INTER_RELEASE_DELAY",
+    type=click.IntRange(min=1, max=32),
+    envvar="DA_MAX_CONCURRENCY",
     help=(
-        "Seconds to sleep between marketplace scrapes (with ±25%% jitter). Useful "
-        "for very large wantlists where you want to spread Cloudflare-facing "
-        "requests across the iteration interval rather than burst them. Default "
-        "0 (no delay)."
+        "Maximum number of concurrent marketplace scrapes per loop iteration. "
+        "Higher values are faster but more likely to trip Cloudflare's bot "
+        "detection on large wantlists. The default is conservative."
     ),
 )
 @click.option(
@@ -269,8 +269,7 @@ logger = logging.getLogger(__name__)
     help=(
         "Override the root log level. Useful for quieting `INFO` chatter under cron "
         "(`--log-level=WARNING`) or capturing extra detail when debugging "
-        "(`--log-level=DEBUG`). When omitted, defaults to INFO (or whatever your "
-        "environment's basicConfig resolved to)."
+        "(`--log-level=DEBUG`). When omitted, defaults to INFO."
     ),
 )
 @click.option(
@@ -319,7 +318,7 @@ def main(
     ntfy_token,
     state_path,
     stats_gate,
-    inter_release_delay,
+    max_concurrency,
     prune_after_days,
     verbose,
     log_level,
@@ -342,7 +341,6 @@ def main(
         logging.getLogger().setLevel(log_level.upper())
 
     # if both a list ID and a local wantlist path are provided, use the wantlist (to force-enable local testing)
-    # TODO: combine them?
     if list_id is not None and wantlist_path is not None:
         list_id = None
 
@@ -384,7 +382,7 @@ def main(
         alerter_kwargs=alerter_kwargs,
         state_path=state_path,
         use_stats_gate=stats_gate,
-        inter_release_delay_seconds=inter_release_delay,
+        max_concurrency=max_concurrency,
         prune_after_days=prune_after_days,
         verbose=verbose,
     )
@@ -402,12 +400,36 @@ def main(
 """
     )
 
-    da_loop.loop(**loop_kwargs)
-    if not one_shot:
-        schedule.every(int(60 / frequency)).minutes.do(lambda: da_loop.loop(**loop_kwargs))
-        while 1:
-            schedule.run_pending()
-            time.sleep(1)
+    interval_seconds = max(1, int(3600 / frequency))
+    asyncio.run(_run(loop_kwargs, run_once=one_shot, interval_seconds=interval_seconds))
+
+
+async def _run(loop_kwargs: dict, run_once: bool, interval_seconds: int) -> None:
+    """Drive the async loop. Holds a single ``UserTokenClient`` and ``AnonClient``
+    across all iterations so TLS handshakes are paid once per process rather
+    than once per iteration.
+    """
+
+    user_token_client = da_client.UserTokenClient(
+        loop_kwargs["user_agent"], loop_kwargs["discogs_token"]
+    )
+    anon_client = da_client.AnonClient(loop_kwargs["user_agent"])
+    try:
+        await da_loop.loop(
+            **loop_kwargs,
+            user_token_client=user_token_client,
+            client_anon=anon_client,
+        )
+        while not run_once:
+            await asyncio.sleep(interval_seconds)
+            await da_loop.loop(
+                **loop_kwargs,
+                user_token_client=user_token_client,
+                client_anon=anon_client,
+            )
+    finally:
+        await anon_client.aclose()
+        await user_token_client.aclose()
 
 
 if __name__ == "__main__":

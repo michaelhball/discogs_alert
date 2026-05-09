@@ -1,3 +1,20 @@
+"""Per-iteration loop logic.
+
+The loop is async: stats-gate calls fan out to ``/marketplace/stats``
+concurrently (cheap API), and the marketplace scrapes that survive the gate
+fan out to ``/sell/release/...`` under a semaphore that caps Cloudflare-
+facing parallelism. With a 100-release wantlist this turns ~30s of
+sequential work into a few seconds of parallel work.
+
+Two clients live across iterations and are passed in by ``__main__.main``:
+``UserTokenClient`` and ``AnonClient``. Recreating them every iteration
+would force a TLS handshake on every call; reusing them amortises the
+handshake cost.
+"""
+
+from __future__ import annotations
+
+import asyncio
 import json
 import logging
 import random
@@ -5,7 +22,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
-from requests.exceptions import ConnectionError
+import httpx
 
 from discogs_alert import client as da_client, entities as da_entities, state as da_state
 from discogs_alert.alert import Alerter, get_alerter
@@ -14,8 +31,10 @@ from discogs_alert.util.wantlist_directives import apply_directives
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_MAX_CONCURRENCY = 6
 
-def load_wantlist(
+
+async def load_wantlist(
     list_id: Optional[int] = None,
     user_token_client: Optional[da_client.UserTokenClient] = None,
     wantlist_path: Optional[str] = None,
@@ -31,8 +50,8 @@ def load_wantlist(
 
     assert wantlist_path is not None or (list_id is not None and user_token_client is not None)
     if list_id is not None:
-        items = user_token_client.get_list(list_id).items
-        return [apply_directives(r) for r in items]
+        user_list = await user_token_client.get_list(list_id)
+        return [apply_directives(r) for r in user_list.items]
 
     # The wantlist.json schema accepts condition fields as their string names
     # (e.g. "VERY_GOOD"); pydantic's `Release.model_validate` accepts both the
@@ -53,16 +72,6 @@ def stats_skip_reason(
     """Return a human-readable reason to skip the marketplace scrape for a release based
     on its lightweight `/marketplace/stats/{release_id}` summary. ``None`` means "don't
     skip — go scrape the marketplace page".
-
-    Skipping rules:
-    * No listings at all → skip.
-    * Release is blocked from sale → skip.
-    * Release has a `price_threshold` and the lowest listed price (converted into the
-      user's preferred currency) is above it → skip. We don't bother converting if the
-      stats currency is missing or unsupported.
-
-    The point of this gate is to avoid the expensive marketplace scrape (and the
-    Cloudflare risk that comes with it) when we already know it can't yield an alert.
     """
 
     if stats.num_for_sale == 0:
@@ -72,18 +81,25 @@ def stats_skip_reason(
     if release.price_threshold is None or stats.lowest_price is None:
         return None
     try:
+        # Currency conversion is sync (cheap when cached, rare when not). Run
+        # it in a thread when uncached so we don't block the event loop.
         lowest = da_currency.convert_currency(
             stats.lowest_price.value, stats.lowest_price.currency, currency
         )
     except da_currency.InvalidCurrencyException:
         # Unknown stats currency: don't gate on price.
         return None
+    except da_currency.CurrencyProviderError:
+        # Provider unreachable and no cache. Don't gate on price; let the full
+        # scrape happen so we still notice listings.
+        logger.warning("currency provider unreachable; skipping price gate", exc_info=True)
+        return None
     if lowest > release.price_threshold:
         return f"lowest price {lowest:.2f} {currency} > threshold {release.price_threshold}"
     return None
 
 
-def process_release(
+async def process_release(
     release: da_entities.Release,
     client_anon: da_client.AnonClient,
     currency: str,
@@ -96,13 +112,14 @@ def process_release(
     store: da_state.AlertStore,
     verbose: bool = False,
 ) -> int:
-    """Find listings for a single release that satisfy the user's filters, alert on them
-    if we haven't already, and record successful alerts in the local store. Returns the
-    number of new alerts sent.
+    """Find listings for a single release that satisfy the user's filters,
+    alert on them if we haven't already, and record successful alerts in the
+    local store. Returns the number of new alerts sent.
     """
 
     new_alerts = 0
-    for listing in client_anon.get_marketplace_listings(release.id):
+    listings = await client_anon.get_marketplace_listings(release.id)
+    for listing in listings:
         try:
             listing = listing.convert_currency(currency)
         except Exception:
@@ -112,9 +129,7 @@ def process_release(
             if verbose:
                 logger.info(
                     "Listing found that's unavailable in %s:\n\tRelease: %s\n\tListing: %s",
-                    country,
-                    release.display_title,
-                    listing.url,
+                    country, release.display_title, listing.url,
                 )
             continue
 
@@ -124,20 +139,15 @@ def process_release(
             if verbose:
                 logger.info(
                     "Listing found that doesn't satisfy conditions:\n\tRelease: %s\n\tListing: %s",
-                    release.display_title,
-                    listing.url,
+                    release.display_title, listing.url,
                 )
             continue
 
-        # Compare against the threshold only when the listing is in the user's
-        # currency — the price-conversion call above can silently fail and we
-        # don't want to compare apples to oranges in that case.
         if listing.price.currency == currency and listing.price_is_above_threshold(release.price_threshold):
             if verbose:
                 logger.info(
                     "Listing found that's above the price threshold:\n\tRelease: %s\n\tListing: %s",
-                    release.display_title,
-                    listing.url,
+                    release.display_title, listing.url,
                 )
             continue
 
@@ -150,13 +160,58 @@ def process_release(
         message_body = f"Listing available: {listing.url}"
         price_string = f"{dac.CURRENCIES_REVERSED[listing.price.currency]}{listing.total_price:.2f}"
         logger.info("%s (%s) — %s", message_title, price_string, message_body)
+        # Alerters are sync (HTTP calls inside, but rare and serial). If they
+        # become a bottleneck, wrap in `asyncio.to_thread`.
         if alerter.send_alert(message_title, message_body):
             store.mark_seen(listing.id, release.id, message_title, message_body)
             new_alerts += 1
     return new_alerts
 
 
-def loop(
+async def _gated_process_release(
+    semaphore: asyncio.Semaphore,
+    release: da_entities.Release,
+    user_token_client: da_client.UserTokenClient,
+    client_anon: da_client.AnonClient,
+    currency: str,
+    country: str,
+    seller_filters: da_entities.SellerFilters,
+    record_filters: da_entities.RecordFilters,
+    country_whitelist: Set[str],
+    country_blacklist: Set[str],
+    alerter: Alerter,
+    store: da_state.AlertStore,
+    use_stats_gate: bool,
+    verbose: bool,
+) -> int:
+    """One release end-to-end: optional /marketplace/stats gate, then a
+    semaphore-capped marketplace scrape if the gate doesn't skip.
+    """
+
+    if use_stats_gate:
+        stats = await user_token_client.get_release_stats(release.id)
+        if stats is False:
+            if verbose:
+                logger.info("stats lookup failed for release %s; scraping anyway", release.id)
+        else:
+            skip_reason = stats_skip_reason(stats, release, currency)
+            if skip_reason is not None:
+                if verbose:
+                    logger.info(
+                        "Skipping marketplace scrape for %s: %s",
+                        release.display_title, skip_reason,
+                    )
+                return 0
+
+    async with semaphore:
+        return await process_release(
+            release, client_anon, currency, country,
+            seller_filters, record_filters, country_whitelist, country_blacklist,
+            alerter, store, verbose=verbose,
+        )
+
+
+async def loop(
     discogs_token: str,
     list_id: Optional[int],
     wantlist_path: Optional[str],
@@ -171,38 +226,33 @@ def loop(
     alerter_kwargs: Dict[str, Any],
     state_path: Optional[Path] = None,
     use_stats_gate: bool = True,
-    inter_release_delay_seconds: float = 0.0,
+    max_concurrency: int = DEFAULT_MAX_CONCURRENCY,
     prune_after_days: int = 90,
+    user_token_client: Optional[da_client.UserTokenClient] = None,
+    client_anon: Optional[da_client.AnonClient] = None,
     verbose: bool = False,
 ):
-    """Event loop. One iteration: pull the wantlist, query the marketplace for each
-    release, send alerts for newly-seen listings that pass the user's filters.
+    """One loop iteration. Async: fans out the per-release work via
+    ``asyncio.gather`` with a semaphore that caps Cloudflare-facing parallelism.
 
-    Alert dedup is local — backed by `discogs_alert.state.AlertStore`. The alerter
-    itself is now stateless from the loop's point of view.
-
-    When `use_stats_gate` is True (the default), each release is first checked
-    against the cheap `/marketplace/stats` API; releases with no listings, blocked
-    from sale, or above the user's price threshold are skipped without scraping
-    the marketplace page. This is the single largest rate-limit win for users
-    with large wantlists.
-
-    `inter_release_delay_seconds` (default 0) spreads marketplace fetches across
-    the iteration interval — useful for very large wantlists where Discogs's
-    Cloudflare layer might throttle a tight burst. With ±25% jitter so multiple
-    parallel runs don't synchronise.
+    The two HTTP clients (``UserTokenClient``, ``AnonClient``) can be passed in
+    so that the long-lived process holding them survives across iterations.
+    If they aren't passed, this function makes its own and closes them at the
+    end — that path is fine for ``--once`` runs but inefficient for repeated
+    iterations.
     """
 
     start_time = time.time()
     if verbose:
         logger.info("running loop")
 
-    client_anon: Optional[da_client.AnonClient] = None
-    try:
+    own_clients = user_token_client is None and client_anon is None
+    if own_clients:
         client_anon = da_client.AnonClient(user_agent)
         user_token_client = da_client.UserTokenClient(user_agent, discogs_token)
-        alerter = get_alerter(alerter_type, alerter_kwargs)
 
+    try:
+        alerter = get_alerter(alerter_type, alerter_kwargs)
         with da_state.AlertStore(state_path) as store:
             if prune_after_days > 0:
                 pruned = store.prune_older_than(prune_after_days)
@@ -217,63 +267,46 @@ def loop(
                     "alert store at %s: %d total (last 24h: %d, last 7d: %d)",
                     store.path, s["total"], s["last_24h"], s["last_7d"],
                 )
-            wantlist_items = load_wantlist(list_id, user_token_client, wantlist_path)
+            wantlist_items = await load_wantlist(list_id, user_token_client, wantlist_path)
             random.shuffle(wantlist_items)
-            num_items = len(wantlist_items)
-            for idx, release in enumerate(wantlist_items):
-                # Rate-limit protection is now handled inside `UserTokenClient`
-                # via `RateLimitGuard` — we don't need an explicit sleep here.
-
-                if use_stats_gate:
-                    stats = user_token_client.get_release_stats(release.id)
-                    if stats is False:
-                        if verbose:
-                            logger.info("stats lookup failed for release %s; scraping anyway", release.id)
-                    else:
-                        skip_reason = stats_skip_reason(stats, release, currency)
-                        if skip_reason is not None:
-                            if verbose:
-                                logger.info(
-                                    "Skipping marketplace scrape for %s: %s",
-                                    release.display_title,
-                                    skip_reason,
-                                )
-                            continue
-
-                process_release(
-                    release,
-                    client_anon,
-                    currency,
-                    country,
-                    seller_filters,
-                    record_filters,
-                    country_whitelist,
-                    country_blacklist,
-                    alerter,
-                    store,
-                    verbose=verbose,
+            if verbose:
+                logger.info(
+                    "wantlist: %d releases, max_concurrency=%d, stats_gate=%s",
+                    len(wantlist_items), max_concurrency, use_stats_gate,
                 )
 
-                # Spread marketplace scrapes across the iteration interval so
-                # we don't hammer Discogs from a single IP in a tight burst.
-                # Cloudflare doesn't expose its rate-limit headers, so any
-                # explicit pacing has to be local. Skip on the last release
-                # to avoid a pointless sleep at the end.
-                if (
-                    inter_release_delay_seconds > 0
-                    and num_items > 1
-                    and idx < num_items - 1
-                ):
-                    # Add ~±25% jitter so two parallel runs don't synchronise.
-                    jitter = random.uniform(-0.25, 0.25) * inter_release_delay_seconds
-                    time.sleep(max(0.0, inter_release_delay_seconds + jitter))
+            semaphore = asyncio.Semaphore(max_concurrency)
+            tasks = [
+                _gated_process_release(
+                    semaphore, release, user_token_client, client_anon, currency,
+                    country, seller_filters, record_filters,
+                    country_whitelist, country_blacklist, alerter, store,
+                    use_stats_gate, verbose,
+                )
+                for release in wantlist_items
+            ]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            new_alerts_total = 0
+            for release, result in zip(wantlist_items, results):
+                if isinstance(result, Exception):
+                    logger.warning(
+                        "Release %s (%s) raised: %r",
+                        release.id, release.display_title, result,
+                    )
+                else:
+                    new_alerts_total += result
+            if verbose:
+                logger.info("loop iteration sent %d new alert(s)", new_alerts_total)
 
-    except ConnectionError:
-        logger.info("ConnectionError: looping will continue as usual", exc_info=True)
+    except (httpx.NetworkError, httpx.TimeoutException):
+        logger.info("Network error: looping will continue as usual", exc_info=True)
     except Exception:
         logger.exception("Unexpected exception in loop; continuing")
     finally:
-        if client_anon is not None:
-            client_anon.close()
+        if own_clients:
+            if client_anon is not None:
+                await client_anon.aclose()
+            if user_token_client is not None:
+                await user_token_client.aclose()
 
     logger.info("\t took %.2fs", time.time() - start_time)

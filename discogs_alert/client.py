@@ -1,26 +1,29 @@
-"""Discogs API + marketplace HTTP clients.
+"""Discogs API + marketplace HTTP clients (async).
 
 Two clients live here:
 
-- `UserTokenClient`: hits `api.discogs.com` with the user's auth token, used for
-  /lists, /marketplace/stats, etc. Plain `requests` is enough; no anti-bot
-  protection on the API.
-- `AnonClient`: hits `www.discogs.com/sell/release/{id}` for marketplace HTML.
-  This endpoint sits behind Cloudflare which checks TLS fingerprints — vanilla
-  `requests` (and even Selenium with default Chrome) gets a 403 "Just a
-  moment…" challenge. We use `curl_cffi` to impersonate a real Chrome's TLS/JA3
-  fingerprint so the challenge passes; this replaced a heavyweight Selenium /
-  webdriver-manager / Chromium / fake-useragent / psutil stack that was the
-  source of recurring chromedriver-leak bugs.
+- ``UserTokenClient``: hits ``api.discogs.com`` with the user's auth token.
+  Uses ``httpx.AsyncClient`` as a long-lived connection pool — instantiate
+  it once per process and reuse across loop iterations so TLS handshakes
+  amortize.
+- ``AnonClient``: hits ``www.discogs.com/sell/release/{id}`` for marketplace
+  HTML. This endpoint sits behind Cloudflare which checks TLS fingerprints —
+  vanilla ``requests``/``httpx`` get a 403 "Just a moment…" challenge. We use
+  ``curl_cffi.requests.AsyncSession`` to impersonate a real Chrome's TLS/JA3
+  fingerprint so the challenge passes.
+
+Both clients are async-context-manager-aware (``async with``), and the
+rate-limit guard sleeps cooperatively with an internal ``asyncio.Lock`` so a
+fan-out of concurrent requests doesn't overshoot the per-minute floor.
 """
 
-import json
-import logging
-import time
-from typing import Union
+from __future__ import annotations
 
-import requests
-from curl_cffi import requests as curl_requests
+import logging
+from typing import Optional, Union
+
+import httpx
+from curl_cffi.requests import AsyncSession as CurlAsyncSession
 
 from discogs_alert import entities as da_entities, scrape as da_scrape
 from discogs_alert.util.rate_limit import RateLimitGuard
@@ -28,160 +31,139 @@ from discogs_alert.util.rate_limit import RateLimitGuard
 logger = logging.getLogger(__name__)
 
 
-class Client:
-    """API Client to interact with discogs server. Taken & modified from https://github.com/joalla/discogs_client."""
+class UserTokenClient:
+    """Async client for ``api.discogs.com``.
 
-    _base_url = "https://api.discogs.com"
-    _base_url_non_api = "https://www.discogs.com"
-    _request_token_url = "https://api.discogs.com/oauth/request_token"
-    _authorise_url = "https://www.discogs.com/oauth/authorize"
-    _access_token_url = "https://api.discogs.com/oauth/access_token"
-
-    def __init__(self, user_agent, *args, **kwargs):
-        self.user_agent = user_agent
-        self.verbose = False
-        self.rate_limit = None
-        self.rate_limit_used = None
-        self.rate_limit_remaining = None
-
-    def _request(self, method, url, data=None, headers=None):
-        raise NotImplementedError
-
-    def _get(self, url: str, is_api: bool = True):
-        response_content, status_code = self._request("GET", url, headers=None)
-        if status_code != 200:
-            logger.info(f"ERROR: status_code: {status_code}, content: {response_content}")
-            return False
-        return json.loads(response_content) if is_api else response_content
-
-    def _delete(self, url: str, is_api: bool = True):
-        return self._request("DELETE", url)
-
-    def _patch(self, url: str, data, is_api: bool = True):
-        return self._request("PATCH", url, data=data)
-
-    def _post(self, url: str, data, is_api: bool = True):
-        return self._request("POST", url, data=data)
-
-    def _put(self, url: str, data, is_api: bool = True):
-        return self._request("PUT", url, data=data)
-
-    def get_list(self, list_id: int) -> da_entities.UserList:
-        user_list_dict = self._get(f"{self._base_url}/lists/{list_id}")
-        return da_entities.UserList.model_validate(user_list_dict)
-
-    def get_listing(self, listing_id: int) -> da_entities.Listing:
-        listing_dict = self._get(f"{self._base_url}/marketplace/listings/{listing_id}")
-        return da_entities.Listing.model_validate(listing_dict)
-
-    def get_release(self, release_id: int) -> da_entities.Release:
-        release_dict = self._get(f"{self._base_url}/releases/{release_id}")
-        return da_entities.Release.model_validate(release_dict)
-
-    def get_release_stats(self, release_id: int) -> Union[da_entities.ReleaseStats, bool]:
-        """Fetch the marketplace stats for a release. Returns False if the API call
-        fails (e.g. a 404 on a non-existent release), otherwise a `ReleaseStats`.
-        """
-
-        release_stats_dict = self._get(f"{self._base_url}/marketplace/stats/{release_id}")
-        if not isinstance(release_stats_dict, dict):
-            return False
-        return da_entities.ReleaseStats.model_validate(release_stats_dict)
-
-
-class UserTokenClient(Client):
-    """A client for sending requests with a user token (for non-oauth authentication).
-
-    Wraps each request in a `RateLimitGuard` that watches Discogs's rate-limit
-    headers and proactively sleeps when we're close to the per-minute floor.
+    Uses a long-lived ``httpx.AsyncClient`` so TLS handshakes are paid once
+    per process. Wraps each request in a ``RateLimitGuard`` that watches the
+    Discogs ``X-Discogs-Ratelimit-*`` headers and proactively (and
+    cooperatively) sleeps if we're close to the per-minute floor.
     """
 
+    BASE_URL = "https://api.discogs.com"
     HTTP_TIMEOUT_SECONDS = 15
 
-    def __init__(self, user_agent: str, user_token: str, *args, **kwargs):
-        super().__init__(user_agent, *args, **kwargs)
+    def __init__(self, user_agent: str, user_token: str) -> None:
+        self.user_agent = user_agent
         self.user_token = user_token
         self.rate_limit_guard = RateLimitGuard()
-
-    def _request(self, method: str, url: str, data=None, headers=None):
-        self.rate_limit_guard.before_request()
-        params = {"token": self.user_token}
-        resp = requests.request(
-            method, url, params=params, data=data, headers=headers, timeout=self.HTTP_TIMEOUT_SECONDS
+        self._client = httpx.AsyncClient(
+            params={"token": user_token},
+            headers={"User-Agent": user_agent},
+            timeout=self.HTTP_TIMEOUT_SECONDS,
         )
+        # Legacy mirrors — older code reads these directly.
+        self.rate_limit: Optional[int] = None
+        self.rate_limit_used: Optional[int] = None
+        self.rate_limit_remaining: Optional[int] = None
+
+    async def aclose(self) -> None:
+        await self._client.aclose()
+
+    async def __aenter__(self) -> "UserTokenClient":
+        return self
+
+    async def __aexit__(self, *_exc) -> None:
+        await self.aclose()
+
+    async def _get(self, url: str) -> Union[dict, list, bool]:
+        await self.rate_limit_guard.before_request_async()
+        try:
+            resp = await self._client.get(url)
+        except httpx.HTTPError as exc:
+            logger.info("HTTP error from %s: %s", url, exc)
+            return False
         self.rate_limit_guard.update_from_headers(resp.headers)
-        # Mirror the guard's view onto the legacy attributes — kept for callers
-        # that read them directly (e.g. older `loop.py` versions).
         self.rate_limit = self.rate_limit_guard.limit
         self.rate_limit_used = self.rate_limit_guard.used
         self.rate_limit_remaining = self.rate_limit_guard.remaining
-        return resp.content, resp.status_code
+        if resp.status_code != 200:
+            logger.info("ERROR: status_code: %s, content: %r", resp.status_code, resp.content[:200])
+            return False
+        try:
+            return resp.json()
+        except ValueError:
+            logger.warning("Non-JSON response from %s: %r", url, resp.content[:200])
+            return False
+
+    async def get_list(self, list_id: int) -> da_entities.UserList:
+        data = await self._get(f"{self.BASE_URL}/lists/{list_id}")
+        return da_entities.UserList.model_validate(data)
+
+    async def get_listing(self, listing_id: int) -> da_entities.Listing:
+        data = await self._get(f"{self.BASE_URL}/marketplace/listings/{listing_id}")
+        return da_entities.Listing.model_validate(data)
+
+    async def get_release(self, release_id: int) -> da_entities.Release:
+        data = await self._get(f"{self.BASE_URL}/releases/{release_id}")
+        return da_entities.Release.model_validate(data)
+
+    async def get_release_stats(
+        self, release_id: int
+    ) -> Union[da_entities.ReleaseStats, bool]:
+        """Fetch the marketplace stats for a release. Returns False if the API
+        call fails (e.g. a 404 on a non-existent release), otherwise a
+        ``ReleaseStats``.
+        """
+
+        data = await self._get(f"{self.BASE_URL}/marketplace/stats/{release_id}")
+        if not isinstance(data, dict):
+            return False
+        return da_entities.ReleaseStats.model_validate(data)
 
 
-class AnonClient(Client):
-    """An HTTP client for anonymous Discogs marketplace scraping.
+class AnonClient:
+    """Async client for anonymous Discogs marketplace scraping.
 
-    Uses `curl_cffi` impersonating a real Chrome's TLS/JA3 fingerprint so we can
-    bypass Cloudflare's bot challenge on `www.discogs.com/sell/...`. Replaces a
-    Selenium + webdriver-manager + Chromium + fake-useragent + psutil stack that
-    used to leak chromedriver processes and added ~5s startup per loop iteration.
+    Uses ``curl_cffi.requests.AsyncSession`` impersonating a real Chrome's
+    TLS/JA3 fingerprint so we can bypass Cloudflare's bot challenge on
+    ``www.discogs.com/sell/...``. The session is long-lived: instantiate
+    once per process and reuse across loop iterations.
 
     Args:
         user_agent: a user-agent string. The TLS fingerprint comes from the
-            `impersonate` setting; the User-Agent header is mostly cosmetic but
-            should match a real browser of the same era.
+            ``impersonate`` setting; the User-Agent header is mostly cosmetic
+            but should match a real browser of the same era.
         impersonate: which browser fingerprint to impersonate. Defaults to a
-            recent Chrome release; `curl_cffi` keeps these up to date.
+            recent Chrome release; ``curl_cffi`` keeps these up to date.
     """
 
+    BASE_URL = "https://www.discogs.com"
     HTTP_TIMEOUT_SECONDS = 20
-    # `chrome124` is the highest target supported across curl_cffi 0.5–0.7. Newer
-    # curl_cffi versions add e.g. `chrome131` — bump this when the project pins a
-    # newer curl_cffi floor, or pass `impersonate=` to override at runtime.
+    # `chrome124` is the highest target supported across curl_cffi 0.5–0.7.
     DEFAULT_IMPERSONATE = "chrome124"
 
-    def __init__(self, user_agent: str, *args, impersonate: str = DEFAULT_IMPERSONATE, **kwargs):
-        super().__init__(user_agent, *args, **kwargs)
+    def __init__(self, user_agent: str, impersonate: str = DEFAULT_IMPERSONATE) -> None:
+        self.user_agent = user_agent
         self.impersonate = impersonate
-        self._session = curl_requests.Session(impersonate=impersonate)
+        self._session = CurlAsyncSession(impersonate=impersonate)
         self._session.headers["User-Agent"] = user_agent
 
-    def close(self) -> None:
+    async def aclose(self) -> None:
         try:
-            self._session.close()
+            await self._session.close()
         except Exception:
-            logger.warning("error closing curl_cffi session", exc_info=True)
+            logger.warning("error closing curl_cffi async session", exc_info=True)
 
-    def __enter__(self) -> "AnonClient":
+    async def __aenter__(self) -> "AnonClient":
         return self
 
-    def __exit__(self, *_exc: object) -> None:
-        self.close()
+    async def __aexit__(self, *_exc) -> None:
+        await self.aclose()
 
-    def get_marketplace_listings(self, release_id: int) -> da_entities.Listings:
-        """Fetch the marketplace HTML for a release and parse the listings.
+    async def get_marketplace_listings(self, release_id: int) -> da_entities.Listings:
+        """Fetch the marketplace HTML for a release and parse the listings."""
 
-        Logs the round-trip duration at DEBUG level so users running with
-        ``--log-level=DEBUG`` can spot Cloudflare slow-downs / network blips
-        without having to instrument anything.
-        """
-
-        url = f"{self._base_url_non_api}/sell/release/{release_id}?ev=rb&sort=price%2Casc"
-        start = time.monotonic()
-        resp = self._session.get(url, timeout=self.HTTP_TIMEOUT_SECONDS)
-        elapsed = time.monotonic() - start
+        url = f"{self.BASE_URL}/sell/release/{release_id}?ev=rb&sort=price%2Casc"
+        try:
+            resp = await self._session.get(url, timeout=self.HTTP_TIMEOUT_SECONDS)
+        except Exception:
+            logger.warning("Marketplace fetch for release %s raised", release_id, exc_info=True)
+            return []
         if resp.status_code != 200:
             logger.warning(
-                "Marketplace fetch for release %s failed in %.2fs with status %s",
-                release_id,
-                elapsed,
-                resp.status_code,
+                "Marketplace fetch for release %s failed with status %s",
+                release_id, resp.status_code,
             )
             return []
-        logger.debug(
-            "Fetched marketplace HTML for release %s in %.2fs (%d bytes)",
-            release_id,
-            elapsed,
-            len(resp.text),
-        )
         return da_scrape.scrape_listings_from_marketplace(resp.text, release_id)

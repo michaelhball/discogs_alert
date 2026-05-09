@@ -15,6 +15,7 @@ a request and getting throttled.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from typing import Mapping, Optional
@@ -53,6 +54,9 @@ class RateLimitGuard:
         self.remaining: Optional[int] = None
         self.limit: Optional[int] = None
         self.used: Optional[int] = None
+        # Lazily-created so the guard can be used on either sync or async paths
+        # without forcing an event loop at construction time.
+        self._async_lock: Optional[asyncio.Lock] = None
 
     def update_from_headers(self, headers: Mapping[str, str]) -> None:
         """Store the most recent header values. Missing headers leave the
@@ -91,3 +95,23 @@ class RateLimitGuard:
             )
             self._sleep(self.sleep_seconds)
             self.remaining = None
+
+    async def before_request_async(self) -> None:
+        """Async variant: serialised across coroutines via an `asyncio.Lock` so
+        a fan-out of concurrent requests doesn't all see the same `remaining`
+        value and overshoot. Sleeps cooperatively with `asyncio.sleep` rather
+        than blocking the event loop.
+        """
+
+        if self._async_lock is None:
+            self._async_lock = asyncio.Lock()
+        async with self._async_lock:
+            if self.remaining is not None and self.remaining <= self.min_remaining:
+                logger.info(
+                    "Discogs API rate limit at %s/%s — sleeping %ss before next request",
+                    self.remaining,
+                    self.limit,
+                    self.sleep_seconds,
+                )
+                await asyncio.sleep(self.sleep_seconds)
+                self.remaining = None
