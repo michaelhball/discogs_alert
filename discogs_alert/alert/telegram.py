@@ -6,6 +6,7 @@ import logging
 
 import requests
 
+from discogs_alert.alert._response import log_alerter_failure
 from discogs_alert.alert.base import Alerter
 
 logger = logging.getLogger(__name__)
@@ -33,6 +34,6 @@ class TelegramAlerter(Alerter):
             logger.error("Exception sending telegram message", exc_info=True)
             return False
         if resp.status_code != 200:
-            logger.error("error %s sending telegram notification: %s", resp.status_code, resp.text[:200])
+            log_alerter_failure("Telegram", resp.status_code, resp.text, resp.headers)
             return False
         return True
