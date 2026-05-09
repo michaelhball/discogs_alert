@@ -122,6 +122,60 @@ def test_get_currency_rates_raises_on_malformed_payload(monkeypatch: pytest.Monk
         da_currency.get_currency_rates("EUR")
 
 
+def test_falls_back_to_stale_cache_on_network_error(monkeypatch: pytest.MonkeyPatch):
+    """When Frankfurter is unreachable, a previously-written cache (any age)
+    must be returned instead of raising — the loop should keep working through
+    short upstream outages.
+    """
+
+    # Seed an old-week cache file directly under CACHE_DIR.
+    da_currency.CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    stale = da_currency.CACHE_DIR / "1999-1-EUR.json"
+    json.dump({"USD": 1.05, "EUR": 1.0}, stale.open("w"))
+
+    monkeypatch.setattr(requests, "get", _fake_response(raise_exc=requests.ConnectionError("nope")))
+    rates = da_currency.get_currency_rates("EUR")
+    assert rates == {"USD": 1.05, "EUR": 1.0}
+
+
+def test_falls_back_to_stale_cache_on_5xx(monkeypatch: pytest.MonkeyPatch):
+    da_currency.CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    stale = da_currency.CACHE_DIR / "1999-1-EUR.json"
+    json.dump({"USD": 1.07, "EUR": 1.0}, stale.open("w"))
+
+    monkeypatch.setattr(requests, "get", _fake_response(503, {"error": "down"}))
+    rates = da_currency.get_currency_rates("EUR")
+    assert rates == {"USD": 1.07, "EUR": 1.0}
+
+
+def test_stale_cache_fallback_picks_newest(monkeypatch: pytest.MonkeyPatch, tmp_path):
+    """If multiple stale caches exist, the most recently modified one wins."""
+
+    import os
+    da_currency.CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    older = da_currency.CACHE_DIR / "1999-1-EUR.json"
+    newer = da_currency.CACHE_DIR / "1999-2-EUR.json"
+    json.dump({"USD": 1.0}, older.open("w"))
+    json.dump({"USD": 2.0}, newer.open("w"))
+    # Force `older` to look older than `newer`.
+    os.utime(older, (1, 1))
+    os.utime(newer, (1000, 1000))
+
+    monkeypatch.setattr(requests, "get", _fake_response(raise_exc=requests.ConnectionError("nope")))
+    rates = da_currency.get_currency_rates("EUR")
+    assert rates == {"USD": 2.0}
+
+
+def test_no_stale_cache_means_we_still_raise(monkeypatch: pytest.MonkeyPatch):
+    """Without any cache to fall back to, network failures must still surface
+    as `CurrencyProviderError` so the loop's exception logging fires.
+    """
+
+    monkeypatch.setattr(requests, "get", _fake_response(raise_exc=requests.ConnectionError("nope")))
+    with pytest.raises(da_currency.CurrencyProviderError):
+        da_currency.get_currency_rates("EUR")
+
+
 def test_convert_currency_uses_rates(mock_currency_rates, rates: da_currency.CurrencyRates):
     assert da_currency.convert_currency(1, "GBP", "EUR") == 1 / rates["GBP"]
     assert da_currency.convert_currency(1, "CHF", "EUR") == 1 / rates["CHF"]
