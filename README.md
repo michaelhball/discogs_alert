@@ -284,6 +284,19 @@ $ python -m discogs_alert.menubar
 
 The menu-bar app is **not** the always-on path — closing it stops the loop. Use it interactively while at your Mac; pair it with `launchd` (above) for 24/7 monitoring.
 
+#### Building a standalone `.app` / `.dmg`
+
+If you'd rather drag-install a `.app` than `pip install` the package, the project ships a [`Makefile`](Makefile) that wraps `py2app` and `hdiutil`:
+
+```bash
+$ make app    # build dist/discogs_alert.app
+$ make dmg    # build dist/discogs_alert-X.Y.Z.dmg (the user-facing artifact)
+```
+
+The build uses a clean throwaway venv at `.build-venv/` so unrelated packages on your outer Python don't pollute the bundle. End users only need to drag the `.app` from the DMG into `/Applications` — no Python install required.
+
+> **Code signing**: the `.app` is unsigned by default. macOS Gatekeeper will prompt the user to right-click → Open on first launch. Code signing requires an Apple Developer ID ($99/yr); see [Apple's notarization docs](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution) for the recipe.
+
 
 ## Contributing
 
