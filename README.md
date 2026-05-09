@@ -265,6 +265,23 @@ Upon saving & existing the file, `discogs_alert` will be run every 10 minutes an
 
 Please refer [here](https://www.hostinger.com/tutorials/cron-job) for more information on cron and how to use `crontab`.
 
+#### Running as a macOS `launchd` daemon
+
+On macOS, the cleanest "always-on" path is a `launchd` agent — survives logout, doesn't need a terminal open, integrates with macOS power management. A starter template lives at `docker/launchd/com.discogsalert.plist.template`. Replace the placeholder paths, drop the file at `~/Library/LaunchAgents/com.discogsalert.plist`, and `launchctl load` it. See the comments in the template for the exact recipe.
+
+`launchd` timers pause while the Mac sleeps; for true 24/7 monitoring, run `discogs_alert` on an always-on box (Raspberry Pi, NAS, home server) instead.
+
+#### macOS menu-bar app
+
+For a lightweight GUI with status, "check now", and quick links to your config + state files, install the menu-bar extra and launch the app:
+
+```bash
+$ pip install 'discogs_alert[menubar]'
+$ python -m discogs_alert.menubar
+```
+
+The menu-bar app is **not** the always-on path — closing it stops the loop. Use it interactively while at your Mac; pair it with `launchd` (above) for 24/7 monitoring.
+
 
 ## Contributing
 
