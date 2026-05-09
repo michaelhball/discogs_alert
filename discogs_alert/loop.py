@@ -11,6 +11,7 @@ from requests.exceptions import ConnectionError
 from discogs_alert import client as da_client, entities as da_entities, state as da_state
 from discogs_alert.alert import Alerter, get_alerter
 from discogs_alert.util import constants as dac, currency as da_currency
+from discogs_alert.util.wantlist_directives import apply_directives
 
 logger = logging.getLogger(__name__)
 
@@ -20,11 +21,19 @@ def load_wantlist(
     user_token_client: Optional[da_client.UserTokenClient] = None,
     wantlist_path: Optional[str] = None,
 ) -> List[da_entities.Release]:
-    """Loads the user's wantlist from one of two sources, as a list of `Release` objects."""
+    """Load the user's wantlist from one of two sources, as a list of `Release`
+    objects.
+
+    Each loaded release is then passed through `apply_directives`, which lifts
+    `@max=…` / `@media=…` / `@sleeve=…` tokens out of its `comment` onto the
+    matching dataclass fields. Explicit JSON-level fields win over directives,
+    so `wantlist.json` users are unaffected.
+    """
 
     assert wantlist_path is not None or (list_id is not None and user_token_client is not None)
     if list_id is not None:
-        return user_token_client.get_list(list_id).items
+        items = user_token_client.get_list(list_id).items
+        return [apply_directives(r) for r in items]
 
     # TODO: find a way to automatically instantiate these nested Enums based on the strings
     wantlist = []
@@ -33,7 +42,7 @@ def load_wantlist(
             release_dict["min_media_condition"] = da_entities.CONDITION[min_media_condition]
         if (min_sleeve_condition := release_dict.get("min_sleeve_condition")) is not None:
             release_dict["min_sleeve_condition"] = da_entities.CONDITION[min_sleeve_condition]
-        wantlist.append(dacite.from_dict(da_entities.Release, release_dict))
+        wantlist.append(apply_directives(dacite.from_dict(da_entities.Release, release_dict)))
     return wantlist
 
 
