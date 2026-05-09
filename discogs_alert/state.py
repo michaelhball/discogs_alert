@@ -88,6 +88,33 @@ class AlertStore:
         cur = self._conn.execute("SELECT COUNT(*) FROM sent_alerts")
         return int(cur.fetchone()[0])
 
+    def stats(self) -> dict[str, int]:
+        """Return a dict of total / last-24h / last-7d alert counts.
+
+        Used by `loop.loop` at startup (in verbose mode) so the operator can see
+        at-a-glance whether the dedup store is actually firing — a sudden jump in
+        last-24h while the upstream listings haven't changed usually means either
+        the SQLite DB was wiped or `--state-path` is pointing somewhere new.
+        """
+
+        # SUM(CASE WHEN ...) over COUNT(*) FILTER so this works on the older
+        # SQLite versions that ship with some Linux distros (FILTER needs 3.30+).
+        cur = self._conn.execute(
+            """
+            SELECT
+                COUNT(*),
+                SUM(CASE WHEN sent_at >= datetime('now', '-1 day')  THEN 1 ELSE 0 END),
+                SUM(CASE WHEN sent_at >= datetime('now', '-7 days') THEN 1 ELSE 0 END)
+            FROM sent_alerts
+            """
+        )
+        total, last_24h, last_7d = cur.fetchone()
+        return {
+            "total": int(total or 0),
+            "last_24h": int(last_24h or 0),
+            "last_7d": int(last_7d or 0),
+        }
+
     def prune_older_than(self, days: int) -> int:
         """Delete alert records older than `days` days. Returns the number of rows
         deleted.

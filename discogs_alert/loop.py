@@ -203,6 +203,12 @@ def loop(
         alerter = get_alerter(alerter_type, alerter_kwargs)
 
         with da_state.AlertStore(state_path) as store:
+            if verbose:
+                s = store.stats()
+                logger.info(
+                    "alert store at %s: %d total (last 24h: %d, last 7d: %d)",
+                    store.path, s["total"], s["last_24h"], s["last_7d"],
+                )
             wantlist_items = load_wantlist(list_id, user_token_client, wantlist_path)
             random.shuffle(wantlist_items)
             num_items = len(wantlist_items)
