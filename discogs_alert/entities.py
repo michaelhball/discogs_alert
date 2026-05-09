@@ -1,6 +1,28 @@
+"""Domain models for `discogs_alert`.
+
+All entities are pydantic v2 `BaseModel`s. We migrated from `dacite` + dataclass
+in #N because:
+
+- `dacite` is slow (~50× slower than pydantic for our shapes).
+- `dacite` doesn't auto-coerce ints into IntEnum members; you had to set
+  ``cast=[CONDITION]`` at every call site, which we kept forgetting (cf. the
+  `get_listing` bug from #86).
+- Pydantic gives us validation with sharp error messages whenever Discogs
+  changes their JSON shape, instead of silent `KeyError`s deep inside the loop.
+- Pydantic supports recursive nested-model parsing out of the box, so the
+  ``Listing(**dict)`` flat-construction class of bugs is gone.
+
+Construction: ``Release.model_validate(dict)`` (replaces
+``dacite.from_dict(Release, dict)``). Direct kwarg construction
+(``Release(id=1, display_title="X", …)``) still works.
+"""
+
+from __future__ import annotations
+
 import enum
-from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Set
+
+from pydantic import BaseModel, ConfigDict
 
 from discogs_alert.util import currency as da_currency
 
@@ -35,43 +57,53 @@ CONDITION_PARSER = {
 }
 
 
-@dataclass
-class SellerFilters:
+class _Base(BaseModel):
+    """Shared pydantic config for all of our entities.
+
+    - `extra="ignore"`: API responses contain fields we don't model; drop them
+      silently rather than raising (matches the old dacite behaviour).
+    - `arbitrary_types_allowed=False`: every field must be a known type; catches
+      typos at definition time.
+    """
+
+    model_config = ConfigDict(extra="ignore", arbitrary_types_allowed=False)
+
+
+class SellerFilters(_Base):
     min_seller_rating: Optional[float] = None
     min_seller_sales: Optional[int] = None
 
 
-@dataclass
-class RecordFilters:
+class RecordFilters(_Base):
     min_media_condition: Optional[CONDITION] = None
     min_sleeve_condition: Optional[CONDITION] = None
 
 
-@dataclass
-class Release:
-    """An entity that represents a record the user is searching for."""
+class Release(_Base):
+    """A record the user is searching for."""
 
     id: int
-
-    # artist & track name
     display_title: str
 
-    # optional args from from `wantlist.json`
+    # Optional per-release filters (from `wantlist.json` keys, or
+    # `@key=value` directives in a Discogs list-item comment). Threshold is a
+    # float because internal currency conversion produces non-integer values;
+    # whole-number inputs (the common case) coerce automatically.
     min_media_condition: Optional[CONDITION] = None
     min_sleeve_condition: Optional[CONDITION] = None
-    price_threshold: Optional[int] = None
+    price_threshold: Optional[float] = None
 
-    # optional args from Discogs list
+    # Other fields that come back from the Discogs list API (mostly ignored
+    # by us but stored so we can round-trip).
     comment: Optional[str] = None
     uri: Optional[str] = None
     resource_url: Optional[str] = None
     image_url: Optional[str] = None
     type: Optional[str] = None
-    stats: Optional[Dict] = None
+    stats: Optional[Dict[str, Any]] = None
 
 
-@dataclass
-class UserList:
+class UserList(_Base):
     id: int
     user: Dict[str, Any]
     name: str
@@ -85,23 +117,7 @@ class UserList:
     items: List[Release]
 
 
-@dataclass
-class ReleaseStats:
-    """Lightweight summary of a release on the marketplace, returned by
-    ``GET /marketplace/stats/{release_id}``.
-
-    `lowest_price` is the cheapest listing currently for sale, in the user's
-    Discogs-account currency setting. We only get a value when the release has
-    listings (i.e. `num_for_sale > 0`).
-    """
-
-    num_for_sale: int
-    lowest_price: Optional["ShippingPrice"] = None
-    blocked_from_sale: bool = False
-
-
-@dataclass
-class ShippingPrice:
+class ShippingPrice(_Base):
     currency: str
     value: float
 
@@ -112,8 +128,7 @@ class ShippingPrice:
         return self
 
 
-@dataclass
-class ListingPrice:
+class ListingPrice(_Base):
     currency: str
     value: float
     shipping: Optional[ShippingPrice] = None
@@ -127,17 +142,28 @@ class ListingPrice:
         return self
 
 
-@dataclass
-class Listing:
-    """An entity representing a specific instance of a record for sale on the Discogs marketplace."""
+class ReleaseStats(_Base):
+    """Lightweight summary returned by ``GET /marketplace/stats/{release_id}``.
+
+    `lowest_price` is the cheapest listing currently for sale, in the user's
+    Discogs-account currency setting. Populated only when `num_for_sale > 0`.
+    """
+
+    num_for_sale: int
+    lowest_price: Optional[ShippingPrice] = None
+    blocked_from_sale: bool = False
+
+
+class Listing(_Base):
+    """A specific instance of a record for sale on the Discogs marketplace."""
 
     id: int
-    availability: Optional[str]  # sometimes can't be parsed (if the seller didn't set this attribute)
+    availability: Optional[str] = None  # absent if the seller didn't set this attribute
     media_condition: CONDITION
     sleeve_condition: CONDITION
     comment: str
     seller_num_ratings: int
-    seller_avg_rating: Optional[float]  # None if new seller
+    seller_avg_rating: Optional[float] = None  # None if new seller
     seller_ships_from: str
     price: ListingPrice
 
@@ -146,7 +172,7 @@ class Listing:
         return self.price.value if self.price.shipping is None else self.price.value + self.price.shipping.value
 
     @property
-    def url(self) -> float:
+    def url(self) -> str:
         return f"https://www.discogs.com/sell/item/{self.id}"
 
     def is_definitely_unavailable(self, country: str) -> bool:
@@ -170,19 +196,10 @@ def conditions_satisfied(
     record_filters: RecordFilters,
     country_whitelist: Set[str],
     country_blacklist: Set[str],
-):
-    """Validates that a given listing satisfies all conditions and filters, including both global filters
-    (set via environment variables or via the CLI at runtime) and per-release filters (set in wantlist.json).
-
-    Args:
-        listing: the listing to validate
-        release: the release object, defined by the user, corresponding to the given listing
-        seller_filters: the global seller filters
-        record_filters: the global record (media & sleeve condition) filters
-        country_whitelist: a list of countries from which we will consider listings as valid
-        country_blacklist: a list of countries from which to consider listings as invalid
-
-    Returns: True if the given listing satisfies all conditions, False otherwise.
+) -> bool:
+    """Validate that a given listing satisfies all configured filters, including
+    both globals (CLI flags / env vars) and per-release overrides (wantlist.json
+    fields or Discogs list comment directives).
     """
 
     # verify country whitelist & blacklist, if used

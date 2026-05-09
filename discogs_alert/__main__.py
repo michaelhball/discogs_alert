@@ -280,8 +280,12 @@ def main(
         user_agent=user_agent,
         country=country,
         currency=currency,
-        seller_filters=da_entities.SellerFilters(min_seller_rating, min_seller_sales),
-        record_filters=da_entities.RecordFilters(min_media_condition, min_sleeve_condition),
+        seller_filters=da_entities.SellerFilters(
+            min_seller_rating=min_seller_rating, min_seller_sales=min_seller_sales
+        ),
+        record_filters=da_entities.RecordFilters(
+            min_media_condition=min_media_condition, min_sleeve_condition=min_sleeve_condition
+        ),
         country_whitelist=set(dac.COUNTRIES[c] for c in country_whitelist),
         country_blacklist=set(dac.COUNTRIES[c] for c in country_blacklist),
         alerter_type=alerter_type,

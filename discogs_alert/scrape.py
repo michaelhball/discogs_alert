@@ -2,7 +2,6 @@ import logging
 import re
 from typing import Optional
 
-import dacite
 from bs4 import BeautifulSoup, Tag
 
 from discogs_alert import entities as da_entities
@@ -250,4 +249,4 @@ def _parse_listing_row(row: Tag, release_id: int) -> Optional[da_entities.Listin
             if shipping is not None:
                 listing["price"]["shipping"] = shipping
 
-    return dacite.from_dict(da_entities.Listing, listing)
+    return da_entities.Listing.model_validate(listing)
