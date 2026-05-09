@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  launchd unit for running discogs_alert as an always-on background daemon
+  on macOS. Survives logout, doesn't need the menu-bar app to be open.
+
+  Setup:
+    1. Replace /Users/YOU/.../python and /Users/YOU/.../config.toml below
+       with absolute paths for your machine.
+    2. Drop this at ~/Library/LaunchAgents/com.discogsalert.plist
+    3. launchctl load ~/Library/LaunchAgents/com.discogsalert.plist
+    4. tail -f ~/Library/Logs/discogs_alert.log
+
+  Notes:
+    - Runs every 600 seconds (10 minutes). Adjust StartInterval to taste.
+    - Runs your discogs_alert in --once mode each fire; the schedule is
+      managed by launchd itself, not by the Python process.
+    - Mac sleep stops launchd timers, so this still pauses while the Mac
+      sleeps. To survive sleep, set the Mac to wake-on-schedule via
+      `pmset` (or use a Raspberry Pi instead).
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.discogsalert</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/REPLACE_WITH/path/to/python</string>
+        <string>-m</string>
+        <string>discogs_alert</string>
+        <string>--once</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>DA_CONFIG_PATH</key>
+        <string>/REPLACE_WITH/Users/YOU/.discogs_alert/config.toml</string>
+    </dict>
+
+    <key>StartInterval</key>
+    <integer>600</integer>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/REPLACE_WITH/Users/YOU/Library/Logs/discogs_alert.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/REPLACE_WITH/Users/YOU/Library/Logs/discogs_alert.log</string>
+</dict>
+</plist>
