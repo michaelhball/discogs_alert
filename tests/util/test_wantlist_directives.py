@@ -5,7 +5,6 @@ import pytest
 from discogs_alert.entities import CONDITION, Release
 from discogs_alert.util.wantlist_directives import apply_directives, parse_directives
 
-
 # -- parse_directives --------------------------------------------------------
 
 
