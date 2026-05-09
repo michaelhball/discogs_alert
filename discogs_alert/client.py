@@ -16,6 +16,7 @@ Two clients live here:
 
 import json
 import logging
+import time
 from typing import Union
 
 import requests
@@ -163,13 +164,29 @@ class AnonClient(Client):
         self.close()
 
     def get_marketplace_listings(self, release_id: int) -> da_entities.Listings:
-        """Fetch the marketplace HTML for a release and parse the listings."""
+        """Fetch the marketplace HTML for a release and parse the listings.
+
+        Logs the round-trip duration at DEBUG level so users running with
+        ``--log-level=DEBUG`` can spot Cloudflare slow-downs / network blips
+        without having to instrument anything.
+        """
 
         url = f"{self._base_url_non_api}/sell/release/{release_id}?ev=rb&sort=price%2Casc"
+        start = time.monotonic()
         resp = self._session.get(url, timeout=self.HTTP_TIMEOUT_SECONDS)
+        elapsed = time.monotonic() - start
         if resp.status_code != 200:
             logger.warning(
-                "Marketplace fetch for release %s failed with status %s", release_id, resp.status_code
+                "Marketplace fetch for release %s failed in %.2fs with status %s",
+                release_id,
+                elapsed,
+                resp.status_code,
             )
             return []
+        logger.debug(
+            "Fetched marketplace HTML for release %s in %.2fs (%d bytes)",
+            release_id,
+            elapsed,
+            len(resp.text),
+        )
         return da_scrape.scrape_listings_from_marketplace(resp.text, release_id)
