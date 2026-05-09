@@ -2,7 +2,6 @@ import logging
 import time
 
 import click
-import schedule
 
 from discogs_alert import __version__, alert as da_alert, entities as da_entities, loop as da_loop
 from discogs_alert.util import click as da_click, constants as dac
@@ -311,10 +310,15 @@ def main(
 
     da_loop.loop(**loop_kwargs)
     if not test:
-        schedule.every(int(60 / frequency)).minutes.do(lambda: da_loop.loop(**loop_kwargs))
-        while 1:
-            schedule.run_pending()
-            time.sleep(1)
+        # Sleep `interval_seconds` between iterations. We schedule on a fixed
+        # interval rather than on a wall-clock cadence (3600 / frequency) so
+        # `--frequency` is forgiving of the loop's own runtime — if an iteration
+        # takes 90s, the next one fires ~interval seconds *after it finished*,
+        # not at a missed wall-clock slot.
+        interval_seconds = max(1, int(3600 / frequency))
+        while True:
+            time.sleep(interval_seconds)
+            da_loop.loop(**loop_kwargs)
 
 
 if __name__ == "__main__":
