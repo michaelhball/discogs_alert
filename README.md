@@ -228,8 +228,10 @@ Here are the possible arguments:
 * `-tt` `--telegram-token`: (str) your telegram API token (only required if `"--alerter-type=TELEGRAM"`)
 * `-tci` `--telegram-chat-id`: (str) your telgram chat ID (only required if `"--alerter-type=TELEGRAM"`)
 * `-sp` `--state-path`: (str) path to the local SQLite database used to deduplicate alerts (default=`~/.discogs_alert/state.db`).
+* `-d` `--inter-release-delay`: (float) seconds to sleep (with ±25% jitter) between marketplace scrapes within a single iteration. Useful for very large wantlists where Cloudflare may throttle a tight burst. Default `0` (no delay).
 
 And here are the possible flags:
+* `--stats-gate` / `--no-stats-gate`: (bool) use the cheap `/marketplace/stats` API to skip the expensive marketplace scrape for releases with no listings or above your price threshold (default `--stats-gate`). Disable only for debugging.
 * `-V` `--verbose`: (bool) use this flag if you want to run the server in verbose mode, meaning it will log updates to the command line as it runs (default=`false`)
 * `-O` `--once`: (bool) run the loop exactly once and exit instead of repeating on a schedule. Useful when you're driving `discogs_alert` from cron / systemd-timer / launchd and want the schedule managed externally. (`-T`/`--test` is a deprecated alias for the same thing.)
 * `-l` `--log-level`: (str) override the root log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`). Useful for quieting INFO chatter under cron (`--log-level=WARNING`) or capturing extra detail when debugging.
