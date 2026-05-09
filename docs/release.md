@@ -40,43 +40,69 @@ existing installs upgrade themselves automatically.
    - That URL is baked into the bundle's `Info.plist` as
      `SUFeedURL`. Override at build time with `DA_APPCAST_URL=…`.
 
-## Each release
+4. **Push the signing keys to GitHub Actions secrets** (one-time):
+   ```bash
+   make secrets
+   ```
+   That just runs `gh secret set SPARKLE_PUBLIC_KEY < ~/…/eddsa_pub.key`
+   and `gh secret set SPARKLE_PRIVATE_KEY < ~/…/eddsa_priv.key`. The
+   release workflow reads both at runtime.
+
+   *Re-running `make secrets` overwrites the secrets in place, so you
+   can do this again any time (e.g. after rotating keys).*
+
+## Each release (automated)
+
+The release workflow at `.github/workflows/release.yml` builds, signs,
+publishes, and updates the appcast on every `vX.Y.Z` tag push. You only
+need to bump the version, commit, tag, push:
 
 ```bash
-# 1. Bump the version in pyproject.toml.
-$EDITOR pyproject.toml          # bump [tool.poetry] version
+# 1. Bump the version in pyproject.toml AND discogs_alert/__init__.py.
+#    Both must match the tag, or the `release` workflow's sanity-check
+#    fails fast.
+$EDITOR pyproject.toml             # bump [tool.poetry] version
 $EDITOR discogs_alert/__init__.py  # bump _FALLBACK_VERSION to match
 
-# 2. Tag the commit (Sparkle ignores the tag name itself but it's nice for git log).
+# 2. Commit, tag, push.
 git commit -am "Bump version to 0.1.1"
 git tag v0.1.1
-git push --tags
+git push origin main --tags
 
-# 3. Build the .app and the .dmg.
-make app
-make dmg
+# That's it. CI (on macos-latest) takes ~5min and:
+#   - builds dist/discogs_alert-0.1.1.dmg
+#   - signs it with the EdDSA key from secrets
+#   - creates a GitHub Release v0.1.1, uploads the DMG
+#   - appends a new <item> to docs/appcast.xml
+#   - commits + pushes the appcast change to main
+#
+# You can watch progress with `gh run watch`.
 
-# 4. Sign the DMG. `make sign` prints something like:
-#       sparkle:edSignature="..." length="..."
-#    Copy those two values; you'll paste them into the appcast below.
-make sign
+# 3. (Optional) Verify the published artifacts:
+gh release view v0.1.1                # confirm the DMG is attached
+curl -fsSI "$(gh release view v0.1.1 --json assets --jq '.assets[0].url')"
+```
 
-# 5. Upload the DMG to a GitHub Release for v0.1.1.
-gh release create v0.1.1 dist/discogs_alert-0.1.1.dmg --notes "0.1.1 release notes…"
+Existing `.app` installs poll the appcast on launch + once a day,
+download the new DMG, verify the EdDSA signature, and prompt the user
+to install. No more manual upgrade steps for users.
 
-# 6. Edit docs/appcast.xml — add a new <item> at the top with:
-#      - <enclosure url=…> pointing at the GitHub release URL
-#      - sparkle:edSignature and length from step 4
-#      - <pubDate> in RFC 822 format
-#      - <description> with a short HTML changelog
-#    Commit + push docs/appcast.xml; Pages picks it up within a minute.
-$EDITOR docs/appcast.xml
-git commit -am "Append v0.1.1 to appcast"
+## Each release (manual fallback)
+
+If the workflow is broken or you want to ship a hotfix from your own
+machine, the `make` targets cover the same steps:
+
+```bash
+make app                                                    # → dist/discogs_alert.app
+make dmg                                                    # → dist/discogs_alert-X.Y.Z.dmg
+make sign                                                   # prints sparkle:edSignature="…" length="…"
+gh release create vX.Y.Z dist/discogs_alert-X.Y.Z.dmg --generate-notes
+python scripts/append_to_appcast.py \
+    --version X.Y.Z \
+    --signature 'sparkle:edSignature="…" length="…"' \
+    --download-url "https://github.com/<owner>/<repo>/releases/download/vX.Y.Z/discogs_alert-X.Y.Z.dmg"
+git commit -am "Append vX.Y.Z to appcast"
 git push
-
-# 7. Existing installs poll the appcast on launch + once a day. They'll
-#    notice the new <item>, download the DMG, verify the EdDSA sig, and
-#    prompt the user to update.
 ```
 
 ## Sanity-checks
