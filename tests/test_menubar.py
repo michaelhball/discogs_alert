@@ -185,6 +185,39 @@ def test_start_only_spawns_one_thread(monkeypatch: pytest.MonkeyPatch):
 # -- module-level guard rails ---------------------------------------------
 
 
+async def test_check_now_returns_false_before_worker_starts():
+    """Calling check_now() before the worker thread has set up its asyncio
+    loop must NOT crash; it returns False so the UI can show "not ready".
+    """
+
+    ctl = da_menubar.MenubarController(_minimal_config())
+    assert ctl.check_now() is False
+
+
+async def test_check_now_wakes_the_loop_sleep():
+    """The 'kick' has to actually wake the asyncio.sleep gating the next
+    iteration. Wire up a controller, install a fake event/loop, and verify
+    that check_now() schedules `_tick_event.set` on the right loop.
+    """
+
+    import asyncio
+
+    ctl = da_menubar.MenubarController(_minimal_config())
+
+    # Stand in for the worker thread's loop: install a real running loop
+    # plus a real asyncio.Event tied to it. Then call check_now() and
+    # confirm the event becomes set.
+    ctl._asyncio_loop = asyncio.get_running_loop()
+    ctl._tick_event = asyncio.Event()
+    assert not ctl._tick_event.is_set()
+
+    assert ctl.check_now() is True
+    # Yield once — call_soon_threadsafe schedules; we need to let the loop
+    # actually run the callback.
+    await asyncio.sleep(0)
+    assert ctl._tick_event.is_set()
+
+
 def test_module_imports_without_rumps_installed():
     """Importing ``discogs_alert.menubar`` must not require rumps. The error
     only fires when ``MenubarApp`` is actually constructed.
