@@ -165,15 +165,16 @@ def test_no_shipping_when_no_currency_in_span(parsed_listings):
     assert by_id[100000003].price.shipping is None
 
 
-def test_iso_coded_shipping_currently_dropped(parsed_listings):
-    """Documented limitation: shipping prices given as ISO codes (e.g.
-    ``+SEK 50.00``) are silently dropped because the shipping parser only
-    handles symbol currencies. Captured here so a future fix shows up as a
-    test diff.
+def test_iso_coded_shipping_is_parsed(parsed_listings):
+    """ISO-code-prefixed shipping (e.g. ``+SEK 50.00``) is now extracted correctly
+    by the dedicated shipping parser, not silently dropped.
     """
 
     by_id = {listing.id: listing for listing in parsed_listings}
-    assert by_id[100000004].price.shipping is None
+    s = by_id[100000004].price.shipping
+    assert s is not None
+    assert s.currency == "SEK"
+    assert s.value == 50.0
 
 
 def test_total_price_includes_shipping(parsed_listings):
@@ -214,3 +215,69 @@ def test_real_marketplace_html_parses_to_listings():
         assert listing.seller_ships_from
         assert isinstance(listing.media_condition, da_entities.CONDITION)
         assert isinstance(listing.sleeve_condition, da_entities.CONDITION)
+
+
+# -- Defensive parsing -----------------------------------------------------
+
+
+def test_scraper_returns_empty_for_html_without_marketplace_table():
+    """If Discogs returns an unexpected page (Cloudflare challenge, 404, etc.)
+    we should get back an empty list, not blow up.
+    """
+
+    listings = da_scrape.scrape_listings_from_marketplace("<html><body>nothing</body></html>", 1)
+    assert listings == []
+
+
+def test_scraper_skips_malformed_rows():
+    """A row missing the ships-from label, or with empty paragraphs, should be
+    skipped quietly rather than crash the whole parse.
+    """
+
+    html = """
+    <table class="mpitems">
+      <tbody>
+        <tr>
+          <td class="item_description">
+            <p><a href="/sell/item/999?ev=rb">empty seller comment</a></p>
+            <p class="item_condition">Media: <span>Very Good (VG)</span></p>
+            <p></p>
+          </td>
+          <td class="seller_info">
+            <ul><li>(no ships-from label)</li></ul>
+          </td>
+          <td class="item_price">
+            <span class="price">€10.00</span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    """
+    listings = da_scrape.scrape_listings_from_marketplace(html, release_id=42)
+    assert listings == []  # the only row was skipped, but we didn't crash
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("+€4.50", {"currency": "EUR", "value": 4.5}),
+        ("+€4.50 shipping", {"currency": "EUR", "value": 4.5}),
+        ("+SEK 50.00", {"currency": "SEK", "value": 50.0}),
+        ("+SEK 50.00 shipping", {"currency": "SEK", "value": 50.0}),
+        ("+free shipping", None),
+        ("+about shipping", None),
+        ("", None),
+        ("shipping", None),
+    ],
+)
+def test_parse_shipping_handles_various_formats(raw, expected):
+    assert da_scrape._parse_shipping(raw) == expected
+
+
+def test_parse_price_string_handles_unparseable_numeric():
+    """Non-numeric text after a currency symbol should raise PriceParsingException
+    rather than letting `float()` throw a less helpful ValueError.
+    """
+
+    with pytest.raises(da_scrape.PriceParsingException):
+        da_scrape._parse_price_string("€not-a-number")
