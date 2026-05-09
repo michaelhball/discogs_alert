@@ -18,3 +18,7 @@ poetry.lock
 
 .currency_cache
 .claude
+
+# py2app build artifacts (Makefile output)
+.build-venv
+build

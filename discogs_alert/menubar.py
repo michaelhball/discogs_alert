@@ -143,7 +143,7 @@ class MenubarController:
             verbose=cfg.runtime.verbose,
         )
 
-    async def _run_one_iteration(
+    async def _run_one_iteration(  # pragma: no cover — needs a real Discogs token + network
         self,
         user_token_client: da_client.UserTokenClient,
         anon_client: da_client.AnonClient,
@@ -164,7 +164,7 @@ class MenubarController:
             except Exception:
                 logger.exception("failed to read alert store stats")
 
-    async def _loop_forever(self) -> None:
+    async def _loop_forever(self) -> None:  # pragma: no cover — runs in the worker thread, needs network
         """The async main loop the worker thread runs.
 
         Two ways out of the inter-iteration sleep:
@@ -330,16 +330,65 @@ def main() -> None:
 
     Loads the config from the default path (or ``DA_CONFIG_PATH`` env var),
     starts the controller's worker thread, then hands off to rumps.
+
+    First-launch UX: if no config exists yet, fall back to a tiny
+    "configure me" rumps app that points the user at where to put the
+    config file and offers to open the parent directory. Better than
+    crashing with a pydantic stack trace.
     """
 
     import os
 
+    from pydantic import ValidationError
+
+    logging.basicConfig(level=logging.INFO)
+
     config_path = os.environ.get("DA_CONFIG_PATH")
-    cfg = da_config.load_config(
-        path=Path(config_path) if config_path else None,
-    )
-    logging.basicConfig(level=cfg.runtime.log_level.upper())
+    resolved = Path(config_path) if config_path else da_config.DEFAULT_CONFIG_PATH
+
+    try:
+        cfg = da_config.load_config(path=resolved)
+    except ValidationError as exc:
+        _run_first_launch_app(resolved, exc)
+        return
+
+    logging.getLogger().setLevel(cfg.runtime.log_level.upper())
     MenubarApp(cfg).run()
+
+
+def _run_first_launch_app(config_path: Path, exc) -> None:  # pragma: no cover
+    """Tiny rumps app shown when the config file is missing or invalid.
+
+    Saves the user from a crash on first launch. Shows the expected config
+    path and an "Open folder…" button so they know where to drop a
+    ``config.toml``. Logs the underlying validation error to stderr so
+    advanced users can see exactly what's missing.
+    """
+
+    _require_rumps()
+    logger.warning("Config not loadable, entering first-launch mode: %s", exc)
+
+    app = rumps.App("discogs_alert", title="🎵 ⚙️")
+    app.menu = [
+        rumps.MenuItem(f"Configure: {config_path}", key=""),
+        None,
+        rumps.MenuItem(
+            "Open config folder…",
+            callback=lambda _s: rumps.macos.open_file(str(config_path.parent)),
+        ),
+        rumps.MenuItem(
+            "Show example config…",
+            callback=lambda _s: rumps.notification(
+                "discogs_alert",
+                "Example config",
+                "See examples/config.example.toml in the source repo.",
+            ),
+        ),
+    ]
+    # Make sure the parent directory exists so the user has somewhere to
+    # save the file from their editor.
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    app.run()
 
 
 if __name__ == "__main__":

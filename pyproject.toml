@@ -56,6 +56,10 @@ TELEGRAM = "discogs_alert.alert.telegram:TelegramAlerter"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+# Only collect from tests/. The plugin-alerter-template under examples/ has
+# its own tests that target its own package; running them from the project
+# root breaks because the example's package isn't on sys.path here.
+testpaths = ["tests"]
 markers = [
     "online: marks tests as requiring internet access (select with '--online')",
 ]

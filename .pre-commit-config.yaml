@@ -32,7 +32,11 @@ repos:
   hooks:
     - id: pytest-offline
       name: pytest (offline)
-      entry: python -m pytest -q -m "not online"
+      # `-p no:lazy-fixture` defends against a stale `pytest-lazyfixture`
+      # plugin that may live in the user's outer environment (it's not a
+      # project dep, but if it's installed at all it crashes pytest's
+      # collection step). Harmless when the plugin isn't there.
+      entry: python -m pytest -q -m "not online" -p no:lazy-fixture
       language: system
       pass_filenames: false
       types: [python]
