@@ -152,10 +152,16 @@ To use Telegram you first need to create a custom bot, the easiest mechanism for
 ```
 You need to find your `CHAT_ID` as indicated above and save that. You may have to send a few "/start" messages to your bot before you get a response that looks like this. Once you've got your CHAT ID as well as your API token, you're all good to go!
 
-#### More coming soon ...
+#### Adding more alerters (plugin authors)
 
-I plan to add more alerting options as soon as possible! Please feel free to open a PR if you have a particular service
-in mind that you'd like to support.
+`discogs_alert` discovers alerters dynamically via the `discogs_alert.alerters` Python entry-point group. To ship a new alerter as a separate package, subclass `discogs_alert.alert.base.Alerter` and register the class in your package's `pyproject.toml`:
+
+```toml
+[project.entry-points."discogs_alert.alerters"]
+ntfy = "discogs_alert_ntfy:NtfyAlerter"
+```
+
+After `pip install discogs-alert-ntfy`, `discogs_alert --alerter-type=NTFY` is selectable. The entry-point name (uppercased) becomes the value of `--alerter-type`. Your alerter is responsible for reading its own config (env vars, a config file, etc.) — built-in CLI flags like `-pt/--pushbullet-token` are only for built-ins.
 
 ## Usage
 

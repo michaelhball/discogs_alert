@@ -143,15 +143,18 @@ logger = logging.getLogger(__name__)
     "--alerter-type",
     required=True,
     envvar="DA_ALERTER_TYPE",
-    type=da_click.EnumChoice(da_alert.AlerterType),
+    # Dynamic Choice — built-in names plus any plugin alerters registered via
+    # the `discogs_alert.alerters` entry-point group. Always shows the current
+    # registered set in `--help`.
+    type=click.Choice(da_alert.alerter_names(), case_sensitive=False),
     help="Your choice of alerting service. Please see the Alerters section in the README for more information",
 )
 @click.option(
     "-pt",
     "--pushbullet-token",
     cls=da_click.RequiredIf,
-    required_if=lambda x: x["alerter_type"] == da_alert.AlerterType.PUSHBULLET,
-    required_if_str="alerter_type=AlerterType.PUSHBULLET",
+    required_if=lambda x: str(x.get("alerter_type", "")).upper() == "PUSHBULLET",
+    required_if_str="alerter_type=PUSHBULLET",
     type=str,
     envvar="DA_PUSHBULLET_TOKEN",
     help="token for pushbullet notification service.",
@@ -160,8 +163,8 @@ logger = logging.getLogger(__name__)
     "-tt",
     "--telegram-token",
     cls=da_click.RequiredIf,
-    required_if=lambda x: x["alerter_type"] == da_alert.AlerterType.TELEGRAM,
-    required_if_str="alerter_type=AlerterType.TELEGRAM",
+    required_if=lambda x: str(x.get("alerter_type", "")).upper() == "TELEGRAM",
+    required_if_str="alerter_type=TELEGRAM",
     type=str,
     envvar="DA_TELEGRAM_TOKEN",
     help="token for telegram bot notification service.",
@@ -170,8 +173,8 @@ logger = logging.getLogger(__name__)
     "-tci",
     "--telegram-chat-id",
     cls=da_click.RequiredIf,
-    required_if=lambda x: x["alerter_type"] == da_alert.AlerterType.TELEGRAM,
-    required_if_str="alerter_type=AlerterType.TELEGRAM",
+    required_if=lambda x: str(x.get("alerter_type", "")).upper() == "TELEGRAM",
+    required_if_str="alerter_type=TELEGRAM",
     type=str,
     envvar="DA_TELEGRAM_CHAT_ID",
     help="chat ID for telegram bot notification service.",
@@ -257,13 +260,18 @@ def main(
     if list_id is not None and wantlist_path is not None:
         list_id = None
 
-    # organise only those kwargs necessary for the alerter being used
-    if alerter_type == da_alert.AlerterType.PUSHBULLET:
+    # `alerter_type` arrives as a string from `click.Choice`. Built-in alerters
+    # have explicit CLI options for their kwargs; plugin alerters (registered
+    # via the `discogs_alert.alerters` entry point) read their own config from
+    # env vars or wherever they like — we just pass an empty kwargs dict.
+    alerter_type = alerter_type.upper()
+    if alerter_type == "PUSHBULLET":
         alerter_kwargs = {"pushbullet_token": pushbullet_token}
-    elif alerter_type == da_alert.AlerterType.TELEGRAM:
+    elif alerter_type == "TELEGRAM":
         alerter_kwargs = {"telegram_token": telegram_token, "telegram_chat_id": telegram_chat_id}
     else:
-        raise ValueError("We should never get here")
+        # Plugin alerter — its constructor is responsible for its own config.
+        alerter_kwargs = {}
 
     loop_kwargs = dict(
         discogs_token=discogs_token,
