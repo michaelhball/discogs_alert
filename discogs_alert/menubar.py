@@ -59,6 +59,11 @@ class MenubarController:
         self._loop_thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
         self._lock = threading.Lock()
+        # Reference to the worker thread's asyncio event loop, set when the
+        # worker starts. Used by `check_now()` to wake the sleep that's
+        # gating the next iteration.
+        self._asyncio_loop: Optional[asyncio.AbstractEventLoop] = None
+        self._tick_event: Optional[asyncio.Event] = None
         # Latest status, updated after every iteration.
         self.last_check_at: Optional[datetime] = None
         self.last_alerts_24h: int = 0
@@ -160,9 +165,18 @@ class MenubarController:
                 logger.exception("failed to read alert store stats")
 
     async def _loop_forever(self) -> None:
-        """The async main loop the worker thread runs."""
+        """The async main loop the worker thread runs.
+
+        Two ways out of the inter-iteration sleep:
+        1. The interval expires (normal cadence).
+        2. ``self._tick_event`` fires — set via ``check_now()`` from the
+           AppKit thread when the user clicks "Check now".
+        """
 
         interval_seconds = max(1, int(3600 / self.cfg.frequency))
+        # Save loop + event so the AppKit thread can poke us mid-sleep.
+        self._asyncio_loop = asyncio.get_running_loop()
+        self._tick_event = asyncio.Event()
         user_token_client = da_client.UserTokenClient(
             self.cfg.user_agent, self.cfg.discogs_token
         )
@@ -175,14 +189,33 @@ class MenubarController:
                     logger.exception("iteration failed")
                     with self._lock:
                         self.last_error = repr(exc)
-                # `asyncio.sleep` is interruptible by the stop event check above —
-                # if you flip `_stop_event` we still wait the rest of the interval.
-                # The user-facing impact is small (worst case: one extra interval
-                # before quit), and it keeps the implementation simple.
-                await asyncio.sleep(interval_seconds)
+                # Sleep until either the interval expires or someone sets
+                # the tick event from another thread (e.g. "Check now").
+                try:
+                    await asyncio.wait_for(self._tick_event.wait(), timeout=interval_seconds)
+                except asyncio.TimeoutError:
+                    pass
+                self._tick_event.clear()
         finally:
             await anon_client.aclose()
             await user_token_client.aclose()
+
+    def check_now(self) -> bool:
+        """Threadsafe: poke the worker thread to skip the rest of its sleep
+        and run another iteration immediately. Returns True if the poke was
+        scheduled, False if the worker isn't running yet.
+
+        Called from the AppKit (rumps) thread. Delegates to the worker's
+        event loop via ``call_soon_threadsafe`` to set the asyncio.Event the
+        sleep is waiting on.
+        """
+
+        if self._asyncio_loop is None or self._tick_event is None:
+            return False
+        # `call_soon_threadsafe` is the only safe way to interact with an
+        # asyncio loop from another thread.
+        self._asyncio_loop.call_soon_threadsafe(self._tick_event.set)
+        return True
 
     def start(self) -> None:
         """Spawn the worker thread that drives the async loop."""
@@ -256,12 +289,15 @@ class MenubarApp:  # pragma: no cover — wired up to AppKit at runtime, not uni
             self.app.menu.add(it)
 
     def _on_check_now(self, _sender):
-        # The worker thread picks up the next interval — there's no clean
-        # way to wake an async sleep from a different thread without an
-        # asyncio queue. For now, bumping the iteration is a follow-up.
-        rumps.notification(
-            "discogs_alert", "", "Will check on the next interval — kick coming soon"
-        )
+        if self.controller.check_now():
+            rumps.notification("discogs_alert", "", "Checking now…")
+        else:
+            # Worker thread hasn't started its asyncio loop yet — happens
+            # only in the brief window between app launch and the first
+            # iteration kicking off.
+            rumps.notification(
+                "discogs_alert", "", "Worker not ready yet; try again in a moment"
+            )
 
     def _on_open_config(self, _sender):
         path = da_config.DEFAULT_CONFIG_PATH
