@@ -39,6 +39,7 @@ build-backend = "poetry.core.masonry.api"
 #     [project.entry-points."discogs_alert.alerters"]
 #     ntfy = "discogs_alert_ntfy:NtfyAlerter"
 [tool.poetry.plugins."discogs_alert.alerters"]
+NTFY = "discogs_alert.alert.ntfy:NtfyAlerter"
 PUSHBULLET = "discogs_alert.alert.pushbullet:PushbulletAlerter"
 TELEGRAM = "discogs_alert.alert.telegram:TelegramAlerter"
 

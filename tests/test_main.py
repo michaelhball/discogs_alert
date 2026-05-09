@@ -110,6 +110,42 @@ def test_cli_telegram_requires_chat_id(stub_loop, wantlist_file):
     assert "telegram_chat_id" in result.output or "is required" in result.output
 
 
+def test_cli_ntfy_requires_topic(stub_loop, wantlist_file):
+    runner = CliRunner()
+    result = runner.invoke(
+        da_main.main,
+        [
+            "--discogs-token", "TOK",
+            "--wantlist-path", str(wantlist_file),
+            "--alerter-type", "NTFY",
+            "--test",
+        ],
+    )
+    assert result.exit_code != 0
+    assert "ntfy_topic" in result.output or "is required" in result.output
+
+
+def test_cli_ntfy_happy_path(stub_loop, wantlist_file):
+    runner = CliRunner()
+    result = runner.invoke(
+        da_main.main,
+        [
+            "--discogs-token", "TOK",
+            "--wantlist-path", str(wantlist_file),
+            "--alerter-type", "NTFY",
+            "--ntfy-topic", "my-topic",
+            "--test",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert stub_loop["alerter_type"] == "NTFY"
+    assert stub_loop["alerter_kwargs"] == {
+        "ntfy_topic": "my-topic",
+        "ntfy_server": "https://ntfy.sh",
+        "ntfy_token": None,
+    }
+
+
 def test_cli_telegram_happy_path(stub_loop, wantlist_file):
     runner = CliRunner()
     result = runner.invoke(
