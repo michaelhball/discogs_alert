@@ -15,18 +15,30 @@ existing installs upgrade themselves automatically.
    ```bash
    make keys
    ```
-   - The **public key** goes into `~/.discogs_alert_release/eddsa_pub.key`
-     and is read by the build into the `.app`'s `Info.plist`.
-   - The **private key** at `~/.discogs_alert_release/eddsa_priv.key`
-     signs each DMG. **Back this up.** Lose it and you'll have to ship a
-     new public key (which means existing installs can never auto-update).
+   Sparkle 2 stores the private key in the macOS Keychain (account name
+   `discogs_alert`); `make sign` finds it there automatically. The
+   target also writes:
+   - A **backup of the private key** at
+     `~/.discogs_alert_release/eddsa_priv.key`. Back this up
+     somewhere safe (1Password, encrypted USB, …) — losing both the
+     keychain entry AND this file means existing installs can never
+     auto-update.
+   - The **public key** at `~/.discogs_alert_release/eddsa_pub.key`,
+     which the build reads into the `.app`'s `Info.plist`.
+
+   `make keys` is idempotent: re-running it on a machine with an
+   existing key for the `discogs_alert` account just re-extracts the
+   public key and refreshes the backup file.
 
 3. **Set up GitHub Pages** for the appcast feed (one-time):
-   - In the repo's settings, enable Pages from `main` / `docs/`.
-   - The appcast lives at `docs/appcast.xml` and ends up served at
+   - This repo already has Pages enabled on `main` / `docs/`. New
+   forks need to do this once via GitHub settings (or
+   `gh api repos/OWNER/REPO/pages -X POST --input -` with
+   `{"source":{"branch":"main","path":"/docs"}}`).
+   - The appcast at `docs/appcast.xml` ends up served at
      `https://<owner>.github.io/<repo>/appcast.xml`.
-   - That URL is what's baked into the bundle's `Info.plist` as
-     `SUFeedURL`. Override at build time with `DA_APPCAST_URL=...`.
+   - That URL is baked into the bundle's `Info.plist` as
+     `SUFeedURL`. Override at build time with `DA_APPCAST_URL=…`.
 
 ## Each release
 
