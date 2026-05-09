@@ -173,6 +173,8 @@ ntfy = "discogs_alert_ntfy:NtfyAlerter"
 
 After `pip install discogs-alert-ntfy`, `discogs_alert --alerter-type=NTFY` is selectable. The entry-point name (uppercased) becomes the value of `--alerter-type`. Your alerter is responsible for reading its own config (env vars, a config file, etc.) — built-in CLI flags like `-pt/--pushbullet-token` are only for built-ins.
 
+For a step-by-step guide and a copy-and-rename starter package, see [`docs/writing-an-alerter.md`](docs/writing-an-alerter.md) and [`examples/discogs-alert-alerter-template/`](examples/discogs-alert-alerter-template/).
+
 ## Usage
 
 `discogs_alert` can be run either as a Python process or as a Docker container. Regardless of which command is used, the `discogs_alert` service will regularly pull the releases from your wantlist, check their availability on the Discogs marketplace, and send you a notification if any release (satisfying your filters) is for sale. You should leave the service running in the background at all times to be most effective.
