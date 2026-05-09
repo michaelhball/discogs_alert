@@ -137,6 +137,16 @@ The possible optional filters are as follows:
 
 You can choose from  several different alerting services to notify you once a record you are searching is on sale, each coming with its own setup requirements. The options and their setup are outlined here
 
+#### ntfy.sh (lowest-friction)
+
+[ntfy.sh](https://ntfy.sh/) is the easiest alerter to set up — no account, no token, no bot. Pick a random hard-to-guess topic name (anyone with the topic name can read your notifications) and subscribe to that topic from the [iOS](https://apps.apple.com/us/app/ntfy/id1625396347), [Android](https://play.google.com/store/apps/details?id=io.heckel.ntfy), [desktop](https://docs.ntfy.sh/subscribe/desktop/), or [web](https://ntfy.sh/app) app. Then run:
+
+```bash
+$ python -m discogs_alert --alerter-type=NTFY --ntfy-topic=<your-topic>
+```
+
+For privacy / reliability, you can self-host ntfy and pass `--ntfy-server=https://ntfy.example.com`. If your ntfy server requires auth, pass `--ntfy-token=<token>`.
+
 #### Pushbullet
 
 As of June 2023, Pushbullet is only available on Android or Desktop. To use Pushbullet, you first need to create an [account](https://www.pushbullet.com/) before installing the app anywhere you wish to receive notifications. Once you've created an account, navigate to your [settings](https://www.pushbullet.com/#settings) page and  create an access token. As before, save this token somewhere on your computer. You'll need to configure it either at the command-line or via an environment variable (see the [usage](#usage) section below).

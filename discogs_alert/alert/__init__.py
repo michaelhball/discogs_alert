@@ -24,6 +24,7 @@ from importlib.metadata import entry_points, EntryPoints
 from typing import Any, Dict, List, Type, Union
 
 from discogs_alert.alert.base import Alerter
+from discogs_alert.alert.ntfy import NtfyAlerter
 from discogs_alert.alert.pushbullet import PushbulletAlerter
 from discogs_alert.alert.telegram import TelegramAlerter
 
@@ -33,6 +34,7 @@ ENTRY_POINT_GROUP = "discogs_alert.alerters"
 
 # Built-in alerters — always available, regardless of entry-point installation.
 _BUILTIN_ALERTERS: Dict[str, Type[Alerter]] = {
+    "NTFY": NtfyAlerter,
     "PUSHBULLET": PushbulletAlerter,
     "TELEGRAM": TelegramAlerter,
 }
@@ -49,6 +51,7 @@ class AlerterType(enum.IntEnum):
 
     PUSHBULLET = enum.auto()
     TELEGRAM = enum.auto()
+    NTFY = enum.auto()
 
 
 def _load_entry_point_alerters() -> Dict[str, Type[Alerter]]:

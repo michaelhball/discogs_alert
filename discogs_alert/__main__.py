@@ -180,6 +180,37 @@ logger = logging.getLogger(__name__)
     help="chat ID for telegram bot notification service.",
 )
 @click.option(
+    "--ntfy-topic",
+    cls=da_click.RequiredIf,
+    required_if=lambda x: str(x.get("alerter_type", "")).upper() == "NTFY",
+    required_if_str="alerter_type=NTFY",
+    type=str,
+    envvar="DA_NTFY_TOPIC",
+    help=(
+        "ntfy.sh topic name (anything random and hard-to-guess works — anyone "
+        "with the topic name can read your notifications). Subscribe to the "
+        "same topic from the ntfy iOS / Android / desktop / web app."
+    ),
+)
+@click.option(
+    "--ntfy-server",
+    default="https://ntfy.sh",
+    show_default=True,
+    type=str,
+    envvar="DA_NTFY_SERVER",
+    help="ntfy server URL. Override to point at a self-hosted instance.",
+)
+@click.option(
+    "--ntfy-token",
+    default=None,
+    type=str,
+    envvar="DA_NTFY_TOKEN",
+    help=(
+        "Optional ntfy access token (only needed for self-hosted instances "
+        "with auth enabled, or paid ntfy.sh tiers)."
+    ),
+)
+@click.option(
     "-sp",
     "--state-path",
     default=None,
@@ -272,6 +303,9 @@ def main(
     pushbullet_token,
     telegram_token,
     telegram_chat_id,
+    ntfy_topic,
+    ntfy_server,
+    ntfy_token,
     state_path,
     stats_gate,
     inter_release_delay,
@@ -305,6 +339,12 @@ def main(
         alerter_kwargs = {"pushbullet_token": pushbullet_token}
     elif alerter_type == "TELEGRAM":
         alerter_kwargs = {"telegram_token": telegram_token, "telegram_chat_id": telegram_chat_id}
+    elif alerter_type == "NTFY":
+        alerter_kwargs = {
+            "ntfy_topic": ntfy_topic,
+            "ntfy_server": ntfy_server,
+            "ntfy_token": ntfy_token,
+        }
     else:
         # Plugin alerter — its constructor is responsible for its own config.
         alerter_kwargs = {}
