@@ -95,6 +95,19 @@ def test_required_if_passes_when_condition_true_with_value():
     assert "mode=secret token=abc" in result.output
 
 
+def test_required_if_handles_click_83_unset_sentinel():
+    """Click 8.3 changed `consume_value` to return `Sentinel.UNSET` for unprovided
+    options instead of the option's `default`. The original RequiredIf code
+    checked `value is None`, which silently no-op'd on click 8.3+. Captured here
+    so the regression doesn't return.
+    """
+
+    runner = CliRunner()
+    result = runner.invoke(_build_required_if_app(), ["--mode", "secret"])
+    assert result.exit_code != 0
+    assert "is required when" in result.output
+
+
 # -- EnumChoice -------------------------------------------------------------
 
 

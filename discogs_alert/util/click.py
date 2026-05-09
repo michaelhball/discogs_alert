@@ -3,6 +3,20 @@ from typing import Any, List, Mapping, Optional, Tuple, Type
 
 import click
 
+# Click 8.3 changed `consume_value` to return the literal `Sentinel.UNSET` for
+# unprovided options, instead of the option's default (typically `None`). We
+# match against both so the same code works on click 8.0–8.2 and 8.3+.
+try:
+    from click.core import UNSET as _CLICK_UNSET  # type: ignore[attr-defined]
+
+    _UNSET_VALUES: tuple = (None, _CLICK_UNSET)
+except ImportError:  # pragma: no cover — pre-8.3 click
+    _UNSET_VALUES = (None,)
+
+
+def _is_unset(value: Any) -> bool:
+    return value in _UNSET_VALUES
+
 
 class NotRequiredIf(click.Option):
     """A class enabling click to specify arguments of which we require one or the other.
@@ -23,8 +37,8 @@ class NotRequiredIf(click.Option):
         # `not_required_if` to mirror the CLI flag style. Normalise to underscores so
         # the comparison actually fires.
         other_name = self.not_required_if.replace("-", "_")
-        we_are_present = self.name in opts and opts.get(self.name) is not None
-        other_present = other_name in opts and opts.get(other_name) is not None
+        we_are_present = self.name in opts and not _is_unset(opts.get(self.name))
+        other_present = other_name in opts and not _is_unset(opts.get(other_name))
         if other_present:
             if we_are_present:
                 raise click.UsageError(
@@ -61,7 +75,7 @@ class RequiredIf(click.Option):
         """If the `required_if` condition is met, check whether this option's value is set before proceeding."""
 
         value, _ = self.consume_value(ctx, opts)
-        if self.required_if(ctx.params) and value is None:
+        if self.required_if(ctx.params) and _is_unset(value):
             raise click.UsageError(f"Illegal usage: `{self.name}` is required when `{self.required_if_str}`")
 
         self.prompt = None
