@@ -53,6 +53,24 @@ def _disk_cache_path(base_currency: str) -> pathlib.Path:
     return CACHE_DIR / f"{now.year}-{now.week}-{base_currency}.json"
 
 
+def _newest_stale_cache(base_currency: str) -> pathlib.Path | None:
+    """Return the most recent on-disk cache for `base_currency`, regardless of week.
+
+    Used as a fallback when Frankfurter is unreachable and we don't have a
+    current-week cache: rates change slowly enough (cents on the dollar) that
+    last week's rates are far better than crashing the loop.
+    """
+
+    if not CACHE_DIR.exists():
+        return None
+    candidates = sorted(
+        CACHE_DIR.glob(f"*-{base_currency}.json"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    return candidates[0] if candidates else None
+
+
 @time_cache(seconds=3600)
 def get_currency_rates(base_currency: str) -> CurrencyRates:
     """Fetch live currency exchange rates from Frankfurter.
@@ -92,18 +110,29 @@ def get_currency_rates(base_currency: str) -> CurrencyRates:
         response = requests.get(
             f"{FRANKFURTER_BASE_URL}/latest", params={"base": base_currency}, timeout=HTTP_TIMEOUT_SECONDS
         )
-    except requests.RequestException as exc:
-        raise CurrencyProviderError(f"Failed to reach Frankfurter for base {base_currency}: {exc}") from exc
-
-    if response.status_code != 200:
+        response.raise_for_status()
+        payload = response.json()
+        rates = payload.get("rates")
+        if not isinstance(rates, dict):
+            raise CurrencyProviderError(f"Frankfurter response missing 'rates': {payload!r}")
+    except (requests.RequestException, ValueError, CurrencyProviderError) as exc:
+        # Upstream is unreachable / errored / returned junk. Fall back to the
+        # newest stale cache for this base currency if we have one — rates only
+        # drift slowly, and a stale conversion is far better than crashing the
+        # loop. Only re-raise if we have no cache to fall back to.
+        stale = _newest_stale_cache(base_currency)
+        if stale is not None:
+            try:
+                logger.warning(
+                    "Frankfurter unreachable (%s); falling back to stale cache %s",
+                    exc, stale,
+                )
+                return json.load(stale.open("r"))
+            except (json.JSONDecodeError, OSError):
+                logger.warning("Stale cache %s unreadable", stale, exc_info=True)
         raise CurrencyProviderError(
-            f"Frankfurter returned {response.status_code} for base {base_currency}: {response.text[:200]}"
-        )
-
-    payload = response.json()
-    rates = payload.get("rates")
-    if not isinstance(rates, dict):
-        raise CurrencyProviderError(f"Frankfurter response missing 'rates': {payload!r}")
+            f"Failed to reach Frankfurter for base {base_currency} and no usable cache: {exc}"
+        ) from exc
 
     # Frankfurter omits the base currency from `rates`; include it so callers
     # may safely look it up.
