@@ -79,11 +79,29 @@ To create an access token, go to your Discogs settings and click on the [Develop
 
 ### Creating your wantlist
 
-There are two different ways you can create a wantlist: 1) by connecting to one of your existing Discogs lists, or 2) by creating a local JSON file. The first option is easier, faster, and fits within your regular Discogs workflow, while the latter enables more expressivity as you can specify fine-grained filters (e.g. price, media/sleeve quality) for each release. I plan to add this level of control to the Discogs list approach shortly, so I intend for that to completely replace the need for a local file.
+There are two different ways you can create a wantlist: 1) by connecting to one of your existing Discogs lists, or 2) by creating a local JSON file. The first option is easier, faster, and fits within your regular Discogs workflow. Both options support the same per-release filters (price threshold, media / sleeve condition); see below for the syntax in each case.
 
 #### Discogs List
 
 Using one of your existing Discogs [lists](https://www.discogs.com/lists) only requires that you specify the ID of the list at runtime, the process for which is outlined in the [usage](#usage) section below. Ideally you should set up a list specifically for this purpose, as you'll be notified the moment any of the releases in your list go on sale. This approach makes it incredibly easy to add new releases to your wantlist: simply add a release to the specified list and `discogs_alert` will automatically identify this and add that release to those it's searching for on the next iteration.
+
+##### Per-release filters in list comments
+
+You can put `@key=value` directives in a list item's _comment_ field to set per-release filters. Any other text in the comment is ignored. Recognised keys:
+
+- `@max=N` (or `@price=N`) — maximum total price (in your `--currency`).
+- `@media=...` — minimum media condition (e.g. `VG+`, `NM`, `M-`, `VERY_GOOD_PLUS`).
+- `@sleeve=...` — minimum sleeve condition (same vocabulary).
+
+Examples (each one is a valid comment on a list item):
+
+```
+@max=500
+Hot one! @max=300 @media=NM
+@media=VG+ @sleeve=NM @max=80
+```
+
+Unknown keys are ignored; malformed values are dropped with a warning so a typo on one item won't break the rest of the loop.
 
 #### Local JSON
 
