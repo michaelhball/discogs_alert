@@ -161,6 +161,7 @@ def loop(
     alerter_kwargs: Dict[str, Any],
     state_path: Optional[Path] = None,
     use_stats_gate: bool = True,
+    inter_release_delay_seconds: float = 0.0,
     verbose: bool = False,
 ):
     """Event loop. One iteration: pull the wantlist, query the marketplace for each
@@ -174,6 +175,11 @@ def loop(
     from sale, or above the user's price threshold are skipped without scraping
     the marketplace page. This is the single largest rate-limit win for users
     with large wantlists.
+
+    `inter_release_delay_seconds` (default 0) spreads marketplace fetches across
+    the iteration interval — useful for very large wantlists where Discogs's
+    Cloudflare layer might throttle a tight burst. With ±25% jitter so multiple
+    parallel runs don't synchronise.
     """
 
     start_time = time.time()
@@ -189,7 +195,8 @@ def loop(
         with da_state.AlertStore(state_path) as store:
             wantlist_items = load_wantlist(list_id, user_token_client, wantlist_path)
             random.shuffle(wantlist_items)
-            for release in wantlist_items:
+            num_items = len(wantlist_items)
+            for idx, release in enumerate(wantlist_items):
                 # Rate-limit protection is now handled inside `UserTokenClient`
                 # via `RateLimitGuard` — we don't need an explicit sleep here.
 
@@ -222,6 +229,20 @@ def loop(
                     store,
                     verbose=verbose,
                 )
+
+                # Spread marketplace scrapes across the iteration interval so
+                # we don't hammer Discogs from a single IP in a tight burst.
+                # Cloudflare doesn't expose its rate-limit headers, so any
+                # explicit pacing has to be local. Skip on the last release
+                # to avoid a pointless sleep at the end.
+                if (
+                    inter_release_delay_seconds > 0
+                    and num_items > 1
+                    and idx < num_items - 1
+                ):
+                    # Add ~±25% jitter so two parallel runs don't synchronise.
+                    jitter = random.uniform(-0.25, 0.25) * inter_release_delay_seconds
+                    time.sleep(max(0.0, inter_release_delay_seconds + jitter))
 
     except ConnectionError:
         logger.info("ConnectionError: looping will continue as usual", exc_info=True)

@@ -199,6 +199,20 @@ logger = logging.getLogger(__name__)
     ),
 )
 @click.option(
+    "-d",
+    "--inter-release-delay",
+    default=0.0,
+    show_default=True,
+    type=click.FloatRange(min=0.0, max=60.0),
+    envvar="DA_INTER_RELEASE_DELAY",
+    help=(
+        "Seconds to sleep between marketplace scrapes (with ±25%% jitter). Useful "
+        "for very large wantlists where you want to spread Cloudflare-facing "
+        "requests across the iteration interval rather than burst them. Default "
+        "0 (no delay)."
+    ),
+)
+@click.option(
     "-V", "--verbose", default=False, is_flag=True, help="use flag if you want to see logs as the program runs"
 )
 @click.option(
@@ -230,6 +244,7 @@ def main(
     telegram_chat_id,
     state_path,
     stats_gate,
+    inter_release_delay,
     verbose,
     test,
 ):
@@ -265,6 +280,7 @@ def main(
         alerter_kwargs=alerter_kwargs,
         state_path=state_path,
         use_stats_gate=stats_gate,
+        inter_release_delay_seconds=inter_release_delay,
         verbose=verbose,
     )
 
