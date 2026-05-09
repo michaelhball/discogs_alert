@@ -31,6 +31,17 @@ ruff = "^0.6"
 requires = ["poetry-core>=1.9.0"]
 build-backend = "poetry.core.masonry.api"
 
+# Built-in alerters are registered both here (so `pip install discogs-alert`
+# exposes them via entry points) and in `discogs_alert.alert.__init__._BUILTIN_ALERTERS`
+# (so editable installs and tests work without entry-point installation). Third-
+# party alerters can register themselves under the same group:
+#
+#     [project.entry-points."discogs_alert.alerters"]
+#     ntfy = "discogs_alert_ntfy:NtfyAlerter"
+[tool.poetry.plugins."discogs_alert.alerters"]
+PUSHBULLET = "discogs_alert.alert.pushbullet:PushbulletAlerter"
+TELEGRAM = "discogs_alert.alert.telegram:TelegramAlerter"
+
 [tool.poetry2conda]
 name = "da"
 

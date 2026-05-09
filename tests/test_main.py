@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from discogs_alert import __main__ as da_main, alert as da_alert, entities as da_entities, loop as da_loop
+from discogs_alert import __main__ as da_main, entities as da_entities, loop as da_loop
 
 
 @pytest.fixture
@@ -51,7 +51,7 @@ def test_cli_runs_with_minimal_required_args(stub_loop, wantlist_file):
     assert result.exit_code == 0, result.output
     assert stub_loop["discogs_token"] == "TOK"
     assert stub_loop["wantlist_path"] == str(wantlist_file)
-    assert stub_loop["alerter_type"] == da_alert.AlerterType.PUSHBULLET
+    assert stub_loop["alerter_type"] == "PUSHBULLET"
     assert stub_loop["alerter_kwargs"] == {"pushbullet_token": "PB"}
     assert stub_loop["currency"] == "EUR"
     assert stub_loop["country"] == "Germany"
@@ -124,7 +124,7 @@ def test_cli_telegram_happy_path(stub_loop, wantlist_file):
         ],
     )
     assert result.exit_code == 0, result.output
-    assert stub_loop["alerter_type"] == da_alert.AlerterType.TELEGRAM
+    assert stub_loop["alerter_type"] == "TELEGRAM"
     assert stub_loop["alerter_kwargs"] == {"telegram_token": "TG", "telegram_chat_id": "42"}
 
 
