@@ -1,73 +1,95 @@
-"""Tests for `discogs_alert.client.UserTokenClient`. We don't exercise
-`AnonClient` here because it spins up a real Selenium browser; that's covered by
-integration runs (and is the next thing on the chopping block — see PR #9).
+"""Tests for `discogs_alert.client.UserTokenClient` (and AnonClient).
+
+Both clients are async now and use httpx / curl_cffi. We mock the underlying
+HTTP layer with `httpx.MockTransport` so tests are fully offline.
 """
 
-from unittest.mock import MagicMock
+from typing import Optional
 
+import httpx
 import pytest
-import requests
 
 from discogs_alert import client as da_client
 
 
-def _fake_response(status: int = 200, body: bytes = b'{"ok":true}', headers=None):
-    resp = MagicMock()
-    resp.status_code = status
-    resp.content = body
-    resp.headers = headers or {
-        "X-Discogs-Ratelimit": "60",
-        "X-Discogs-Ratelimit-Used": "1",
-        "X-Discogs-Ratelimit-Remaining": "59",
-    }
-    return resp
+def _make_client_with_transport(handler, user_token: str = "TOKEN") -> da_client.UserTokenClient:
+    """Build a UserTokenClient whose internal httpx.AsyncClient routes through
+    the supplied request handler (a callable taking httpx.Request → httpx.Response).
+    """
+
+    client = da_client.UserTokenClient(user_agent="UA", user_token=user_token)
+    transport = httpx.MockTransport(handler)
+    # Replace the auto-created client with one bound to the mock transport.
+    # Same params/headers/timeout as the real one.
+    client._client = httpx.AsyncClient(
+        transport=transport,
+        params={"token": user_token},
+        headers={"User-Agent": "UA"},
+        timeout=da_client.UserTokenClient.HTTP_TIMEOUT_SECONDS,
+    )
+    return client
 
 
-def test_user_token_client_attaches_token_param_and_timeout(monkeypatch: pytest.MonkeyPatch):
+def _ok(body: bytes = b'{"ok":true}', headers: Optional[dict] = None) -> httpx.Response:
+    return httpx.Response(
+        200, content=body,
+        headers=headers or {
+            "X-Discogs-Ratelimit": "60",
+            "X-Discogs-Ratelimit-Used": "1",
+            "X-Discogs-Ratelimit-Remaining": "59",
+        },
+    )
+
+
+async def test_user_token_client_attaches_token_param(monkeypatch: pytest.MonkeyPatch):
     captured = {}
 
-    def fake_request(method, url, params=None, data=None, headers=None, timeout=None):
-        captured.update({"method": method, "url": url, "params": params, "timeout": timeout})
-        return _fake_response()
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["method"] = request.method
+        captured["url"] = str(request.url)
+        return _ok()
 
-    monkeypatch.setattr(requests, "request", fake_request)
-
-    client = da_client.UserTokenClient(user_agent="UA", user_token="TOKEN")
-    client._get("https://api.discogs.com/lists/1")
+    client = _make_client_with_transport(handler)
+    try:
+        await client._get("https://api.discogs.com/lists/1")
+    finally:
+        await client.aclose()
 
     assert captured["method"] == "GET"
-    assert captured["url"] == "https://api.discogs.com/lists/1"
-    assert captured["params"] == {"token": "TOKEN"}
-    assert captured["timeout"] == da_client.UserTokenClient.HTTP_TIMEOUT_SECONDS
+    assert "token=TOKEN" in captured["url"]
+    assert captured["url"].startswith("https://api.discogs.com/lists/1")
 
 
-def test_user_token_client_tracks_rate_limit_headers(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(
-        requests,
-        "request",
-        lambda *a, **kw: _fake_response(
-            headers={
-                "X-Discogs-Ratelimit": "60",
-                "X-Discogs-Ratelimit-Used": "5",
-                "X-Discogs-Ratelimit-Remaining": "55",
-            }
-        ),
-    )
-    client = da_client.UserTokenClient(user_agent="UA", user_token="TOKEN")
-    client._get("https://api.discogs.com/anything")
+async def test_user_token_client_tracks_rate_limit_headers():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return _ok(headers={
+            "X-Discogs-Ratelimit": "60",
+            "X-Discogs-Ratelimit-Used": "5",
+            "X-Discogs-Ratelimit-Remaining": "55",
+        })
 
-    assert client.rate_limit == 60
-    assert client.rate_limit_used == 5
-    assert client.rate_limit_remaining == 55
+    client = _make_client_with_transport(handler)
+    try:
+        await client._get("https://api.discogs.com/anything")
+        assert client.rate_limit == 60
+        assert client.rate_limit_used == 5
+        assert client.rate_limit_remaining == 55
+    finally:
+        await client.aclose()
 
 
-def test_user_token_client_get_returns_false_on_non_200(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(requests, "request", lambda *a, **kw: _fake_response(status=429, body=b'{"error":"rate"}'))
-    client = da_client.UserTokenClient(user_agent="UA", user_token="TOKEN")
-    assert client._get("https://api.discogs.com/anything") is False
+async def test_user_token_client_get_returns_false_on_non_200():
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(429, content=b'{"error":"rate"}')
+
+    client = _make_client_with_transport(handler)
+    try:
+        assert await client._get("https://api.discogs.com/anything") is False
+    finally:
+        await client.aclose()
 
 
-def test_user_token_client_get_listing_returns_entity(monkeypatch: pytest.MonkeyPatch):
+async def test_user_token_client_get_listing_returns_entity():
     payload = (
         b'{"id": 1, "availability": null, '
         b'"media_condition": -3, "sleeve_condition": -3, '
@@ -75,17 +97,42 @@ def test_user_token_client_get_listing_returns_entity(monkeypatch: pytest.Monkey
         b'"seller_ships_from": "Germany", '
         b'"price": {"currency": "EUR", "value": 10.0, "shipping": null}}'
     )
-    monkeypatch.setattr(requests, "request", lambda *a, **kw: _fake_response(body=payload))
 
-    client = da_client.UserTokenClient(user_agent="UA", user_token="TOKEN")
-    listing = client.get_listing(1)
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return _ok(body=payload)
 
-    assert listing.id == 1
-    assert listing.price.currency == "EUR"
-    assert listing.price.value == 10.0
+    client = _make_client_with_transport(handler)
+    try:
+        listing = await client.get_listing(1)
+        assert listing.id == 1
+        assert listing.price.currency == "EUR"
+        assert listing.price.value == 10.0
+    finally:
+        await client.aclose()
 
 
-def test_user_token_client_get_release_stats_handles_unknown_release(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(requests, "request", lambda *a, **kw: _fake_response(status=404, body=b'{"error":"nope"}'))
-    client = da_client.UserTokenClient(user_agent="UA", user_token="TOKEN")
-    assert client.get_release_stats(123) is False
+async def test_user_token_client_get_release_stats_handles_unknown_release():
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, content=b'{"error":"nope"}')
+
+    client = _make_client_with_transport(handler)
+    try:
+        assert await client.get_release_stats(123) is False
+    finally:
+        await client.aclose()
+
+
+async def test_user_token_client_get_returns_false_on_network_error():
+    """`httpx.HTTPError` (timeout, connect failure, etc.) should be swallowed
+    by `_get` and surfaced as `False`, just like the previous requests-based
+    implementation.
+    """
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("nope")
+
+    client = _make_client_with_transport(handler)
+    try:
+        assert await client._get("https://api.discogs.com/anything") is False
+    finally:
+        await client.aclose()

@@ -16,11 +16,19 @@ from discogs_alert import __main__ as da_main, entities as da_entities, loop as 
 
 @pytest.fixture
 def stub_loop(monkeypatch: pytest.MonkeyPatch):
-    """Capture the kwargs the CLI hands to `da_loop.loop` and bypass execution."""
+    """Capture the kwargs the CLI hands to `da_loop.loop` and bypass execution.
+
+    The loop is now async, so the stub is async too. We strip ``user_token_client``
+    and ``client_anon`` from the captured kwargs so assertion-by-equality still
+    works — `__main__._run` injects them, but they're implementation details
+    not user input.
+    """
 
     captured: dict = {}
 
-    def fake_loop(**kwargs):
+    async def fake_loop(**kwargs):
+        kwargs.pop("user_token_client", None)
+        kwargs.pop("client_anon", None)
         captured.update(kwargs)
 
     monkeypatch.setattr(da_loop, "loop", fake_loop)
