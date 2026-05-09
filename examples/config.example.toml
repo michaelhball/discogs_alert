@@ -1,0 +1,109 @@
+# discogs_alert config — copy to ~/.discogs_alert/config.toml and edit.
+#
+# Environment variables (DA_*) override individual fields here, so secrets
+# can stay out of the file (Docker / launchd / CI workflows). See
+# `discogs_alert/config.py` for the full DA_* mapping.
+
+# ---- required ---------------------------------------------------------------
+
+# Your Discogs user-token (https://www.discogs.com/settings/developers).
+# Can also be set via $DA_DISCOGS_TOKEN.
+discogs_token = "REPLACE_ME"
+
+# ---- general ----------------------------------------------------------------
+
+# Country you ship to — used for shipping availability and the country
+# whitelist / blacklist (see [country_filters] below).
+country = "Germany"
+
+# Preferred currency for price comparisons. Listings in other currencies
+# are converted via Frankfurter (https://www.frankfurter.app).
+currency = "EUR"
+
+# How many times per hour to query the marketplace. 60 = once a minute.
+frequency = 60
+
+# Optional: override the user-agent string sent on anonymous marketplace
+# requests. The default identifies discogs_alert and a placeholder URL;
+# customising it is polite to Discogs.
+# user_agent = "DiscogsAlert/0.1.0 +http://my-site.example.com"
+
+# ---- wantlist ---------------------------------------------------------------
+
+# Set exactly ONE of these — `list_id` (a Discogs list) or `path` (a local
+# JSON file). See README for the wantlist.json format.
+
+[wantlist]
+list_id = 12345
+# path = "/Users/me/.discogs_alert/wantlist.json"
+
+# ---- seller filters ---------------------------------------------------------
+
+[seller]
+min_rating = 99      # 0–100; only alert on sellers with this rating or better
+# min_sales = 100    # uncomment to require a minimum number of completed sales
+
+# ---- record condition filters ----------------------------------------------
+
+[record]
+# One of: POOR, FAIR, GOOD, GOOD_PLUS, VERY_GOOD, VERY_GOOD_PLUS, NEAR_MINT, MINT
+min_media_condition = "VERY_GOOD"
+min_sleeve_condition = "NOT_GRADED"  # NOT_GRADED is the most permissive
+
+# ---- country filters --------------------------------------------------------
+#
+# Two-letter ISO country codes. The blacklist wins when both are set.
+# Leave both empty (or omit the section) to alert on listings from anywhere.
+
+[country_filters]
+whitelist = []
+blacklist = ["UK", "US"]   # e.g. avoid customs / tariff hassle
+
+# ---- alerter ----------------------------------------------------------------
+#
+# `type` selects which alerter to use; only the matching sub-section's
+# config is read. Built-ins: NTFY, PUSHBULLET, TELEGRAM. Plugin alerters
+# (entry-point) are also valid here — see docs/writing-an-alerter.md.
+
+[alerter]
+type = "NTFY"
+
+[alerter.ntfy]
+# Pick something random and hard-to-guess — anyone with the topic name
+# can read your notifications.
+topic = "REPLACE_ME"
+server = "https://ntfy.sh"
+# token = "..."   # only for paid ntfy.sh tiers / self-hosted with auth
+
+[alerter.pushbullet]
+# token = "..."
+
+[alerter.telegram]
+# token = "..."
+# chat_id = "..."
+
+# ---- runtime ---------------------------------------------------------------
+
+[runtime]
+# Path to the local SQLite dedup database. Defaults to
+# ~/.discogs_alert/state.db.
+# state_path = "/Users/me/.discogs_alert/state.db"
+
+# Use the cheap /marketplace/stats API to skip the expensive scrape for
+# releases with no listings or above your price threshold. Recommended.
+stats_gate = true
+
+# Cap parallel marketplace scrapes per iteration. Higher is faster but
+# more likely to trip Cloudflare's bot detection on large wantlists.
+max_concurrency = 6
+
+# On startup, drop dedup records older than this many days. Set to 0 to
+# disable. Discogs listings disappear long before 90 days so older rows
+# can never match a new listing.
+prune_after_days = 90
+
+# Verbose logs (per-iteration stats, skip reasons, listing decisions).
+verbose = false
+
+# Root log level. Overridden by --log-level on the CLI.
+log_level = "INFO"

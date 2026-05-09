@@ -1,275 +1,120 @@
+"""Slim CLI entry point.
+
+Configuration lives in ``~/.discogs_alert/config.toml`` (or wherever
+``--config`` points), with ``DA_*`` env vars layered on top — see
+``discogs_alert/config.py`` and ``examples/config.example.toml``.
+
+The CLI itself is intentionally tiny: a config file, a ``--once`` switch
+for cron / launchd / systemd-timer use, a ``--verbose`` shortcut for
+log-level bumping, and a couple of debug helpers (``--validate-config``,
+``--print-config``). Anything richer goes in the TOML file.
+"""
+
+from __future__ import annotations
+
 import asyncio
+import json
 import logging
+import sys
+from pathlib import Path
+from typing import Optional
 
 import click
+from pydantic import ValidationError
 
 from discogs_alert import (
     __version__,
-    alert as da_alert,
     client as da_client,
+    config as da_config,
     entities as da_entities,
     loop as da_loop,
 )
-from discogs_alert.util import click as da_click, constants as dac
+from discogs_alert.util import constants as dac
 
 logger = logging.getLogger(__name__)
 
 
+def _load_or_die(config_path: Optional[Path]) -> da_config.Config:
+    """Load the config file (or env-var defaults) and exit cleanly with a
+    helpful message on validation failure.
+
+    `load_config` doesn't raise on a missing file — it just falls through
+    to env-var defaults. The only failure shape we wrap here is the
+    `ValidationError` you get when neither the file nor env vars supply
+    the required fields (e.g. `discogs_token`).
+    """
+
+    try:
+        return da_config.load_config(path=config_path)
+    except ValidationError as exc:
+        click.echo("Invalid config:", err=True)
+        click.echo(str(exc), err=True)
+        click.echo(
+            f"\nTip: copy examples/config.example.toml to "
+            f"{da_config.DEFAULT_CONFIG_PATH} and edit, or set the "
+            "required DA_* environment variables.",
+            err=True,
+        )
+        sys.exit(2)
+
+
+def _build_loop_kwargs(cfg: da_config.Config) -> dict:
+    """Translate the validated Config into the kwargs that ``loop.loop`` accepts."""
+
+    alerter_type = cfg.alerter.type.upper()
+    alerter_kwargs: dict = {}
+    if alerter_type == "PUSHBULLET":
+        alerter_kwargs = {"pushbullet_token": cfg.alerter.pushbullet.token}
+    elif alerter_type == "TELEGRAM":
+        alerter_kwargs = {
+            "telegram_token": cfg.alerter.telegram.token,
+            "telegram_chat_id": cfg.alerter.telegram.chat_id,
+        }
+    elif alerter_type == "NTFY":
+        alerter_kwargs = {
+            "ntfy_topic": cfg.alerter.ntfy.topic,
+            "ntfy_server": cfg.alerter.ntfy.server,
+            "ntfy_token": cfg.alerter.ntfy.token,
+        }
+
+    return dict(
+        discogs_token=cfg.discogs_token,
+        list_id=cfg.wantlist.list_id,
+        wantlist_path=cfg.wantlist.path,
+        user_agent=cfg.user_agent,
+        country=cfg.country,
+        currency=cfg.currency,
+        seller_filters=da_entities.SellerFilters(
+            min_seller_rating=cfg.seller.min_rating,
+            min_seller_sales=cfg.seller.min_sales,
+        ),
+        record_filters=da_entities.RecordFilters(
+            min_media_condition=da_entities.CONDITION[cfg.record.min_media_condition],
+            min_sleeve_condition=da_entities.CONDITION[cfg.record.min_sleeve_condition],
+        ),
+        country_whitelist=set(dac.COUNTRIES[c] for c in cfg.country_filters.whitelist),
+        country_blacklist=set(dac.COUNTRIES[c] for c in cfg.country_filters.blacklist),
+        alerter_type=alerter_type,
+        alerter_kwargs=alerter_kwargs,
+        state_path=cfg.runtime.state_path,
+        use_stats_gate=cfg.runtime.stats_gate,
+        max_concurrency=cfg.runtime.max_concurrency,
+        prune_after_days=cfg.runtime.prune_after_days,
+        verbose=cfg.runtime.verbose,
+    )
+
+
 @click.command()
 @click.option(
-    "-dt",
-    "--discogs-token",
-    required=True,
-    type=str,
-    envvar="DA_DISCOGS_TOKEN",
-    help="unique discogs user access token (enabling sending of requests on your behalf)",
-)
-@click.option(
-    "-lid",
-    "--list-id",
-    type=int,
-    envvar="DA_LIST_ID",
-    cls=da_click.NotRequiredIf,
-    not_required_if="wantlist-path",
-    help="ID of Discogs list to use as wantlist",
-)
-@click.option(
-    "-wp",
-    "--wantlist-path",
-    type=click.Path(exists=True),
-    envvar="DA_WANTLIST_PATH",
-    cls=da_click.NotRequiredIf,
-    not_required_if="list-id",
-    help="path to your wantlist json file (including filename)",
-)
-@click.option(
-    "-ua",
-    "--user-agent",
-    default="DiscogsAlert/0.0.1 +http://discogsalert.com",
-    type=str,
-    envvar="DA_USER_AGENT",
-    help="user-agent indicating source of HTTP request",
-)
-@click.option(
-    "-f",
-    "--frequency",
-    default=60,
-    show_default=True,
-    type=click.IntRange(1, 60),
-    envvar="DA_FREQUENCY",
-    help="number of times per hour to check the marketplace",
-)
-@click.option(
-    "-co",
-    "--country",
-    default="Germany",
-    show_default=True,
-    type=str,
-    envvar="DA_COUNTRY",
-    help="country where you live (e.g. for shipping availability)",
-)
-@click.option(
-    "-$",
-    "--currency",
-    default="EUR",
-    show_default=True,
-    envvar="DA_CURRENCY",
-    type=click.Choice(dac.CURRENCY_CHOICES),
-    help="preferred currency (to convert all others to)",
-)
-@click.option(
-    "-msr",
-    "--min-seller-rating",
-    default=99,
-    show_default=True,
-    type=int,
-    envvar="DA_MIN_SELLER_RATING",
-    help="minimum seller rating you want to allow",
-)
-@click.option(
-    "-mss",
-    "--min-seller-sales",
+    "-c",
+    "--config",
+    "config_path",
     default=None,
-    show_default=True,
-    type=int,
-    envvar="DA_MIN_SELLER_SALES",
-    help="minimum number of seller sales you want to allow",
-)
-@click.option(
-    "-mmc",
-    "--min-media-condition",
-    default=da_entities.CONDITION.VERY_GOOD.name,
-    show_default=True,
-    envvar="DA_MIN_MEDIA_CONDITION",
-    type=da_click.EnumChoice(da_entities.CONDITION),
-    help="minimum media condition you want to accept",
-)
-@click.option(
-    "-msc",
-    "--min-sleeve-condition",
-    default=da_entities.CONDITION.NOT_GRADED.name,
-    show_default=True,
-    envvar="DA_MIN_SLEEVE_CONDITION",
-    type=da_click.EnumChoice(da_entities.CONDITION),
-    help="minimum sleeve condition you want to accept",
-)
-@click.option(
-    "-wl",
-    "--country-whitelist",
-    multiple=True,
-    default=[],
-    envvar="DA_COUNTRY_WHITELIST",
-    type=click.Choice(dac.COUNTRY_CHOICES),
+    type=click.Path(dir_okay=False, file_okay=True, path_type=Path),
+    envvar="DA_CONFIG_PATH",
     help=(
-        "If any countries are passed in the whitelist, you'll _only_ be alerted about listings by sellers of those "
-        "countries (e.g. if you live in the USA and only want to consider releases for sale in the USA). To specify a "
-        "whitelist as an environment variable you must use a string with whitespace, for example "
-        '`export DA_COUNTRY_WHITELIST="DE US"`.'
-    ),
-)
-@click.option(
-    "-bl",
-    "--country-blacklist",
-    multiple=True,
-    default=[],
-    envvar="DA_COUNTRY_BLACKLIST",
-    type=click.Choice(dac.COUNTRY_CHOICES),
-    help=(
-        "If any countries are passed in the blacklist, you'll be alerted about listings by sellers of all countries "
-        "excluding those excluding those, e.g. if you live in Germany and don't want to consider releases from the UK "
-        "due to import taxes. To specify a blacklist as an environment variable you must use a string with whitespace, "
-        'for example `export DA_COUNTRY_BLACKLIST="UK US"`. If you have a country in both the blacklist and the '
-        "whitelist, the blacklist wins."
-    ),
-)
-@click.option(
-    "-at",
-    "--alerter-type",
-    required=True,
-    envvar="DA_ALERTER_TYPE",
-    type=click.Choice(da_alert.alerter_names(), case_sensitive=False),
-    help="Your choice of alerting service. Please see the Alerters section in the README for more information",
-)
-@click.option(
-    "-pt",
-    "--pushbullet-token",
-    cls=da_click.RequiredIf,
-    required_if=lambda x: str(x.get("alerter_type", "")).upper() == "PUSHBULLET",
-    required_if_str="alerter_type=PUSHBULLET",
-    type=str,
-    envvar="DA_PUSHBULLET_TOKEN",
-    help="token for pushbullet notification service.",
-)
-@click.option(
-    "-tt",
-    "--telegram-token",
-    cls=da_click.RequiredIf,
-    required_if=lambda x: str(x.get("alerter_type", "")).upper() == "TELEGRAM",
-    required_if_str="alerter_type=TELEGRAM",
-    type=str,
-    envvar="DA_TELEGRAM_TOKEN",
-    help="token for telegram bot notification service.",
-)
-@click.option(
-    "-tci",
-    "--telegram-chat-id",
-    cls=da_click.RequiredIf,
-    required_if=lambda x: str(x.get("alerter_type", "")).upper() == "TELEGRAM",
-    required_if_str="alerter_type=TELEGRAM",
-    type=str,
-    envvar="DA_TELEGRAM_CHAT_ID",
-    help="chat ID for telegram bot notification service.",
-)
-@click.option(
-    "--ntfy-topic",
-    cls=da_click.RequiredIf,
-    required_if=lambda x: str(x.get("alerter_type", "")).upper() == "NTFY",
-    required_if_str="alerter_type=NTFY",
-    type=str,
-    envvar="DA_NTFY_TOPIC",
-    help=(
-        "ntfy.sh topic name (anything random and hard-to-guess works — anyone "
-        "with the topic name can read your notifications). Subscribe to the "
-        "same topic from the ntfy iOS / Android / desktop / web app."
-    ),
-)
-@click.option(
-    "--ntfy-server",
-    default="https://ntfy.sh",
-    show_default=True,
-    type=str,
-    envvar="DA_NTFY_SERVER",
-    help="ntfy server URL. Override to point at a self-hosted instance.",
-)
-@click.option(
-    "--ntfy-token",
-    default=None,
-    type=str,
-    envvar="DA_NTFY_TOKEN",
-    help=(
-        "Optional ntfy access token (only needed for self-hosted instances "
-        "with auth enabled, or paid ntfy.sh tiers)."
-    ),
-)
-@click.option(
-    "-sp",
-    "--state-path",
-    default=None,
-    type=click.Path(dir_okay=False, file_okay=True),
-    envvar="DA_STATE_PATH",
-    help=(
-        "Path to the local SQLite database used to deduplicate alerts. "
-        "Defaults to `~/.discogs_alert/state.db`."
-    ),
-)
-@click.option(
-    "--stats-gate/--no-stats-gate",
-    default=True,
-    show_default=True,
-    envvar="DA_STATS_GATE",
-    help=(
-        "Use the cheap `/marketplace/stats` API to skip the expensive marketplace "
-        "scrape for releases with no listings or above your price threshold. "
-        "Recommended; disable only for debugging."
-    ),
-)
-@click.option(
-    "--max-concurrency",
-    default=da_loop.DEFAULT_MAX_CONCURRENCY,
-    show_default=True,
-    type=click.IntRange(min=1, max=32),
-    envvar="DA_MAX_CONCURRENCY",
-    help=(
-        "Maximum number of concurrent marketplace scrapes per loop iteration. "
-        "Higher values are faster but more likely to trip Cloudflare's bot "
-        "detection on large wantlists. The default is conservative."
-    ),
-)
-@click.option(
-    "--prune-after-days",
-    default=90,
-    show_default=True,
-    type=click.IntRange(min=0),
-    envvar="DA_PRUNE_AFTER_DAYS",
-    help=(
-        "On startup, drop dedup records older than this many days from the local "
-        "state database. Listings disappear from Discogs long before this, so "
-        "older rows can't ever match a future listing. Set to 0 to disable."
-    ),
-)
-@click.option(
-    "-V", "--verbose", default=False, is_flag=True, help="use flag if you want to see logs as the program runs"
-)
-@click.option(
-    "-l",
-    "--log-level",
-    default=None,
-    envvar="DA_LOG_LEVEL",
-    type=click.Choice(["DEBUG", "INFO", "WARNING", "ERROR"], case_sensitive=False),
-    help=(
-        "Override the root log level. Useful for quieting `INFO` chatter under cron "
-        "(`--log-level=WARNING`) or capturing extra detail when debugging "
-        "(`--log-level=DEBUG`). When omitted, defaults to INFO."
+        "Path to a TOML config file. Defaults to ~/.discogs_alert/config.toml. "
+        "See examples/config.example.toml for the schema."
     ),
 )
 @click.option(
@@ -280,112 +125,75 @@ logger = logging.getLogger(__name__)
     is_flag=True,
     envvar="DA_ONCE",
     help=(
-        "Run the loop exactly once and exit, instead of scheduling it to repeat. "
-        "Useful when you're driving discogs_alert from cron / systemd-timer / "
-        "launchd and want the schedule managed externally."
+        "Run the loop exactly once and exit. Use with cron / launchd / "
+        "systemd-timer when you want the schedule managed externally."
     ),
 )
 @click.option(
-    "-T",
-    "--test",
-    "test",
+    "-V",
+    "--verbose",
+    "verbose",
     default=False,
     is_flag=True,
-    hidden=True,
-    help="Deprecated alias for --once; kept for backward compatibility.",
+    help="Shortcut for `--log-level=DEBUG` and `runtime.verbose=true`.",
+)
+@click.option(
+    "-l",
+    "--log-level",
+    default=None,
+    envvar="DA_LOG_LEVEL",
+    type=click.Choice(["DEBUG", "INFO", "WARNING", "ERROR"], case_sensitive=False),
+    help="Override the root log level.",
+)
+@click.option(
+    "--validate-config",
+    is_flag=True,
+    help="Load and validate the config, print a one-line summary, and exit.",
+)
+@click.option(
+    "--print-config",
+    is_flag=True,
+    help="Load the config, dump the resolved values as JSON, and exit.",
 )
 @click.version_option(__version__)
 def main(
-    discogs_token,
-    list_id,
-    wantlist_path,
-    user_agent,
-    frequency,
-    country,
-    currency,
-    min_seller_rating,
-    min_seller_sales,
-    min_media_condition,
-    min_sleeve_condition,
-    country_whitelist,
-    country_blacklist,
-    alerter_type,
-    pushbullet_token,
-    telegram_token,
-    telegram_chat_id,
-    ntfy_topic,
-    ntfy_server,
-    ntfy_token,
-    state_path,
-    stats_gate,
-    max_concurrency,
-    prune_after_days,
-    verbose,
-    log_level,
-    once,
-    test,
-):
-    """
-    This loop queries your watchlist at regular intervals, alerting you if a release satisfying your criteria is found.
+    config_path: Optional[Path],
+    once: bool,
+    verbose: bool,
+    log_level: Optional[str],
+    validate_config: bool,
+    print_config: bool,
+) -> None:
+    """Run the discogs_alert loop, configured by a TOML file + env vars.
+
+    Quick start:
+
+      \b
+      cp examples/config.example.toml ~/.discogs_alert/config.toml
+      $EDITOR ~/.discogs_alert/config.toml
+      python -m discogs_alert
     """
 
-    # Configure logging here, not at module import — importing the package
-    # shouldn't install a global handler on the root logger.
     logging.basicConfig(level=logging.INFO)
+    cfg = _load_or_die(config_path)
 
-    # `--once` is the canonical name; `--test` is the legacy alias.
-    one_shot = once or test
-
-    # Apply log-level override on top of the basicConfig above.
+    # Apply CLI overrides on top of the loaded config.
+    if verbose:
+        cfg.runtime.verbose = True
+        if log_level is None:
+            log_level = "DEBUG"
     if log_level is not None:
         logging.getLogger().setLevel(log_level.upper())
 
-    # if both a list ID and a local wantlist path are provided, use the wantlist (to force-enable local testing)
-    if list_id is not None and wantlist_path is not None:
-        list_id = None
+    if validate_config:
+        click.echo(f"Config valid. Alerter: {cfg.alerter.type}, frequency: {cfg.frequency}/h")
+        return
 
-    # `alerter_type` arrives as a string from `click.Choice`. Built-in alerters
-    # have explicit CLI options for their kwargs; plugin alerters (registered
-    # via the `discogs_alert.alerters` entry point) read their own config from
-    # env vars or wherever they like — we just pass an empty kwargs dict.
-    alerter_type = alerter_type.upper()
-    if alerter_type == "PUSHBULLET":
-        alerter_kwargs = {"pushbullet_token": pushbullet_token}
-    elif alerter_type == "TELEGRAM":
-        alerter_kwargs = {"telegram_token": telegram_token, "telegram_chat_id": telegram_chat_id}
-    elif alerter_type == "NTFY":
-        alerter_kwargs = {
-            "ntfy_topic": ntfy_topic,
-            "ntfy_server": ntfy_server,
-            "ntfy_token": ntfy_token,
-        }
-    else:
-        # Plugin alerter — its constructor is responsible for its own config.
-        alerter_kwargs = {}
+    if print_config:
+        click.echo(json.dumps(cfg.model_dump(), indent=2, default=str))
+        return
 
-    loop_kwargs = dict(
-        discogs_token=discogs_token,
-        list_id=list_id,
-        wantlist_path=wantlist_path,
-        user_agent=user_agent,
-        country=country,
-        currency=currency,
-        seller_filters=da_entities.SellerFilters(
-            min_seller_rating=min_seller_rating, min_seller_sales=min_seller_sales
-        ),
-        record_filters=da_entities.RecordFilters(
-            min_media_condition=min_media_condition, min_sleeve_condition=min_sleeve_condition
-        ),
-        country_whitelist=set(dac.COUNTRIES[c] for c in country_whitelist),
-        country_blacklist=set(dac.COUNTRIES[c] for c in country_blacklist),
-        alerter_type=alerter_type,
-        alerter_kwargs=alerter_kwargs,
-        state_path=state_path,
-        use_stats_gate=stats_gate,
-        max_concurrency=max_concurrency,
-        prune_after_days=prune_after_days,
-        verbose=verbose,
-    )
+    loop_kwargs = _build_loop_kwargs(cfg)
 
     logger.info(
         r"""
@@ -400,20 +208,19 @@ def main(
 """
     )
 
-    interval_seconds = max(1, int(3600 / frequency))
-    asyncio.run(_run(loop_kwargs, run_once=one_shot, interval_seconds=interval_seconds))
+    interval_seconds = max(1, int(3600 / cfg.frequency))
+    asyncio.run(_run(loop_kwargs, run_once=once, interval_seconds=interval_seconds, cfg=cfg))
 
 
-async def _run(loop_kwargs: dict, run_once: bool, interval_seconds: int) -> None:
+async def _run(
+    loop_kwargs: dict, run_once: bool, interval_seconds: int, cfg: da_config.Config
+) -> None:
     """Drive the async loop. Holds a single ``UserTokenClient`` and ``AnonClient``
-    across all iterations so TLS handshakes are paid once per process rather
-    than once per iteration.
+    across all iterations so TLS handshakes amortize.
     """
 
-    user_token_client = da_client.UserTokenClient(
-        loop_kwargs["user_agent"], loop_kwargs["discogs_token"]
-    )
-    anon_client = da_client.AnonClient(loop_kwargs["user_agent"])
+    user_token_client = da_client.UserTokenClient(cfg.user_agent, cfg.discogs_token)
+    anon_client = da_client.AnonClient(cfg.user_agent)
     try:
         await da_loop.loop(
             **loop_kwargs,
