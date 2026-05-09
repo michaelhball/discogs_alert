@@ -11,6 +11,7 @@ import logging
 
 import requests
 
+from discogs_alert.alert._response import log_alerter_failure
 from discogs_alert.alert.base import Alerter
 
 logger = logging.getLogger(__name__)
@@ -34,6 +35,6 @@ class PushbulletAlerter(Alerter):
             logger.error("Exception sending pushbullet push", exc_info=True)
             return False
         if resp.status_code != 200:
-            logger.error("error %s sending pushbullet notification: %s", resp.status_code, resp.content[:200])
+            log_alerter_failure("Pushbullet", resp.status_code, resp.content, resp.headers)
             return False
         return True
