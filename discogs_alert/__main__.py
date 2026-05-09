@@ -7,7 +7,6 @@ import schedule
 from discogs_alert import __version__, alert as da_alert, entities as da_entities, loop as da_loop
 from discogs_alert.util import click as da_click, constants as dac
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -318,10 +317,14 @@ def main(
     This loop queries your watchlist at regular intervals, alerting you if a release satisfying your criteria is found.
     """
 
+    # Configure logging here, not at module import — importing the package
+    # shouldn't install a global handler on the root logger.
+    logging.basicConfig(level=logging.INFO)
+
     # `--once` is the canonical name; `--test` is the legacy alias.
     one_shot = once or test
 
-    # Apply log-level override after `basicConfig` already ran (at module import).
+    # Apply log-level override on top of the basicConfig above.
     if log_level is not None:
         logging.getLogger().setLevel(log_level.upper())
 
