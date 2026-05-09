@@ -1,292 +1,135 @@
-"""Tests for the CLI in `discogs_alert.__main__`.
+"""Tests for the slim CLI in `discogs_alert.__main__`.
 
-Uses Click's `CliRunner` to invoke `main` without hitting any real network or
-filesystem state. The actual `loop` function is monkey-patched out so we just
-verify CLI parsing, validation, and the arg-shaping that happens before
-`da_loop.loop` is called.
+The CLI got a lot smaller in Phase B of the config-file refactor — most
+behaviour now lives in the TOML config and the `DA_*` env-var overrides,
+both of which are tested in `tests/test_config.py`. Here we only check
+the CLI's job: load → optional `--once` / `--validate-config` /
+`--print-config` → kick the loop.
 """
 
+from __future__ import annotations
+
+import json
+import os
 from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
 
-from discogs_alert import __main__ as da_main, entities as da_entities, loop as da_loop
+from discogs_alert import __main__ as da_main
+
+
+@pytest.fixture(autouse=True)
+def _clear_da_env(monkeypatch: pytest.MonkeyPatch):
+    """Strip inherited DA_* env vars so each test starts from a clean slate."""
+
+    for key in list(os.environ):
+        if key.startswith("DA_"):
+            monkeypatch.delenv(key, raising=False)
 
 
 @pytest.fixture
-def stub_loop(monkeypatch: pytest.MonkeyPatch):
-    """Capture the kwargs the CLI hands to `da_loop.loop` and bypass execution.
-
-    The loop is now async, so the stub is async too. We strip ``user_token_client``
-    and ``client_anon`` from the captured kwargs so assertion-by-equality still
-    works — `__main__._run` injects them, but they're implementation details
-    not user input.
-    """
+def stub_run(monkeypatch: pytest.MonkeyPatch):
+    """Capture the kwargs `_run` is called with, without actually running it."""
 
     captured: dict = {}
 
-    async def fake_loop(**kwargs):
-        kwargs.pop("user_token_client", None)
-        kwargs.pop("client_anon", None)
-        captured.update(kwargs)
+    async def fake_run(loop_kwargs, run_once, interval_seconds, cfg):
+        captured["loop_kwargs"] = loop_kwargs
+        captured["run_once"] = run_once
+        captured["interval_seconds"] = interval_seconds
+        captured["cfg"] = cfg
 
-    monkeypatch.setattr(da_loop, "loop", fake_loop)
-    monkeypatch.setattr(da_main.da_loop, "loop", fake_loop)
+    monkeypatch.setattr(da_main, "_run", fake_run)
     return captured
 
 
 @pytest.fixture
-def wantlist_file(tmp_path: Path) -> Path:
-    path = tmp_path / "wantlist.json"
-    path.write_text('[{"id": 1, "display_title": "X"}]')
+def config_file(tmp_path: Path) -> Path:
+    """Minimal valid config file."""
+
+    path = tmp_path / "config.toml"
+    path.write_text(
+        """
+        discogs_token = "TOK"
+        country = "France"
+        currency = "GBP"
+
+        [wantlist]
+        list_id = 42
+
+        [alerter]
+        type = "NTFY"
+        [alerter.ntfy]
+        topic = "x"
+        """
+    )
     return path
 
 
-def _base_args(wantlist_file: Path) -> list[str]:
-    return [
-        "--discogs-token", "TOK",
-        "--wantlist-path", str(wantlist_file),
-        "--alerter-type", "PUSHBULLET",
-        "--pushbullet-token", "PB",
-        "--test",
-    ]
-
-
-def test_cli_runs_with_minimal_required_args(stub_loop, wantlist_file):
+def test_cli_loads_config_and_starts_loop(stub_run, config_file):
     runner = CliRunner()
-    result = runner.invoke(da_main.main, _base_args(wantlist_file))
+    result = runner.invoke(da_main.main, ["--config", str(config_file), "--once"])
     assert result.exit_code == 0, result.output
-    assert stub_loop["discogs_token"] == "TOK"
-    assert stub_loop["wantlist_path"] == str(wantlist_file)
-    assert stub_loop["alerter_type"] == "PUSHBULLET"
-    assert stub_loop["alerter_kwargs"] == {"pushbullet_token": "PB"}
-    assert stub_loop["currency"] == "EUR"
-    assert stub_loop["country"] == "Germany"
-    assert stub_loop["use_stats_gate"] is True
+    assert stub_run["run_once"] is True
+    assert stub_run["loop_kwargs"]["alerter_type"] == "NTFY"
+    assert stub_run["loop_kwargs"]["country"] == "France"
+    assert stub_run["loop_kwargs"]["currency"] == "GBP"
+    assert stub_run["cfg"].discogs_token == "TOK"
 
 
-def test_cli_requires_discogs_token(stub_loop, wantlist_file):
+def test_cli_missing_config_exits_2(tmp_path: Path):
     runner = CliRunner()
-    args = _base_args(wantlist_file)
-    args.remove("--discogs-token")
-    args.remove("TOK")
-    result = runner.invoke(da_main.main, args)
-    assert result.exit_code != 0
-    assert "discogs-token" in result.output.lower() or "DISCOGS_TOKEN" in result.output
+    result = runner.invoke(da_main.main, ["--config", str(tmp_path / "no.toml")])
+    assert result.exit_code == 2
+    assert "Invalid config" in result.output or "Config file not found" in result.output
 
 
-def test_cli_with_neither_wantlist_nor_list_id_does_not_crash_at_parse(stub_loop):
-    """Neither --list-id nor --wantlist-path is required at parse time — the
-    NotRequiredIf helpers only enforce mutual *exclusion*, not mutual *requirement*.
-    The runtime check inside `loop.load_wantlist` raises later; here we just
-    verify the CLI parses without crashing.
-    """
-
+def test_cli_validate_config_short_circuits(stub_run, config_file):
     runner = CliRunner()
-    result = runner.invoke(
-        da_main.main,
-        [
-            "--discogs-token", "TOK",
-            "--alerter-type", "PUSHBULLET",
-            "--pushbullet-token", "PB",
-            "--test",
-        ],
-    )
-    assert result.exit_code == 0
-    assert stub_loop["list_id"] is None
-    assert stub_loop["wantlist_path"] is None
+    result = runner.invoke(da_main.main, ["--config", str(config_file), "--validate-config"])
+    assert result.exit_code == 0, result.output
+    assert "Config valid" in result.output
+    assert "NTFY" in result.output
+    assert "loop_kwargs" not in stub_run
 
 
-def test_cli_telegram_requires_chat_id(stub_loop, wantlist_file):
-    """RequiredIf should fire when --alerter-type=TELEGRAM is set without
-    --telegram-chat-id (regression check for the click-8.3 UNSET bug).
-    """
+def test_cli_print_config_emits_json(stub_run, config_file):
+    runner = CliRunner()
+    result = runner.invoke(da_main.main, ["--config", str(config_file), "--print-config"])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["discogs_token"] == "TOK"
+    assert payload["alerter"]["type"] == "NTFY"
+    assert payload["alerter"]["ntfy"]["topic"] == "x"
+    assert "loop_kwargs" not in stub_run
+
+
+def test_cli_verbose_flag_sets_debug_log_level(stub_run, config_file):
+    import logging
 
     runner = CliRunner()
-    result = runner.invoke(
-        da_main.main,
-        [
-            "--discogs-token", "TOK",
-            "--wantlist-path", str(wantlist_file),
-            "--alerter-type", "TELEGRAM",
-            "--telegram-token", "TG",
-            "--test",
-        ],
-    )
-    assert result.exit_code != 0
-    assert "telegram_chat_id" in result.output or "is required" in result.output
+    result = runner.invoke(da_main.main, ["--config", str(config_file), "--once", "--verbose"])
+    assert result.exit_code == 0, result.output
+    assert logging.getLogger().level == logging.DEBUG
+    assert stub_run["loop_kwargs"]["verbose"] is True
 
 
-def test_cli_ntfy_requires_topic(stub_loop, wantlist_file):
+def test_cli_log_level_override(stub_run, config_file):
+    import logging
+
     runner = CliRunner()
     result = runner.invoke(
-        da_main.main,
-        [
-            "--discogs-token", "TOK",
-            "--wantlist-path", str(wantlist_file),
-            "--alerter-type", "NTFY",
-            "--test",
-        ],
-    )
-    assert result.exit_code != 0
-    assert "ntfy_topic" in result.output or "is required" in result.output
-
-
-def test_cli_ntfy_happy_path(stub_loop, wantlist_file):
-    runner = CliRunner()
-    result = runner.invoke(
-        da_main.main,
-        [
-            "--discogs-token", "TOK",
-            "--wantlist-path", str(wantlist_file),
-            "--alerter-type", "NTFY",
-            "--ntfy-topic", "my-topic",
-            "--test",
-        ],
+        da_main.main, ["--config", str(config_file), "--once", "--log-level", "WARNING"]
     )
     assert result.exit_code == 0, result.output
-    assert stub_loop["alerter_type"] == "NTFY"
-    assert stub_loop["alerter_kwargs"] == {
-        "ntfy_topic": "my-topic",
-        "ntfy_server": "https://ntfy.sh",
-        "ntfy_token": None,
-    }
+    assert logging.getLogger().level == logging.WARNING
 
 
-def test_cli_telegram_happy_path(stub_loop, wantlist_file):
+def test_cli_log_level_invalid_value_rejected(config_file):
     runner = CliRunner()
     result = runner.invoke(
-        da_main.main,
-        [
-            "--discogs-token", "TOK",
-            "--wantlist-path", str(wantlist_file),
-            "--alerter-type", "TELEGRAM",
-            "--telegram-token", "TG",
-            "--telegram-chat-id", "42",
-            "--test",
-        ],
-    )
-    assert result.exit_code == 0, result.output
-    assert stub_loop["alerter_type"] == "TELEGRAM"
-    assert stub_loop["alerter_kwargs"] == {"telegram_token": "TG", "telegram_chat_id": "42"}
-
-
-def test_cli_passes_filters_through(stub_loop, wantlist_file):
-    runner = CliRunner()
-    result = runner.invoke(
-        da_main.main,
-        _base_args(wantlist_file)
-        + [
-            "--min-media-condition", "NEAR_MINT",
-            "--min-sleeve-condition", "VERY_GOOD",
-            "--min-seller-rating", "98",
-            "--country", "France",
-            "--currency", "GBP",
-        ],
-    )
-    assert result.exit_code == 0, result.output
-    assert stub_loop["country"] == "France"
-    assert stub_loop["currency"] == "GBP"
-    assert stub_loop["seller_filters"].min_seller_rating == 98
-    assert stub_loop["record_filters"].min_media_condition == da_entities.CONDITION.NEAR_MINT
-    assert stub_loop["record_filters"].min_sleeve_condition == da_entities.CONDITION.VERY_GOOD
-
-
-def test_cli_country_whitelist_and_blacklist(stub_loop, wantlist_file):
-    runner = CliRunner()
-    result = runner.invoke(
-        da_main.main,
-        _base_args(wantlist_file) + ["-wl", "DE", "-wl", "FR", "-bl", "UK"],
-    )
-    assert result.exit_code == 0, result.output
-    assert stub_loop["country_whitelist"] == {"Germany", "France"}
-    assert stub_loop["country_blacklist"] == {"United Kingdom"}
-
-
-def test_cli_no_stats_gate_flag(stub_loop, wantlist_file):
-    runner = CliRunner()
-    result = runner.invoke(da_main.main, _base_args(wantlist_file) + ["--no-stats-gate"])
-    assert result.exit_code == 0, result.output
-    assert stub_loop["use_stats_gate"] is False
-
-
-def test_cli_state_path_passes_through(stub_loop, wantlist_file, tmp_path):
-    db = tmp_path / "x.db"
-    runner = CliRunner()
-    result = runner.invoke(da_main.main, _base_args(wantlist_file) + ["--state-path", str(db)])
-    assert result.exit_code == 0, result.output
-    assert stub_loop["state_path"] == str(db)
-
-
-def test_cli_once_flag_runs_loop_once(stub_loop, wantlist_file):
-    """`--once` should invoke `loop` exactly once and skip the schedule path."""
-
-    runner = CliRunner()
-    args = _base_args(wantlist_file)
-    # _base_args already includes --test (the legacy alias for --once); replace
-    # it with the canonical flag so we exercise that path.
-    args.remove("--test")
-    args.append("--once")
-    result = runner.invoke(da_main.main, args)
-    assert result.exit_code == 0, result.output
-
-
-def test_cli_log_level_flag_propagates(stub_loop, wantlist_file, monkeypatch):
-    import logging as stdlogging
-
-    runner = CliRunner()
-    result = runner.invoke(
-        da_main.main, _base_args(wantlist_file) + ["--log-level", "WARNING"]
-    )
-    assert result.exit_code == 0, result.output
-    # Root logger level should now be WARNING.
-    assert stdlogging.getLogger().level == stdlogging.WARNING
-
-
-def test_cli_log_level_invalid_value_rejected(stub_loop, wantlist_file):
-    runner = CliRunner()
-    result = runner.invoke(
-        da_main.main, _base_args(wantlist_file) + ["--log-level", "TRACE"]
-    )
-    assert result.exit_code != 0
-
-
-def test_cli_prune_after_days_default(stub_loop, wantlist_file):
-    runner = CliRunner()
-    result = runner.invoke(da_main.main, _base_args(wantlist_file))
-    assert result.exit_code == 0, result.output
-    assert stub_loop["prune_after_days"] == 90
-
-
-def test_cli_prune_after_days_override(stub_loop, wantlist_file):
-    runner = CliRunner()
-    result = runner.invoke(da_main.main, _base_args(wantlist_file) + ["--prune-after-days", "0"])
-    assert result.exit_code == 0, result.output
-    assert stub_loop["prune_after_days"] == 0
-
-
-def test_cli_list_id_and_wantlist_path_mutual_exclusion(stub_loop, wantlist_file):
-    runner = CliRunner()
-    result = runner.invoke(
-        da_main.main,
-        [
-            "--discogs-token", "TOK",
-            "--list-id", "42",
-            "--wantlist-path", str(wantlist_file),
-            "--alerter-type", "PUSHBULLET",
-            "--pushbullet-token", "PB",
-            "--test",
-        ],
-    )
-    assert result.exit_code != 0
-    assert "mutually exclusive" in result.output
-
-
-def test_cli_unknown_currency_rejected(stub_loop, wantlist_file):
-    runner = CliRunner()
-    result = runner.invoke(
-        da_main.main, _base_args(wantlist_file) + ["--currency", "XYZ"]
+        da_main.main, ["--config", str(config_file), "--log-level", "TRACE"]
     )
     assert result.exit_code != 0
 
@@ -296,3 +139,86 @@ def test_cli_version_flag_works():
     result = runner.invoke(da_main.main, ["--version"])
     assert result.exit_code == 0
     assert "version" in result.output.lower()
+
+
+def test_cli_env_vars_override_config_file(stub_run, config_file, monkeypatch):
+    monkeypatch.setenv("DA_DISCOGS_TOKEN", "FROM_ENV")
+    runner = CliRunner()
+    result = runner.invoke(da_main.main, ["--config", str(config_file), "--once"])
+    assert result.exit_code == 0, result.output
+    assert stub_run["cfg"].discogs_token == "FROM_ENV"
+
+
+def test_cli_config_via_env_var(stub_run, config_file, monkeypatch):
+    monkeypatch.setenv("DA_CONFIG_PATH", str(config_file))
+    runner = CliRunner()
+    result = runner.invoke(da_main.main, ["--once"])
+    assert result.exit_code == 0, result.output
+    assert stub_run["loop_kwargs"]["alerter_type"] == "NTFY"
+
+
+# -- _build_loop_kwargs (unit) ----------------------------------------------
+
+
+def test_build_loop_kwargs_pushbullet():
+    from discogs_alert import config as da_config
+
+    cfg = da_config.Config.model_validate(
+        {
+            "discogs_token": "T",
+            "alerter": {"type": "PUSHBULLET", "pushbullet": {"token": "PB"}},
+            "wantlist": {"path": "/x"},
+        }
+    )
+    kw = da_main._build_loop_kwargs(cfg)
+    assert kw["alerter_type"] == "PUSHBULLET"
+    assert kw["alerter_kwargs"] == {"pushbullet_token": "PB"}
+    assert kw["wantlist_path"] == "/x"
+
+
+def test_build_loop_kwargs_country_filters():
+    from discogs_alert import config as da_config
+
+    cfg = da_config.Config.model_validate(
+        {
+            "discogs_token": "T",
+            "country_filters": {"whitelist": ["DE"], "blacklist": ["UK", "US"]},
+        }
+    )
+    kw = da_main._build_loop_kwargs(cfg)
+    assert kw["country_whitelist"] == {"Germany"}
+    assert kw["country_blacklist"] == {"United Kingdom", "United States"}
+
+
+# -- _run (unit) ------------------------------------------------------------
+
+
+async def test_run_invokes_loop_once_when_run_once_true(monkeypatch: pytest.MonkeyPatch):
+    """Once-mode should call `loop.loop` exactly once and tear the clients down."""
+
+    from unittest.mock import AsyncMock, MagicMock
+
+    from discogs_alert import client as da_client, config as da_config, loop as da_loop
+
+    fake_anon = MagicMock()
+    fake_anon.aclose = AsyncMock()
+    fake_user = MagicMock()
+    fake_user.aclose = AsyncMock()
+    monkeypatch.setattr(da_client, "AnonClient", lambda *_a, **_kw: fake_anon)
+    monkeypatch.setattr(da_client, "UserTokenClient", lambda *_a, **_kw: fake_user)
+
+    loop_calls: list = []
+
+    async def fake_loop(**kwargs):
+        loop_calls.append(kwargs)
+
+    monkeypatch.setattr(da_loop, "loop", fake_loop)
+
+    cfg = da_config.Config.model_validate({"discogs_token": "T"})
+    await da_main._run(
+        loop_kwargs={"discogs_token": "T"}, run_once=True, interval_seconds=1, cfg=cfg
+    )
+
+    assert len(loop_calls) == 1
+    fake_anon.aclose.assert_awaited_once()
+    fake_user.aclose.assert_awaited_once()

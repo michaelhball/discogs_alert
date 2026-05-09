@@ -1,13 +1,39 @@
+# Pre-commit hooks. Mirror as much of CI as we cheaply can so failures
+# surface locally before push. The full tox / coverage matrix only runs
+# on CI; here we run the fast subset (lint + offline tests).
+#
+# Bypass with `git commit --no-verify` if you really need to.
+
 repos:
 
-# run ruff style, import-order, & general linting checks
-- repo: https://github.com/charliermarsh/ruff-pre-commit
-  rev: 'v0.0.249'
+# Ruff: lint + import-order + tidy-imports. Mirrors the `ruff (Python 3.x)`
+# CI matrix — same config (`[tool.ruff]` in pyproject.toml).
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  rev: v0.6.9
   hooks:
     - id: ruff
+      args: ["--fix"]
 
-# check that pyproject.toml is a valid poetry config file
+# pyproject.toml stays a valid Poetry file.
 - repo: https://github.com/python-poetry/poetry
-  rev: '1.3.0'
+  rev: '1.8.4'
   hooks:
     - id: poetry-check
+
+# Run the offline test subset locally before commit. The full suite
+# (tox across 3.10–3.13 with coverage gating) still runs on CI; this
+# catches the >90% case where someone broke a test in the file they
+# just edited. ~1 second on the current 250-test suite.
+#
+# Uses `local` so we use the project's own pytest install (matches
+# what tests/ expect) rather than a hook-managed env where deps aren't
+# installed.
+- repo: local
+  hooks:
+    - id: pytest-offline
+      name: pytest (offline)
+      entry: python -m pytest -q -m "not online"
+      language: system
+      pass_filenames: false
+      types: [python]
+      stages: [pre-commit]
