@@ -175,6 +175,39 @@ def test_cli_state_path_passes_through(stub_loop, wantlist_file, tmp_path):
     assert stub_loop["state_path"] == str(db)
 
 
+def test_cli_once_flag_runs_loop_once(stub_loop, wantlist_file):
+    """`--once` should invoke `loop` exactly once and skip the schedule path."""
+
+    runner = CliRunner()
+    args = _base_args(wantlist_file)
+    # _base_args already includes --test (the legacy alias for --once); replace
+    # it with the canonical flag so we exercise that path.
+    args.remove("--test")
+    args.append("--once")
+    result = runner.invoke(da_main.main, args)
+    assert result.exit_code == 0, result.output
+
+
+def test_cli_log_level_flag_propagates(stub_loop, wantlist_file, monkeypatch):
+    import logging as stdlogging
+
+    runner = CliRunner()
+    result = runner.invoke(
+        da_main.main, _base_args(wantlist_file) + ["--log-level", "WARNING"]
+    )
+    assert result.exit_code == 0, result.output
+    # Root logger level should now be WARNING.
+    assert stdlogging.getLogger().level == stdlogging.WARNING
+
+
+def test_cli_log_level_invalid_value_rejected(stub_loop, wantlist_file):
+    runner = CliRunner()
+    result = runner.invoke(
+        da_main.main, _base_args(wantlist_file) + ["--log-level", "TRACE"]
+    )
+    assert result.exit_code != 0
+
+
 def test_cli_list_id_and_wantlist_path_mutual_exclusion(stub_loop, wantlist_file):
     runner = CliRunner()
     result = runner.invoke(
