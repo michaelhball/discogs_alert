@@ -148,7 +148,10 @@ class AnonClient(Client):
     """
 
     HTTP_TIMEOUT_SECONDS = 20
-    DEFAULT_IMPERSONATE = "chrome131"
+    # `chrome124` is the highest target supported across curl_cffi 0.5–0.7. Newer
+    # curl_cffi versions add e.g. `chrome131` — bump this when the project pins a
+    # newer curl_cffi floor, or pass `impersonate=` to override at runtime.
+    DEFAULT_IMPERSONATE = "chrome124"
 
     def __init__(self, user_agent: str, *args, impersonate: str = DEFAULT_IMPERSONATE, **kwargs):
         super().__init__(user_agent, *args, **kwargs)
