@@ -27,19 +27,19 @@ which schedules `discogs_alert.loop.loop` via the `schedule` library.
   3. If CI fails, investigate, push a fix to the same branch, wait for CI
      again. Don't open follow-up PRs for CI fixes — keep the original PR in
      flight until green.
-  4. After merging a base PR, update the next PR's base if it was stacked:
-     `gh pr edit <PR> --base main`.
+  4. **Retarget downstream PRs *before* merging their base** (not after).
+     If you squash-merge a stacked PR with `--delete-branch`, GitHub deletes
+     the head ref synchronously; downstream PRs whose base was that ref
+     auto-close *and cannot be reopened* (the base ref is gone). The fix is
+     to `gh pr edit <child> --base main` first, *then* merge. We learned
+     this the hard way during the original 9-PR stack — PR #85 had to be
+     re-created as PR #91 because of this.
   5. End-to-end verification happens at release time, not per PR. The user
      trusts the test suite + CI between releases.
 - **Releases are deliberate, not automatic.** Every so often we cut a release:
-  1. Open a `Bump version (#NN)` PR that bumps `pyproject.toml`'s `version`.
-  2. Merge it.
-  3. Tag the merge commit `vX.Y.Z` (matching `pyproject.toml`).
-  4. Publish to PyPI manually (`poetry build && poetry publish`) and push the
-     Docker image to DockerHub (`miggleball/discogs_alert`). There is no
-     GitHub Actions release workflow yet — see the open task to add one.
-  5. Summarise the changes since the previous tag for the release notes (use
-     `git log vPREV..HEAD --oneline`).
+  see `RELEASING.md` for the full recipe. Short version: open a `Bump version`
+  PR, merge it, tag `vX.Y.Z`, push the tag — `release.yml` does the rest
+  (PyPI trusted publishing + GitHub Release + DockerHub).
 - **Versioning:** still `0.0.x`. Treat any user-facing breakage as worth a
   bump, but the user decides when to cut.
 
@@ -122,6 +122,13 @@ If you spawn a background agent to monitor PRs, be aware:
   should only push to branches it owns. Don't share a branch.
 - When the parent is doing a complex operation (e.g. a stack-wide rebase),
   pause the agent first via SendMessage with explicit "stand down" instructions.
+- Agents from earlier in the session may still be polling with stale watch
+  lists. They get notifications back to the parent — those can be safely
+  ignored once a fresh agent has been spawned.
+- If you suspect the agent is auto-closing PRs (auto-close cascade after a
+  squash-merge with `--delete-branch`), check whether the PR you wanted to
+  merge had downstream PRs whose bases pointed at it — those will close.
+  Recover by recreating with `gh pr create --base main --head <branch>`.
 
 ## Testing
 
