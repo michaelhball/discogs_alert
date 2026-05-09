@@ -35,9 +35,15 @@ SPARKLE_VERSION := 2.7.2
 SPARKLE_TARBALL_URL := https://github.com/sparkle-project/Sparkle/releases/download/$(SPARKLE_VERSION)/Sparkle-$(SPARKLE_VERSION).tar.xz
 VENDOR := vendor
 SPARKLE_FRAMEWORK := $(VENDOR)/Sparkle.framework
-SPARKLE_BIN := $(VENDOR)/sparkle-bin
 
-# EdDSA keypair for update signing. Lives outside the repo for safety.
+# Sparkle 2 keys live in the macOS Keychain; we use a per-project account
+# name so they don't collide with any existing keys.
+SPARKLE_ACCOUNT := discogs_alert
+
+# EdDSA keypair files outside the repo. The PUB_KEY file is what the
+# build reads via DA_SPARKLE_PUBLIC_KEY → Info.plist. The PRIV_KEY file
+# is a backup of the keychain entry; the actual signing uses the
+# keychain by default (`sign_update --account $(SPARKLE_ACCOUNT)`).
 RELEASE_DIR := $(HOME)/.discogs_alert_release
 PRIV_KEY := $(RELEASE_DIR)/eddsa_priv.key
 PUB_KEY := $(RELEASE_DIR)/eddsa_pub.key
@@ -94,31 +100,41 @@ $(SPARKLE_FRAMEWORK):
 	@echo "✅ $(SPARKLE_FRAMEWORK) ready"
 	@echo "   Sparkle binaries (generate_keys, sign_update) at $(VENDOR)/bin/"
 
-# Generate the EdDSA keypair used to sign updates. The private key NEVER
-# enters the repo — it lives at $(PRIV_KEY) (under $HOME). Run once per
-# project; treat the private key like any other long-lived signing key.
-keys: $(PRIV_KEY)
-
-$(PRIV_KEY): $(SPARKLE_FRAMEWORK)
+# Generate the EdDSA keypair used to sign updates.
+#
+# Sparkle 2's `generate_keys` stores the *private* key in the macOS
+# Keychain under an account name (we use `discogs_alert`). What we add:
+# parse the public key out of the tool's stdout, save it to a file the
+# build can read, and export the private key to a backup file.
+#
+# Idempotent: re-running just re-extracts the public key from the
+# existing keychain entry and refreshes the backup file.
+keys: $(SPARKLE_FRAMEWORK)
 	@mkdir -p $(RELEASE_DIR)
 	@chmod 700 $(RELEASE_DIR)
-	@if [ -f $(PRIV_KEY) ]; then \
-		echo "❌ $(PRIV_KEY) already exists; refusing to overwrite. Move or rename if you really want a new key."; \
-		exit 1; \
-	fi
-	$(VENDOR)/bin/generate_keys -f $(PRIV_KEY) > $(PUB_KEY)
-	@chmod 600 $(PRIV_KEY) $(PUB_KEY)
+	@# Run generate_keys; if a key for our account doesn't exist this
+	@# creates one, otherwise it re-prints the existing public key.
+	@$(VENDOR)/bin/generate_keys --account $(SPARKLE_ACCOUNT) 2>&1 \
+		| awk '/<string>/{ gsub(/^[[:space:]]*<string>|<\/string>.*$$/, ""); print; exit }' \
+		> $(PUB_KEY)
+	@chmod 600 $(PUB_KEY)
+	@# Best-effort backup of the private key.
+	@$(VENDOR)/bin/generate_keys --account $(SPARKLE_ACCOUNT) -x $(PRIV_KEY) >/dev/null 2>&1 || true
+	@if [ -f $(PRIV_KEY) ]; then chmod 600 $(PRIV_KEY); fi
 	@echo
-	@echo "✅ Generated EdDSA keypair."
-	@echo "   Public key  → $(PUB_KEY)"
-	@echo "   Private key → $(PRIV_KEY)  (BACK THIS UP)"
-	@echo "   The public key is what we bake into Info.plist; the private key signs DMGs."
+	@echo "✅ EdDSA keypair ready (Sparkle account '$(SPARKLE_ACCOUNT)')."
+	@echo "   Public key  → $(PUB_KEY)  (baked into the next 'make app')"
+	@echo "   Private key → macOS Keychain (account=$(SPARKLE_ACCOUNT))"
+	@if [ -f $(PRIV_KEY) ]; then \
+		echo "   Backup file → $(PRIV_KEY)  (BACK THIS UP)"; \
+	fi
 
-# Sign the most recently built DMG with the private key. Prints the
-# `sparkle:edSignature` you'll paste into appcast.xml.
-sign: $(DMG) $(PRIV_KEY)
-	@echo "Signing $(DMG) with $(PRIV_KEY)…"
-	@$(VENDOR)/bin/sign_update -f $(PRIV_KEY) $(DMG)
+# Sign the most recently built DMG with the keychain-stored private key.
+# Prints the `sparkle:edSignature="…" length="…"` line you paste into
+# appcast.xml.
+sign: $(DMG) $(PUB_KEY)
+	@echo "Signing $(DMG)…"
+	@$(VENDOR)/bin/sign_update --account $(SPARKLE_ACCOUNT) $(DMG)
 
 # Wrap the .app in a draggable DMG. Uses macOS-native hdiutil; no
 # extra deps. The DMG ends up tagged with the package version so
