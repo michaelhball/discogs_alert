@@ -18,7 +18,6 @@ import json
 import logging
 from typing import Union
 
-import dacite
 import requests
 from curl_cffi import requests as curl_requests
 
@@ -68,23 +67,15 @@ class Client:
 
     def get_list(self, list_id: int) -> da_entities.UserList:
         user_list_dict = self._get(f"{self._base_url}/lists/{list_id}")
-        user_list_dict["items"] = [da_entities.Release(**item) for item in user_list_dict["items"]]
-        return da_entities.UserList(**user_list_dict)
+        return da_entities.UserList.model_validate(user_list_dict)
 
     def get_listing(self, listing_id: int) -> da_entities.Listing:
-        # Use dacite so the nested `price` (and its optional `shipping`) become
-        # `ListingPrice` / `ShippingPrice` instances, not raw dicts. `cast=[CONDITION]`
-        # lets dacite coerce raw ints into the IntEnum members.
         listing_dict = self._get(f"{self._base_url}/marketplace/listings/{listing_id}")
-        return dacite.from_dict(
-            da_entities.Listing, listing_dict, config=dacite.Config(cast=[da_entities.CONDITION])
-        )
+        return da_entities.Listing.model_validate(listing_dict)
 
     def get_release(self, release_id: int) -> da_entities.Release:
         release_dict = self._get(f"{self._base_url}/releases/{release_id}")
-        return dacite.from_dict(
-            da_entities.Release, release_dict, config=dacite.Config(cast=[da_entities.CONDITION])
-        )
+        return da_entities.Release.model_validate(release_dict)
 
     def get_release_stats(self, release_id: int) -> Union[da_entities.ReleaseStats, bool]:
         """Fetch the marketplace stats for a release. Returns False if the API call
@@ -94,7 +85,7 @@ class Client:
         release_stats_dict = self._get(f"{self._base_url}/marketplace/stats/{release_id}")
         if not isinstance(release_stats_dict, dict):
             return False
-        return dacite.from_dict(da_entities.ReleaseStats, release_stats_dict)
+        return da_entities.ReleaseStats.model_validate(release_stats_dict)
 
     def get_wantlist(self, username: str):
         # TODO: add entities to deserialise this correctly

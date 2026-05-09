@@ -5,7 +5,6 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
-import dacite
 from requests.exceptions import ConnectionError
 
 from discogs_alert import client as da_client, entities as da_entities, state as da_state
@@ -35,14 +34,16 @@ def load_wantlist(
         items = user_token_client.get_list(list_id).items
         return [apply_directives(r) for r in items]
 
-    # TODO: find a way to automatically instantiate these nested Enums based on the strings
-    wantlist = []
+    # The wantlist.json schema accepts condition fields as their string names
+    # (e.g. "VERY_GOOD"); pydantic's `Release.model_validate` accepts both the
+    # IntEnum value and the name, so we can pass the dict through directly.
+    wantlist: list = []
     for release_dict in json.load(Path(wantlist_path).open("r")):
-        if (min_media_condition := release_dict.get("min_media_condition")) is not None:
-            release_dict["min_media_condition"] = da_entities.CONDITION[min_media_condition]
-        if (min_sleeve_condition := release_dict.get("min_sleeve_condition")) is not None:
-            release_dict["min_sleeve_condition"] = da_entities.CONDITION[min_sleeve_condition]
-        wantlist.append(apply_directives(dacite.from_dict(da_entities.Release, release_dict)))
+        if (mmc := release_dict.get("min_media_condition")) is not None and isinstance(mmc, str):
+            release_dict["min_media_condition"] = da_entities.CONDITION[mmc]
+        if (msc := release_dict.get("min_sleeve_condition")) is not None and isinstance(msc, str):
+            release_dict["min_sleeve_condition"] = da_entities.CONDITION[msc]
+        wantlist.append(apply_directives(da_entities.Release.model_validate(release_dict)))
     return wantlist
 
 
