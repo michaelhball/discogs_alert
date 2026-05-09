@@ -22,3 +22,6 @@ poetry.lock
 # py2app build artifacts (Makefile output)
 .build-venv
 build
+
+# Sparkle.framework + signing tools (downloaded by `make sparkle`)
+vendor
