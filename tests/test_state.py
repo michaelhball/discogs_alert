@@ -110,6 +110,39 @@ def test_concurrent_inserts_within_one_window_dedup(tmp_store: da_state.AlertSto
     assert tmp_store.count() == 1
 
 
+def test_stats_empty_store(tmp_store: da_state.AlertStore):
+    assert tmp_store.stats() == {"total": 0, "last_24h": 0, "last_7d": 0}
+
+
+def test_stats_counts_recent_rows(tmp_store: da_state.AlertStore):
+    tmp_store.mark_seen(1, 10, "t", "b")
+    tmp_store.mark_seen(2, 10, "t", "b")
+    tmp_store.mark_seen(3, 11, "t", "b")
+    s = tmp_store.stats()
+    assert s == {"total": 3, "last_24h": 3, "last_7d": 3}
+
+
+def test_stats_time_windows(tmp_path: Path):
+    db_path = tmp_path / "state.db"
+    with da_state.AlertStore(db_path) as store:
+        # Three rows at distinct ages: now, 3 days ago, 30 days ago.
+        store._conn.executemany(  # noqa: SLF001 — direct write keeps the test deterministic
+            "INSERT INTO sent_alerts (listing_id, release_id, title, body, sent_at) "
+            "VALUES (?, ?, ?, ?, datetime('now', ?))",
+            [
+                (1, 1, "t", "b", "-1 minute"),
+                (2, 1, "t", "b", "-3 days"),
+                (3, 1, "t", "b", "-30 days"),
+            ],
+        )
+        store._conn.commit()
+
+        s = store.stats()
+        assert s["total"] == 3
+        assert s["last_24h"] == 1
+        assert s["last_7d"] == 2
+
+
 def test_sent_at_is_iso_like(tmp_store: da_state.AlertStore):
     """Sanity-check: the default `sent_at` should be parseable as a YYYY-MM-DD HH:MM:SS string."""
 
