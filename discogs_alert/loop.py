@@ -172,6 +172,7 @@ def loop(
     state_path: Optional[Path] = None,
     use_stats_gate: bool = True,
     inter_release_delay_seconds: float = 0.0,
+    prune_after_days: int = 90,
     verbose: bool = False,
 ):
     """Event loop. One iteration: pull the wantlist, query the marketplace for each
@@ -203,6 +204,13 @@ def loop(
         alerter = get_alerter(alerter_type, alerter_kwargs)
 
         with da_state.AlertStore(state_path) as store:
+            if prune_after_days > 0:
+                pruned = store.prune_older_than(prune_after_days)
+                if pruned and verbose:
+                    logger.info(
+                        "pruned %d alert record(s) older than %d days from %s",
+                        pruned, prune_after_days, store.path,
+                    )
             if verbose:
                 s = store.stats()
                 logger.info(

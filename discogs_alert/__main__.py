@@ -247,6 +247,18 @@ logger = logging.getLogger(__name__)
     ),
 )
 @click.option(
+    "--prune-after-days",
+    default=90,
+    show_default=True,
+    type=click.IntRange(min=0),
+    envvar="DA_PRUNE_AFTER_DAYS",
+    help=(
+        "On startup, drop dedup records older than this many days from the local "
+        "state database. Listings disappear from Discogs long before this, so "
+        "older rows can't ever match a future listing. Set to 0 to disable."
+    ),
+)
+@click.option(
     "-V", "--verbose", default=False, is_flag=True, help="use flag if you want to see logs as the program runs"
 )
 @click.option(
@@ -309,6 +321,7 @@ def main(
     state_path,
     stats_gate,
     inter_release_delay,
+    prune_after_days,
     verbose,
     log_level,
     once,
@@ -369,6 +382,7 @@ def main(
         state_path=state_path,
         use_stats_gate=stats_gate,
         inter_release_delay_seconds=inter_release_delay,
+        prune_after_days=prune_after_days,
         verbose=verbose,
     )
 

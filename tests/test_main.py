@@ -244,6 +244,20 @@ def test_cli_log_level_invalid_value_rejected(stub_loop, wantlist_file):
     assert result.exit_code != 0
 
 
+def test_cli_prune_after_days_default(stub_loop, wantlist_file):
+    runner = CliRunner()
+    result = runner.invoke(da_main.main, _base_args(wantlist_file))
+    assert result.exit_code == 0, result.output
+    assert stub_loop["prune_after_days"] == 90
+
+
+def test_cli_prune_after_days_override(stub_loop, wantlist_file):
+    runner = CliRunner()
+    result = runner.invoke(da_main.main, _base_args(wantlist_file) + ["--prune-after-days", "0"])
+    assert result.exit_code == 0, result.output
+    assert stub_loop["prune_after_days"] == 0
+
+
 def test_cli_list_id_and_wantlist_path_mutual_exclusion(stub_loop, wantlist_file):
     runner = CliRunner()
     result = runner.invoke(
