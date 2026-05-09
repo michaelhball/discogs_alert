@@ -87,11 +87,6 @@ class Client:
             return False
         return da_entities.ReleaseStats.model_validate(release_stats_dict)
 
-    def get_wantlist(self, username: str):
-        # TODO: add entities to deserialise this correctly
-        url = f"{self._base_url}/users/{username}/wants"
-        return self._get(url)
-
 
 class UserTokenClient(Client):
     """A client for sending requests with a user token (for non-oauth authentication).
