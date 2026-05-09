@@ -135,32 +135,53 @@ The possible optional filters are as follows:
 
 ### Alerting
 
-You can choose from  several different alerting services to notify you once a record you are searching is on sale, each coming with its own setup requirements. The options and their setup are outlined here
+`discogs_alert` ships with three built-in alerters. Pick the one whose setup matches what you have on your phone — they all do the same job (one notification per matching listing). **ntfy.sh is the recommended default** because it has the least setup and no account dependencies.
 
-#### ntfy.sh (lowest-friction)
+Configuration goes in `~/.discogs_alert/config.toml` (see [`examples/config.example.toml`](examples/config.example.toml) for the full schema). The `[alerter]` section selects which one and provides its credentials.
 
-[ntfy.sh](https://ntfy.sh/) is the easiest alerter to set up — no account, no token, no bot. Pick a random hard-to-guess topic name (anyone with the topic name can read your notifications) and subscribe to that topic from the [iOS](https://apps.apple.com/us/app/ntfy/id1625396347), [Android](https://play.google.com/store/apps/details?id=io.heckel.ntfy), [desktop](https://docs.ntfy.sh/subscribe/desktop/), or [web](https://ntfy.sh/app) app. Then run:
+#### ntfy.sh (recommended — no account, no token)
 
-```bash
-$ python -m discogs_alert --alerter-type=NTFY --ntfy-topic=<your-topic>
+[ntfy.sh](https://ntfy.sh/) is the easiest alerter to set up. Pick a random hard-to-guess topic name (anyone with the topic name can read your notifications) and subscribe to that topic from the [iOS](https://apps.apple.com/us/app/ntfy/id1625396347), [Android](https://play.google.com/store/apps/details?id=io.heckel.ntfy), [desktop](https://docs.ntfy.sh/subscribe/desktop/), or [web](https://ntfy.sh/app) app. Then in your `config.toml`:
+
+```toml
+[alerter]
+type = "NTFY"
+[alerter.ntfy]
+topic = "your-secret-topic-here"
 ```
 
-For privacy / reliability, you can self-host ntfy and pass `--ntfy-server=https://ntfy.example.com`. If your ntfy server requires auth, pass `--ntfy-token=<token>`.
+For privacy / reliability you can self-host ntfy: add `server = "https://ntfy.example.com"` (and optionally `token = "..."` if your server requires auth).
 
 #### Pushbullet
 
-As of June 2023, Pushbullet is only available on Android or Desktop. To use Pushbullet, you first need to create an [account](https://www.pushbullet.com/) before installing the app anywhere you wish to receive notifications. Once you've created an account, navigate to your [settings](https://www.pushbullet.com/#settings) page and  create an access token. As before, save this token somewhere on your computer. You'll need to configure it either at the command-line or via an environment variable (see the [usage](#usage) section below).
+Create an account at [pushbullet.com](https://www.pushbullet.com/) and install the app on the device(s) where you want notifications. Then create an access token from your [settings](https://www.pushbullet.com/#settings) page. Configure:
 
-NB: when using Pushbullet, please be sure to open the app at least once a month. If you don't the notification service will silently stop working as it deams your account to be 'dead'.
+```toml
+[alerter]
+type = "PUSHBULLET"
+[alerter.pushbullet]
+token = "..."
+```
+
+> ⚠️ **Open the Pushbullet app at least once a month.** If you don't, Pushbullet's API silently 401s requests because it considers the account dormant — your alerts will go nowhere with no error visible from `discogs_alert`'s side.
 
 #### Telegram
 
-To use Telegram you first need to create a custom bot, the easiest mechanism for which is to use `BotFather`. Search for `@BotFather` on Telegram and send a "/start" message followed by "/newbot", before following the setup instructions. Be sure to save your API token somewhere on your computer, you'll need this to configure `discogs_alert`. Next you need to search for your bot on Telegram (by the username you just created) and send a "/start" message. Open a new tab in your browser and enter `"https://api.telegram.org/bot<yourAPIToken>/getUpdates"` in the URL bar, and you should see a response that looks like the following
-```json
-{"ok":true,"result":[{"update_id":"xxxxx",
-"message":{"message_id":2, "from":{"id":"xxxxx","is_bot":false,"first_name":"xxxxx","username":"xxxxx","language_code":"en"},"chat":{"id":"<CHAT_ID>","first_name":"xxxxx","username":"xxxxx","type":"private"},"date":1685860541,"text":"/start","entities":[{"offset":0,"length":6,"type":"bot_command"}]}}]}
+To use Telegram you first need to create a custom bot. Easiest path is via `@BotFather`:
+
+1. Open Telegram on your phone, search for **@BotFather**, send `/start` then `/newbot`. Pick a name + username. BotFather replies with **a bot token** (looks like `123456789:ABC-…`).
+2. Search for **your new bot** (by the username you chose) and send it `/start` (any message works).
+3. In a browser, open `https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates`. Find the `"chat":{"id": …}` field — that number is your **chat_id**.
+
+Then configure:
+
+```toml
+[alerter]
+type = "TELEGRAM"
+[alerter.telegram]
+token = "..."
+chat_id = "..."
 ```
-You need to find your `CHAT_ID` as indicated above and save that. You may have to send a few "/start" messages to your bot before you get a response that looks like this. Once you've got your CHAT ID as well as your API token, you're all good to go!
 
 #### Adding more alerters (plugin authors)
 
@@ -171,101 +192,100 @@ You need to find your `CHAT_ID` as indicated above and save that. You may have t
 ntfy = "discogs_alert_ntfy:NtfyAlerter"
 ```
 
-After `pip install discogs-alert-ntfy`, `discogs_alert --alerter-type=NTFY` is selectable. The entry-point name (uppercased) becomes the value of `--alerter-type`. Your alerter is responsible for reading its own config (env vars, a config file, etc.) — built-in CLI flags like `-pt/--pushbullet-token` are only for built-ins.
+After `pip install discogs-alert-ntfy`, `[alerter] type = "NTFY"` becomes selectable in your `config.toml`. The entry-point name (uppercased) is the value of `type`. Your alerter is responsible for reading its own config (env vars, a config file section, etc.).
 
 For a step-by-step guide and a copy-and-rename starter package, see [`docs/writing-an-alerter.md`](docs/writing-an-alerter.md) and [`examples/discogs-alert-alerter-template/`](examples/discogs-alert-alerter-template/).
 
 ## Usage
 
-`discogs_alert` can be run either as a Python process or as a Docker container. Regardless of which command is used, the `discogs_alert` service will regularly pull the releases from your wantlist, check their availability on the Discogs marketplace, and send you a notification if any release (satisfying your filters) is for sale. You should leave the service running in the background at all times to be most effective.
+`discogs_alert` can be run as a Python process or as a Docker container. Either way, the service polls your wantlist on a schedule, checks each release on the Discogs marketplace, and sends you a notification if any release (satisfying your filters) is for sale. Leave it running to be most effective.
+
+Configuration lives in `~/.discogs_alert/config.toml` (or wherever `--config` points). See [`examples/config.example.toml`](examples/config.example.toml) for the full schema. Any field can be overridden by a `DA_*` environment variable — handy for Docker / launchd / CI without committing secrets.
 
 #### Python
 
-The minimal command needed to run the `discogs_alert` Python package is 
 ```bash
-$ python -m discogs_alert --alerter-type=PUSHBULLET
+$ cp examples/config.example.toml ~/.discogs_alert/config.toml
+$ $EDITOR ~/.discogs_alert/config.toml   # fill in your token, list_id, alerter
+$ python -m discogs_alert
 ```
-though this assumes that you have previously set a few environment variables: `DA_DISCOGS_TOKEN`, either `DA_LIST_ID` or `DA_WANTLIST_PATH`, and in this case `DA_PUSHBULLET_TOKEN` (though the required arguments are different for different alerters). The discogs token should be set to the value of the token you created earlier and the list ID should be set to the ID of the Discogs list you want to use as your `discogs_alert` wantlist (or the wantlist path to a local `wantlist.json` file).
 
-If you aren't sure how to set environment variables, you can pass these values manually using the following command
-```bash
-$ python -m discogs_alert --alerter-type -dt <discogs_access_token> --list-id <discogs_list_id> -pt <pushbullet_token>
-```
+A few CLI helpers exist for debugging:
+
+* `-c`/`--config <path>` — point at a non-default config file.
+* `-O`/`--once` — run the loop once and exit (use with cron / launchd / systemd-timer).
+* `-V`/`--verbose` — DEBUG-level logs.
+* `-l`/`--log-level=<DEBUG|INFO|WARNING|ERROR>` — explicit log-level override.
+* `--validate-config` — load the config, print a one-line summary, exit.
+* `--print-config` — load the config, dump the resolved values as JSON, exit.
+* `--version`
+
+Run `python -m discogs_alert --help` for the full list.
 
 #### Docker
 
-The minimal command needed to run the `discogs_alert` Docker image is
 ```bash
 $ docker run -d --env-file .env miggleball/discogs_alert:latest
 ```
-where it is assumed that you have specified the three minimal environment variables outlined above (as well as any additional customizations) in an `.env` txt file in the current directory. Your env file should simply look as follows:
+
+Your `.env` file should set the required `DA_*` variables. Minimal example:
+
 ```bash
 DA_DISCOGS_TOKEN=<discogs_access_token>
 DA_LIST_ID=<discogs_list_id>
-DA_PUSHBULLET_TOKEN=<pushbullet_token>
-...
+DA_ALERTER_TYPE=NTFY
+DA_NTFY_TOPIC=<your-ntfy-topic>
 ```
-The `-d` flag specifies that you want to "detach" from the newly created docker container meaning it will continue running in the background.
+
+The `-d` flag detaches the container so it runs in the background.
 
 ### Extras
 
-Please note that you _can_ add to or change the contents of your wantlist (either Discogs list or local file) while the service is running; the updated list of releases will come into effect the next time the service runs.
+You can add to or change your wantlist (Discogs list or local JSON) while the service is running; updates are picked up on the next iteration.
 
-Each time a listing is found for one of the releases in your wantlist, you will be sent a notification via the alerter service of your choice with the title of the release and the URL to the marketplace listing. Deduplication is handled locally — `discogs_alert` records every successful alert in a small SQLite database (default `~/.discogs_alert/state.db`, configurable via `--state-path`), and won't re-alert on the same listing across loop iterations regardless of which alerter you use. You can test that your alerting is working properly by adding a release to your wantlist that you know is currently for sale.
+Each matching listing produces one notification — title is the release's display title, body is the listing URL. Deduplication is local: `discogs_alert` records every successful alert in `~/.discogs_alert/state.db` (configurable via `runtime.state_path` in `config.toml`) and won't re-alert across iterations.
 
-There are a a number of additional arguments and flags that provide a deeper level of customisation. These optional arguments include the global versions of the conditions mentioned above (i.e. global seller, media, and sleeve conditions), as well as a country whitelist and blacklist. The use of any of these flags will apply to all releases in your wantlist.
-
-For any of the following arguments, you can use either the abbreviated argument indicator (prefixed with `-`) or the verbose option (prefixed with `--`). The complete list of options, including options and default values, can be accessed at any time by running:
-```bash
-$ python -m discogs_alert --help
-```
-
-Here are the possible arguments:
- 
-* `-dt` `--discogs-token`: (str) your discogs user access token
-* `-lid` `--list-id`: (int) the ID of your Discogs list (NB: either this or the `-wp` option are required).
-*  `-wp` `--wantlist-path`: (str) the relative or absolute path to your `wantlist.json` file (NB: either this or the `-lid` option are required).
-* `-ua` `--user-agent`: (str) the user agent string to use for anonymous queries to `discogs.com`. Please make some personalised modification to this string before you use this program, otherwise your requests might be blocked.
-* `-f` `--frequency`: (int) how often you want the service to run (number of times per hour). This value must be in [1, 60]  (default=`60`, meaning the service runs once a minute)
-* `-co` `--country`: (str) the country where you are (used for things like computing shipping) (default=`'Germany'`)
-* `-$` `--currency`: (str) your preferred currency (default=`EUR`)
-* `-msr` `--min-seller-rating`: (float) the minimum seller rating you want to accept (default=`99`)
-* `-mss` `--min-seller-sales`: (float) the minimum number of sales your accept a seller to have (default=`None`)
-* `-mmc` `--min-media-condition`: (str) minimum allowable media condition, as outlined above (default=`'VERY_GOOD'`)
-* `-msc` `--min-sleeve-condition`: (str) minimum allowable sleeve condition, as outlined above (default=`'NOT_GRADED'`)
-* `-wl` `--country-whitelist`: (str) you can pass this argument any number of times to construct a list of countries. If using a whitelist, you will only be alerted about listings by sellers from those specified countries.
-* `-bl` `--country-blacklist`: (str) you can pass this argument any number of times to construct a list of countries. If using a blacklist, you will be alerted about listings by sellers from all countries except those specified in the list.
-* `-at` `--alerter-type`: (str) one of the valid alerter types: `PUSHBULLET` or `TELEGRAM`
-* `-pt` `--pushbullet-token`: (str) your pushbullet token (only required if `"--alerter-type=PUSHBULLET"`)
-* `-tt` `--telegram-token`: (str) your telegram API token (only required if `"--alerter-type=TELEGRAM"`)
-* `-tci` `--telegram-chat-id`: (str) your telgram chat ID (only required if `"--alerter-type=TELEGRAM"`)
-* `-sp` `--state-path`: (str) path to the local SQLite database used to deduplicate alerts (default=`~/.discogs_alert/state.db`).
-* `-d` `--inter-release-delay`: (float) seconds to sleep (with ±25% jitter) between marketplace scrapes within a single iteration. Useful for very large wantlists where Cloudflare may throttle a tight burst. Default `0` (no delay).
-
-And here are the possible flags:
-* `--stats-gate` / `--no-stats-gate`: (bool) use the cheap `/marketplace/stats` API to skip the expensive marketplace scrape for releases with no listings or above your price threshold (default `--stats-gate`). Disable only for debugging.
-* `-V` `--verbose`: (bool) use this flag if you want to run the server in verbose mode, meaning it will log updates to the command line as it runs (default=`false`)
-* `-O` `--once`: (bool) run the loop exactly once and exit instead of repeating on a schedule. Useful when you're driving `discogs_alert` from cron / systemd-timer / launchd and want the schedule managed externally. (`-T`/`--test` is a deprecated alias for the same thing.)
-* `-l` `--log-level`: (str) override the root log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`). Useful for quieting INFO chatter under cron (`--log-level=WARNING`) or capturing extra detail when debugging.
-
-NB: all command-line options & arguments outlined above can be configured using environment variables. Check out `python -m discogs_alert --help` for more info.
+The full set of knobs lives in [`examples/config.example.toml`](examples/config.example.toml) — global filters (seller rating, media / sleeve condition, country whitelist / blacklist), runtime tuning (`max_concurrency`, `prune_after_days`, `stats_gate`), and per-alerter config. Per-release overrides go in your wantlist JSON or as `@key=value` directives in Discogs list comments (see above).
 
 #### Full Example
 
-To clarify the command-line interfact outlined above, here is a realistic example. In this case, we are replicating a user who is using a Discogs list as their wantlist, who wants verbose logs, no minimum seller rating, a global minimum media condition of `"VERY_GOOD"`, and who doesn't want to consider sellers from the UK or US. The command to run the service in this case would be
-```bash
-$ python -m discogs_alert -dt <discogs_access_token> -at PUSHBULLET -pt <pushbullet_token> --list-id <list_id> --msr None -mmc VERY_GOOD -bl UK -bl US --verbose
+A realistic `~/.discogs_alert/config.toml` for a user driven by a Discogs list, who wants verbose logs, no minimum seller rating, a global minimum media condition of `VERY_GOOD`, and who doesn't want to consider sellers from the UK or US:
+
+```toml
+discogs_token = "<discogs_access_token>"
+
+[wantlist]
+list_id = <list_id>
+
+[seller]
+min_rating = 0   # turn off the seller-rating gate
+
+[record]
+min_media_condition = "VERY_GOOD"
+
+[country_filters]
+blacklist = ["UK", "US"]
+
+[alerter]
+type = "NTFY"
+[alerter.ntfy]
+topic = "<your-secret-topic>"
+
+[runtime]
+verbose = true
 ```
 
 #### Running as a `cron` job
 
-If you aren't running `discogs_alert` as a background docker container, another good approach (and my preference) is to run the process as a `cron` job. This method uses the cron command-line utility to run `discogs_alert` at regular intervals. Assuming you have specified the required environment variables, all you have to do is run `crontab -e` to open the cronjob editing window before appending the following line to the bottom of the file
+For low-effort always-on use, run `discogs_alert` as a `cron` job — set up your `config.toml` once and let cron schedule the iterations. Run `crontab -e` and add:
+
 ```bash
 */10 * * * * source ~/.bash_profile; python -m discogs_alert --once >> <path_to_log_file>.log 2>&1
 ```
-Upon saving & existing the file, `discogs_alert` will be run every 10 minutes and its logs will be output to the specified log file. You can then `tail -f <path_to_log_file>.log` at any point to make sure that things are running as expected.
 
-Please refer [here](https://www.hostinger.com/tutorials/cron-job) for more information on cron and how to use `crontab`.
+`discogs_alert` runs every 10 minutes and logs to the specified file. `tail -f <path_to_log_file>.log` to follow.
+
+See [here](https://www.hostinger.com/tutorials/cron-job) for more on cron / `crontab`.
 
 #### Running as a macOS `launchd` daemon
 
