@@ -11,7 +11,7 @@ Keep ``_FALLBACK_VERSION`` in sync with ``[tool.poetry] version`` in
 
 import importlib.metadata
 
-_FALLBACK_VERSION = "0.0.21"
+_FALLBACK_VERSION = "0.1.0"
 
 try:
     __version__ = importlib.metadata.version(__package__.split(".")[-1])
