@@ -47,6 +47,11 @@ jobs:
       url: https://pypi.org/project/discogs-alert
     permissions:
       id-token: write  # required for PyPI trusted publishing
+    # PyPI failures (e.g. missing trusted-publisher config on pypi.org)
+    # shouldn't block the GitHub Release / .app build. Set
+    # `continue-on-error` so the chain proceeds and the user can fix
+    # PyPI out-of-band if they want.
+    continue-on-error: true
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -57,7 +62,7 @@ jobs:
 
   github-release:
     name: Create GitHub Release
-    needs: publish-pypi
+    needs: build  # not publish-pypi — independent of PyPI's trusted-publisher setup
     runs-on: ubuntu-latest
     permissions:
       contents: write
