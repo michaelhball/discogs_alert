@@ -23,8 +23,10 @@ RUN pip install "poetry==$POETRY_VERSION"
 
 # install dependencies & create build version of package. No browser or
 # webdriver needed — `curl_cffi` handles the marketplace scrape directly.
-COPY pyproject.toml poetry.lock ./
-RUN poetry install --no-dev --no-root
+# `poetry.lock` is .gitignore'd, so we generate one inside the build.
+COPY pyproject.toml ./
+RUN poetry lock --no-update 2>/dev/null || poetry lock
+RUN poetry install --no-root --without dev
 COPY . .
 RUN poetry build
 
