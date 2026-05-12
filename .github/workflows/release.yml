@@ -112,9 +112,11 @@ jobs:
     name: Build macOS .app + .dmg, sign, append to appcast
     needs: github-release
     runs-on: macos-latest
-    # Skip if Sparkle signing keys aren't configured. The job is
-    # otherwise unconditional on tag pushes.
-    if: ${{ vars.SPARKLE_PUBLIC_KEY != '' || secrets.SPARKLE_PUBLIC_KEY != '' }}
+    # GitHub Actions forbids `secrets.*` in `if:` conditionals (the
+    # secret's existence would be a side channel), so we can't gate the
+    # whole job on whether SPARKLE_PUBLIC_KEY is set. Forks that don't
+    # have the secret will fail at the "Stage public key" step with a
+    # clear error; that's fine.
     permissions:
       contents: write  # to push the appcast update back to main
     steps:
