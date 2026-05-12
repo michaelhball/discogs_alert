@@ -76,6 +76,12 @@ def _build_loop_kwargs(cfg: da_config.Config) -> dict:
             "ntfy_server": cfg.alerter.ntfy.server,
             "ntfy_token": cfg.alerter.ntfy.token,
         }
+    elif alerter_type == "GMAIL":
+        alerter_kwargs = {
+            "gmail_user": cfg.alerter.gmail.user,
+            "gmail_app_password": cfg.alerter.gmail.app_password,
+            "gmail_to": cfg.alerter.gmail.to,
+        }
 
     return dict(
         discogs_token=cfg.discogs_token,

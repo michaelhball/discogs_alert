@@ -1,18 +1,20 @@
 """Alerter discovery and dispatch.
 
-Built-in alerters (Pushbullet, Telegram) are registered directly. Third-party
-alerters can register themselves via the ``discogs_alert.alerters`` entry-point
-group in their `pyproject.toml`::
+All alerters live in this package and are registered in two places:
 
-    [project.entry-points."discogs_alert.alerters"]
-    ntfy = "discogs_alert_ntfy:NtfyAlerter"
+1. ``_BUILTIN_ALERTERS`` (below) — used by tests / editable installs that
+   don't have the metadata for entry-point discovery.
+2. ``[tool.poetry.plugins."discogs_alert.alerters"]`` in ``pyproject.toml``
+   — used by installed-wheel / pip runtimes; discovered at startup via
+   ``importlib.metadata.entry_points``.
 
-After ``pip install discogs-alert-ntfy``, the alerter shows up in
-``discover_alerters()`` and can be selected via ``--alerter-type=NTFY``.
+The two should always agree. Adding a new alerter means editing both
+plus shipping the implementation under ``discogs_alert/alert/``; see the
+README "Adding more alerters" section.
 
-The legacy ``AlerterType`` IntEnum is kept for back-compat with existing call
-sites, but the canonical "type" is now the alerter's registered name (a
-string). Pass the name as either a string or an `AlerterType` member; both are
+The legacy ``AlerterType`` IntEnum is kept for back-compat with existing
+call sites, but the canonical "type" is now the alerter's registered name
+(a string). Pass either a string or an ``AlerterType`` member; both are
 accepted.
 """
 
@@ -24,6 +26,7 @@ from importlib.metadata import entry_points, EntryPoints
 from typing import Any, Dict, List, Type, Union
 
 from discogs_alert.alert.base import Alerter
+from discogs_alert.alert.gmail import GmailAlerter
 from discogs_alert.alert.ntfy import NtfyAlerter
 from discogs_alert.alert.pushbullet import PushbulletAlerter
 from discogs_alert.alert.telegram import TelegramAlerter
@@ -32,8 +35,9 @@ logger = logging.getLogger(__name__)
 
 ENTRY_POINT_GROUP = "discogs_alert.alerters"
 
-# Built-in alerters — always available, regardless of entry-point installation.
+# Built-in alerters — always available.
 _BUILTIN_ALERTERS: Dict[str, Type[Alerter]] = {
+    "GMAIL": GmailAlerter,
     "NTFY": NtfyAlerter,
     "PUSHBULLET": PushbulletAlerter,
     "TELEGRAM": TelegramAlerter,
@@ -45,13 +49,13 @@ class AlerterType(enum.IntEnum):
     """Built-in alerter identifiers.
 
     Kept for back-compat — `discogs_alert` accepts string names and these enum
-    members interchangeably. Third-party alerters registered via entry points
-    don't appear here; refer to them by name (e.g. ``"NTFY"``).
+    members interchangeably.
     """
 
     PUSHBULLET = enum.auto()
     TELEGRAM = enum.auto()
     NTFY = enum.auto()
+    GMAIL = enum.auto()
 
 
 def _load_entry_point_alerters() -> Dict[str, Type[Alerter]]:

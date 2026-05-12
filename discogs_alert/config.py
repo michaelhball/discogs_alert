@@ -83,6 +83,12 @@ class NtfyConfig(BaseModel):
     token: Optional[str] = None
 
 
+class GmailConfig(BaseModel):
+    user: Optional[str] = None         # full Gmail address
+    app_password: Optional[str] = None # 16-char app password, not the account password
+    to: Optional[str] = None           # destination address
+
+
 class AlerterConfig(BaseModel):
     """Choice of alerter and per-alerter configuration.
 
@@ -94,6 +100,7 @@ class AlerterConfig(BaseModel):
     pushbullet: PushbulletConfig = Field(default_factory=PushbulletConfig)
     telegram: TelegramConfig = Field(default_factory=TelegramConfig)
     ntfy: NtfyConfig = Field(default_factory=NtfyConfig)
+    gmail: GmailConfig = Field(default_factory=GmailConfig)
 
 
 class RuntimeConfig(BaseModel):
@@ -180,6 +187,9 @@ _ENV_OVERRIDES = {
     "DA_NTFY_TOPIC": "alerter.ntfy.topic",
     "DA_NTFY_SERVER": "alerter.ntfy.server",
     "DA_NTFY_TOKEN": "alerter.ntfy.token",
+    "DA_GMAIL_USER": "alerter.gmail.user",
+    "DA_GMAIL_APP_PASSWORD": "alerter.gmail.app_password",
+    "DA_GMAIL_TO": "alerter.gmail.to",
     "DA_STATE_PATH": "runtime.state_path",
     "DA_STATS_GATE": "runtime.stats_gate",
     "DA_MAX_CONCURRENCY": "runtime.max_concurrency",

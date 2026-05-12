@@ -43,13 +43,13 @@ requires = ["poetry-core>=1.9.0"]
 build-backend = "poetry.core.masonry.api"
 
 # Built-in alerters are registered both here (so `pip install discogs-alert`
-# exposes them via entry points) and in `discogs_alert.alert.__init__._BUILTIN_ALERTERS`
-# (so editable installs and tests work without entry-point installation). Third-
-# party alerters can register themselves under the same group:
-#
-#     [project.entry-points."discogs_alert.alerters"]
-#     ntfy = "discogs_alert_ntfy:NtfyAlerter"
+# exposes them via entry points) and in
+# `discogs_alert.alert.__init__._BUILTIN_ALERTERS` (so editable installs and
+# tests work without entry-point installation). The entry-point group keeps
+# the alerter lookup table dynamic; new alerters land here as part of a
+# regular in-tree PR.
 [tool.poetry.plugins."discogs_alert.alerters"]
+GMAIL = "discogs_alert.alert.gmail:GmailAlerter"
 NTFY = "discogs_alert.alert.ntfy:NtfyAlerter"
 PUSHBULLET = "discogs_alert.alert.pushbullet:PushbulletAlerter"
 TELEGRAM = "discogs_alert.alert.telegram:TelegramAlerter"
