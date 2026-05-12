@@ -1,45 +1,18 @@
-<?xml version="1.0" standalone="yes"?>
-<!--
-    Sparkle appcast feed. The .app bundle's Info.plist points at the
-    URL where this file is hosted (https://michaelhball.github.io/discogs_alert/appcast.xml
-    by default).
-
-    Each <item> is one release. The <enclosure> URL must point at a real
-    .dmg the user's Mac can download; `sparkle:edSignature` is the
-    EdDSA signature produced by `vendor/bin/sign_update`. See
-    docs/release.md for the full recipe.
--->
-<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+<?xml version='1.0' encoding='utf-8'?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
     <channel>
         <title>discogs_alert</title>
         <link>https://github.com/michaelhball/discogs_alert</link>
         <description>Most recent macOS releases of discogs_alert.</description>
         <language>en</language>
-
-        <!--
-        Example item — copy and edit when you cut a new release. Paste the
-        edSignature/length values printed by `make sign` into the
-        sparkle:edSignature= and length= attributes below.
-        -->
-        <!--
         <item>
             <title>0.1.0</title>
-            <pubDate>Sun, 12 May 2026 12:00:00 +0000</pubDate>
+            <pubDate>Tue, 12 May 2026 17:32:55 +0000</pubDate>
             <sparkle:version>0.1.0</sparkle:version>
             <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
-            <description><![CDATA[
-                <h2>0.1.0 — Initial menu-bar release</h2>
-                <ul>
-                    <li>First .dmg release; auto-update via Sparkle</li>
-                </ul>
-            ]]></description>
-            <enclosure
-                url="https://github.com/michaelhball/discogs_alert/releases/download/v0.1.0/discogs_alert-0.1.0.dmg"
-                sparkle:edSignature="REPLACE_WITH_OUTPUT_OF_make_sign"
-                length="REPLACE_WITH_DMG_BYTE_SIZE"
-                type="application/octet-stream" />
+            <description>&lt;h2&gt;v0.1.0&lt;/h2&gt;</description>
+            <enclosure url="https://github.com/michaelhball/discogs_alert/releases/download/v0.1.0/discogs_alert-0.1.0.dmg" sparkle:edSignature="Il6MLvFJ1DmB9pvXNOB0TXeBELtwgt45QaSCMQPjbcedpjYVqrHTA7m5Rgvi0ePo/JAM7iN4TfXwo/Lz5cNaAQ==" length="47595485" type="application/octet-stream" />
         </item>
-        -->
     </channel>
 </rss>
