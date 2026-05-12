@@ -5,163 +5,191 @@ Working notes for Claude Code on this repo. Update freely as the workflow evolve
 ## What this project is
 
 `discogs_alert` polls the Discogs marketplace for releases on a user's wantlist
-and sends a notification (Pushbullet / Telegram / …) when a matching listing
-appears. Runs locally as a long-lived process or as a `cron`-triggered single
-shot, packaged for PyPI and DockerHub.
+and sends a notification (ntfy / Pushbullet / Telegram / Gmail) when a matching
+listing appears. Runs locally as a long-lived process, as a `cron` / `launchd`
+single shot, as a macOS menu-bar app, or as a self-contained `.app` bundle.
+Packaged for PyPI and DockerHub.
 
-Entry point: `python -m discogs_alert` → `discogs_alert/__main__.py:main`,
-which schedules `discogs_alert.loop.loop` via the `schedule` library.
+Entry points:
+- CLI: `python -m discogs_alert` → `discogs_alert/__main__.py:main` runs
+  `asyncio.run(_run(...))` which drives `discogs_alert.loop.loop` on a fixed
+  interval (`asyncio.sleep`, not `schedule`).
+- Menu-bar: `python -m discogs_alert.menubar` → `MenubarApp` (rumps) wrapping a
+  `MenubarController` that owns the worker thread.
+- `.app` bundle: built via `make app` / `make dmg`; Sparkle auto-update.
+
+Configuration lives in `~/.discogs_alert/config.toml` (TOML, pydantic-validated)
+with `DA_*` env-var overrides on top. The CLI is intentionally tiny: `--config`,
+`--once`, `--verbose`, `--log-level`, `--validate-config`, `--print-config`,
+`--version`.
 
 ## How the user works
 
 - **Many small PRs, squash-merged into `main`.** Each PR is a single concern.
   PR title becomes the squash commit title and ends with ` (#NN)`.
-- **Direct-to-`main` is fine.** No long-lived feature branches; main is
-  always-shippable-ish.
+- **Direct-to-`main` is fine for the user (admin bypass on branch protection).**
+  Bots can't push direct — they have to PR + you merge.
 - **CI is the source of truth — merge autonomously.** The user does not want
   to manually review every PR. Workflow:
   1. Open the PR. Wait for the GitHub Actions checks (`ruff`, `tox`,
-     `lfs-warning`) using `gh pr checks <PR>`.
-  2. If CI passes and coverage isn't regressed, **squash-merge it yourself**
-     with `gh pr merge <PR> --squash --delete-branch`.
-  3. If CI fails, investigate, push a fix to the same branch, wait for CI
-     again. Don't open follow-up PRs for CI fixes — keep the original PR in
-     flight until green.
-  4. **Retarget downstream PRs *before* merging their base** (not after).
-     If you squash-merge a stacked PR with `--delete-branch`, GitHub deletes
-     the head ref synchronously; downstream PRs whose base was that ref
-     auto-close *and cannot be reopened* (the base ref is gone). The fix is
-     to `gh pr edit <child> --base main` first, *then* merge. We learned
-     this the hard way during the original 9-PR stack — PR #85 had to be
-     re-created as PR #91 because of this.
-  5. End-to-end verification happens at release time, not per PR. The user
-     trusts the test suite + CI between releases.
-- **Releases are deliberate, not automatic.** Every so often we cut a release:
-  see `RELEASING.md` for the full recipe. Short version: open a `Bump version`
-  PR, merge it, tag `vX.Y.Z`, push the tag — `release.yml` does the rest
-  (PyPI trusted publishing + GitHub Release + DockerHub).
-- **Versioning:** still `0.0.x`. Treat any user-facing breakage as worth a
-  bump, but the user decides when to cut.
+     `lfs-warning`).
+  2. If CI passes, **squash-merge it yourself** with
+     `gh pr merge <PR> --squash --delete-branch`.
+  3. If CI fails, push a fix to the same branch; don't open a follow-up PR.
+  4. **Retarget downstream PRs *before* merging their base** if you ever stack.
+     Squash-merge with `--delete-branch` deletes the head ref synchronously,
+     auto-closing dependent PRs whose base was that ref. Use
+     `gh pr edit <child> --base main` first.
+- **Local checks before push** are wired up via pre-commit
+  (`.pre-commit-config.yaml`): ruff + offline pytest. CI runs the full
+  tox matrix + coverage gate.
 
 When asked to "make a PR", default to: branch off `main`, single concern,
-descriptive title in the past-tense / imperative style the user uses
-(e.g. `Replace exchangerate.host with frankfurter.app`,
-`Gate marketplace scrapes on /marketplace/stats`).
+descriptive title in the past-tense / imperative style the user uses (e.g.
+`Add ntfy.sh built-in alerter`, `Drop schedule for a plain sleep loop`).
+
+## Releases
+
+Releases are **automated on tag push**. There is a saved memory note
+at `~/.claude/projects/.../memory/release_process.md` with the exact recipe.
+Short version when the user says "release X.Y.Z":
+
+1. Bump `version` in `pyproject.toml` and `_FALLBACK_VERSION` in
+   `discogs_alert/__init__.py` (both must match the tag).
+2. `git commit -am "Bump version to X.Y.Z"`
+3. `git tag vX.Y.Z`
+4. `git push origin main --follow-tags`
+
+CI on `macos-latest` then builds `.app` + `.dmg`, signs with EdDSA from the
+`SPARKLE_PRIVATE_KEY` secret, uploads to a GitHub Release, publishes to PyPI
+via trusted publishing, pushes Docker image, and **opens a PR** appending to
+`docs/appcast.xml` (direct push to main is blocked by branch protection). The
+maintainer one-click-merges that appcast PR; that's the only manual step.
+
+See `docs/release.md` for the full reference.
 
 ## Before starting a session
 
 1. **Always `git fetch origin main && git log main..origin/main --oneline` first.**
-   This repo's `main` moves between sessions, often with PRs whose scope
-   overlaps with whatever you're about to do. We learned this the hard way:
-   in May 2026 the entire stack #82–#86 had to be rebased after the user
-   merged 13 commits (releases v0.0.20/v0.0.21) that duplicated the early
-   PRs' work.
+   This repo's `main` moves between sessions.
 2. **Then `git pull --ff-only` on main** before branching.
-3. Sanity-check `pyproject.toml`'s version, the deps, and a quick read of
-   recent commits — what's there might already do what you were about to do.
+3. Sanity-check `pyproject.toml`'s version, the deps, and recent commits.
 
 ## Repo layout
 
 ```
 discogs_alert/
-  __main__.py        # click CLI, env-var-driven, schedules the loop
-  loop.py            # the per-iteration logic
-  client.py          # Discogs API + anonymous Selenium scraper
-  scrape.py          # BeautifulSoup parsing of the marketplace HTML
-  entities.py        # dataclasses for Release, Listing, conditions, etc.
+  __main__.py        # slim click CLI; loads config, asyncio.run-s the loop
+  loop.py            # async per-iteration logic (asyncio.gather + semaphore)
+  client.py          # httpx.AsyncClient (API) + curl_cffi AsyncSession (marketplace)
+  scrape.py          # BeautifulSoup parsing of marketplace HTML
+  entities.py        # pydantic v2 models for Release, Listing, etc.
+  config.py          # pydantic schema + TOML loader for ~/.discogs_alert/config.toml
+  state.py           # SQLite AlertStore (dedup)
+  menubar.py         # rumps menu-bar app + MenubarController
+  _sparkle.py        # PyObjC bridge for Sparkle auto-update (only active in .app)
   alert/
-    base.py, pushbullet.py, telegram.py, __init__.py (AlerterType + factory)
+    base.py, ntfy.py, pushbullet.py, telegram.py, gmail.py
+    __init__.py        # registry + entry-point discovery
+    _response.py       # shared HTTP-error logging helper
   util/
-    click.py         # NotRequiredIf / RequiredIf / EnumChoice click helpers
-    constants.py     # COUNTRIES, CURRENCY_CHOICES, currency symbols
-    currency.py      # rate fetching + conversion
-    system.py        # time_cache decorator
-tests/               # pytest, with `--online` flag to gate network tests
-docker/              # Dockerfile + entrypoint
+    click.py           # NotRequiredIf / RequiredIf / EnumChoice helpers
+    constants.py       # COUNTRIES, CURRENCY_CHOICES, currency symbols
+    currency.py        # Frankfurter API + on-disk weekly cache + stale fallback
+    rate_limit.py      # X-Discogs-Ratelimit-* tracking (sync + async)
+    system.py          # time_cache decorator
+    wantlist_directives.py  # parses `@max=…` / `@media=…` from Discogs list comments
+  py.typed           # PEP 561 marker
+
+docker/              # Dockerfile (poetry-based multi-stage) + launchd plist template
+docs/                # release.md, appcast.xml (Sparkle feed served via Pages)
+examples/            # config.example.toml
+scripts/             # append_to_appcast.py (used by the release workflow)
+tests/               # pytest + pytest-asyncio (auto mode); offline by default,
+                     #   network tests gated with @pytest.mark.online + --online
+.github/workflows/   # pr_checks.yml + release.yml (tag-triggered full release)
+Makefile             # make app / dmg / sparkle / keys / sign / secrets
+setup_app.py         # py2app config for the .app bundle
 ```
 
 ## Things to be careful about
 
-- **Rate limits matter a lot.** The user has historically been bitten by:
-  - Discogs API (60/min user-token) — `client.UserTokenClient` tracks
-    `X-Discogs-Ratelimit-Remaining`; respect it with margin, don't wait
-    until `==1`.
-  - Discogs marketplace scraping — Cloudflare gets aggressive with repeated
-    requests from one IP. Reducing request *volume* matters more than
-    rotating user-agents. Prefer cheap API gates (e.g.
-    `/marketplace/stats/{id}`) before a full page load.
-  - Pushbullet — the v2 API has a low rate limit; `get_all_alerts`
-    historically paginated the whole push history every iteration. Local
-    dedup (SQLite) is the fix.
-  - Currency provider — `freecurrencyapi` (currently on main) needs an API
-    key (`DA_CURRENCY_TOKEN`); `Frankfurter` is free, key-less, ECB-backed.
-- **Don't run the loop against live APIs while iterating.** Use unit tests
-  with fixtures (`tests/conftest.py` already mocks `get_currency_rates`).
-  When a manual smoke test is unavoidable, run with a 1-item wantlist, not
-  the user's full list.
-- **Plain `requests` does NOT work against Discogs marketplace pages.** A
-  one-off probe in May 2026 with a realistic Chrome User-Agent returned a
-  Cloudflare 403 "Just a moment…" challenge. Future scraper work needs
-  `curl_cffi` (TLS-fingerprint impersonation) or Selenium / Playwright;
-  `cloudscraper` is unmaintained. When changing the HTTP client, do
-  exactly one probe to verify the new client bypasses Cloudflare, save the
-  response HTML as a test fixture (`tests/data/marketplace_listing.html`),
-  and never hit Discogs from CI.
-- **Keep dependencies on a leash.** `selenium` + `webdriver-manager` churn
-  their public API. If they break again, that's a hint to drop them.
+- **Rate limits matter.** Patterns the user has been bitten by:
+  - Discogs API (60/min for the user token) — `client.UserTokenClient` tracks
+    `X-Discogs-Ratelimit-Remaining`. `RateLimitGuard` sleeps proactively and
+    cooperatively (async lock).
+  - Discogs marketplace (Cloudflare) — `AnonClient` uses `curl_cffi` with
+    `impersonate="chrome124"` for TLS fingerprinting. The async loop caps
+    parallelism via `asyncio.Semaphore(max_concurrency=6)`. The cheap
+    `/marketplace/stats/{id}` gate skips the full scrape when nothing's listed.
+  - Pushbullet — silently 401s when the account is dormant; open the app
+    monthly. Telegram dedup historically broken; SQLite `AlertStore` fixed it.
+- **Don't run the loop against live APIs while iterating.** Unit tests use
+  fixtures (`tests/conftest.py` mocks `get_currency_rates`; HTML fixtures in
+  `tests/data/`). When a manual smoke test is unavoidable, scope the wantlist
+  small.
+- **Plain `requests`/`httpx` don't work against marketplace pages** —
+  Cloudflare returns a 403 "Just a moment…" challenge without TLS
+  impersonation. Stick with `curl_cffi` for `AnonClient`. Use `httpx` for the
+  typed API client (no Cloudflare there).
 - **`.env` is gitignored** but contains real tokens. Never `cat` or echo it
-  into commit messages, logs, or PR descriptions.
+  into commit messages, logs, or PR descriptions. The hook blocks `grep
+  DA_DISCOGS_TOKEN .env` patterns; use `grep -l` to test presence or pipe via
+  `set -a; source .env; set +a` to flow values into child processes without
+  echoing.
+- **GH Actions disallows `secrets.*` in `if:` conditions.** They'll silently
+  fail to parse the workflow. Gate on `vars.*` or check existence inside a
+  step.
 
 ## Concurrent agents
 
-If you spawn a background agent to monitor PRs, be aware:
+If you spawn a background agent to monitor PRs or do other long-running work:
 
 - The agent operates in the same git working tree as the parent. Concurrent
-  `git checkout` / `git merge` / `git push` from both sides will conflict.
+  `git checkout` / `git push` from both sides will conflict. Stick the parent
+  to a different branch.
 - The agent should only touch branches in its explicit watch list. The parent
-  should only push to branches it owns. Don't share a branch.
-- When the parent is doing a complex operation (e.g. a stack-wide rebase),
-  pause the agent first via SendMessage with explicit "stand down" instructions.
-- Agents from earlier in the session may still be polling with stale watch
-  lists. They get notifications back to the parent — those can be safely
-  ignored once a fresh agent has been spawned.
+  should only push to branches it owns.
 - If you suspect the agent is auto-closing PRs (auto-close cascade after a
-  squash-merge with `--delete-branch`), check whether the PR you wanted to
-  merge had downstream PRs whose bases pointed at it — those will close.
-  Recover by recreating with `gh pr create --base main --head <branch>`.
+  squash-merge with `--delete-branch`), check whether the PR had downstream
+  PRs whose bases pointed at it. Recover by recreating via
+  `gh pr create --base main --head <branch>`.
 
 ## Testing
 
-- **Coverage matters here.** Every PR that touches runtime code must add or
-  update tests. The user explicitly wants CI to be trustworthy. Aim for >80%
-  with a goal of ~90% by the end of the active stack.
-- `tox` runs the full suite. `pytest` directly works too.
+- **Coverage matters.** Every PR that touches runtime code must add or update
+  tests. CI gate: `--cov-fail-under=88`. Aim to keep it green or rising;
+  today ~89%.
+- `tox` runs the full matrix (Python 3.10–3.13). `pytest -m 'not online'`
+  runs the offline suite locally in ~1s.
+- `pytest-asyncio` is in `auto` mode (`asyncio_mode = "auto"` in pyproject) —
+  any `async def test_*` runs in an event loop automatically.
+- Some environments have a stale `pytest-lazyfixture` plugin that crashes
+  pytest collection. The pre-commit and CLI invocations include
+  `-p no:lazy-fixture` defensively.
 - Network-gated tests use `@pytest.mark.online` and `--online`. Don't add
-  online-only tests without that marker, and don't make them load-bearing —
-  the offline suite must catch regressions on its own.
-- Some test files are empty stubs. Fill them out when touching the adjacent
-  code; treat empty stubs as a debt, not a license.
-- Prefer fixture-based tests over mocks where practical (e.g. saved
-  marketplace HTML in `tests/data/`), so a real Discogs HTML change shows up
-  as a test diff.
+  online-only tests without that marker, and don't make them load-bearing.
+- Prefer fixture-based tests over mocks where practical — saved marketplace
+  HTML in `tests/data/` catches real Discogs HTML changes as test diffs.
 
 ## Style
 
 - `ruff` configured in `pyproject.toml` (E, F, I, TID, W, line-length 120,
-  ban relative imports). The new `[tool.ruff.lint]` table layout is required
-  on ruff 0.6+.
-- `black` is configured for 120 cols; pre-commit hook in
-  `.pre-commit-config.yaml`.
-- Imports use the `da_xxx` alias convention for in-package modules
-  (e.g. `from discogs_alert import entities as da_entities`). Match it.
+  ban relative imports). Auto-fixes via the pre-commit hook on commit.
+- Imports use the `da_xxx` alias convention for in-package modules (e.g.
+  `from discogs_alert import entities as da_entities`). Match it.
 
 ## When making changes
 
 1. Keep the diff small and the PR scope tight.
-2. If a change is user-visible (CLI flags, env vars, alerter behavior),
-   update the README in the same PR.
+2. If a change is user-visible (CLI flags, env vars, alerter behavior, config
+   schema), update the README in the same PR. The "Adding more alerters"
+   section of the README has the recipe for an in-tree new alerter — third-
+   party / separate-package alerters are explicitly NOT a supported direction
+   anymore (we rolled that back; the entry-point discovery mechanism remains
+   internally because the in-tree built-ins use it).
 3. If a change affects the runtime contract (new env var, new dependency,
    removed Python version), call it out in the PR body so it can land in
    the release notes later.
-4. Don't bump `pyproject.toml`'s version inside a feature PR — version
-   bumps live in their own PR (see release flow above).
+4. Version bumps go in the release commit (`Bump version to X.Y.Z`); they
+   don't go in feature PRs.
