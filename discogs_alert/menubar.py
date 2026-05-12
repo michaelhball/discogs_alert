@@ -117,6 +117,12 @@ class MenubarController:
                 "ntfy_server": cfg.alerter.ntfy.server,
                 "ntfy_token": cfg.alerter.ntfy.token,
             }
+        elif cfg.alerter.type.upper() == "GMAIL":
+            alerter_kwargs = {
+                "gmail_user": cfg.alerter.gmail.user,
+                "gmail_app_password": cfg.alerter.gmail.app_password,
+                "gmail_to": cfg.alerter.gmail.to,
+            }
         return dict(
             discogs_token=cfg.discogs_token,
             list_id=cfg.wantlist.list_id,

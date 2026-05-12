@@ -49,8 +49,10 @@ def test_get_alerter_unknown_name_raises():
 
 
 def test_entry_point_alerter_is_discovered(monkeypatch: pytest.MonkeyPatch):
-    """A third-party alerter registered via the `discogs_alert.alerters`
-    entry-point group should appear in `discover_alerters()`.
+    """An alerter registered against the `discogs_alert.alerters` entry-point
+    group (which is how the in-tree built-ins are loaded at install time)
+    should appear in `discover_alerters()`. This is the mechanism the CLI's
+    dynamic `--alerter-type` choices depend on.
     """
 
     class FakeAlerter(Alerter):
@@ -80,8 +82,9 @@ def test_entry_point_alerter_is_discovered(monkeypatch: pytest.MonkeyPatch):
 
 
 def test_entry_point_cannot_shadow_builtin(monkeypatch: pytest.MonkeyPatch, caplog):
-    """A plugin trying to register under a built-in name (e.g. ``PUSHBULLET``)
-    should be ignored — built-ins always win.
+    """An entry-point trying to register under a built-in name (e.g.
+    ``PUSHBULLET``) should be ignored — built-ins always win. Defensive
+    against a stale install or a packaging bug.
     """
 
     class FakePushbullet(Alerter):
@@ -122,8 +125,8 @@ def test_entry_point_load_failure_is_logged_and_skipped(monkeypatch: pytest.Monk
 
 
 def test_entry_point_non_alerter_subclass_is_skipped(monkeypatch: pytest.MonkeyPatch):
-    """If someone registers a class that doesn't subclass `Alerter`, refuse to
-    add it — that's a contract violation.
+    """If an entry-point points at a class that doesn't subclass `Alerter`,
+    refuse to add it — that's a contract violation.
     """
 
     class NotAnAlerter:

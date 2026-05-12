@@ -183,18 +183,29 @@ token = "..."
 chat_id = "..."
 ```
 
-#### Adding more alerters (plugin authors)
+#### Gmail
 
-`discogs_alert` discovers alerters dynamically via the `discogs_alert.alerters` Python entry-point group. To ship a new alerter as a separate package, subclass `discogs_alert.alert.base.Alerter` and register the class in your package's `pyproject.toml`:
+Sends each alert as a plain-text email via Gmail SMTP. Setup:
+
+1. Make sure 2-Step Verification is on for your Google account (<https://myaccount.google.com/security>). Gmail SMTP requires it.
+2. Generate an app password at <https://myaccount.google.com/apppasswords> — give it a name like `discogs_alert`, copy the 16-character value.
+
+Then configure:
 
 ```toml
-[project.entry-points."discogs_alert.alerters"]
-ntfy = "discogs_alert_ntfy:NtfyAlerter"
+[alerter]
+type = "GMAIL"
+[alerter.gmail]
+user = "you@gmail.com"           # also the From: address
+app_password = "xxxx xxxx xxxx xxxx"
+to = "you@gmail.com"             # where alerts get delivered
 ```
 
-After `pip install discogs-alert-ntfy`, `[alerter] type = "NTFY"` becomes selectable in your `config.toml`. The entry-point name (uppercased) is the value of `type`. Your alerter is responsible for reading its own config (env vars, a config file section, etc.).
+> ⚠️ **App password, not your regular Gmail password.** Gmail stopped accepting the latter for SMTP in 2022.
 
-For a step-by-step guide and a copy-and-rename starter package, see [`docs/writing-an-alerter.md`](docs/writing-an-alerter.md) and [`examples/discogs-alert-alerter-template/`](examples/discogs-alert-alerter-template/).
+#### Adding more alerters
+
+New alerters go in-tree as a PR: subclass `discogs_alert.alert.base.Alerter`, implement `send_alert(title, body) -> bool`, drop a file under `discogs_alert/alert/`, register it in both `_BUILTIN_ALERTERS` (in `alert/__init__.py`) and `[tool.poetry.plugins."discogs_alert.alerters"]` (in `pyproject.toml`). The built-in alerters are short — copy the closest one to whatever you're shipping (e.g. start from `ntfy.py` for a plain HTTP POST, or `gmail.py` for SMTP).
 
 ## Usage
 

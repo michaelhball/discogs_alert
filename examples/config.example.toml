@@ -62,8 +62,7 @@ blacklist = ["UK", "US"]   # e.g. avoid customs / tariff hassle
 # ---- alerter ----------------------------------------------------------------
 #
 # `type` selects which alerter to use; only the matching sub-section's
-# config is read. Built-ins: NTFY, PUSHBULLET, TELEGRAM. Plugin alerters
-# (entry-point) are also valid here — see docs/writing-an-alerter.md.
+# config is read. Built-ins: NTFY, PUSHBULLET, TELEGRAM, GMAIL.
 
 [alerter]
 type = "NTFY"
@@ -81,6 +80,14 @@ server = "https://ntfy.sh"
 [alerter.telegram]
 # token = "..."
 # chat_id = "..."
+
+[alerter.gmail]
+# Requires 2-Step Verification on your Google account + a 16-character
+# app password from https://myaccount.google.com/apppasswords.
+# `to` is where alert emails get sent (usually your own Gmail).
+# user = "you@gmail.com"
+# app_password = "xxxx xxxx xxxx xxxx"
+# to = "you@gmail.com"
 
 # ---- runtime ---------------------------------------------------------------
 
