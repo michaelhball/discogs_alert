@@ -346,6 +346,10 @@ Ideally, you should work inside a virtual environment set up for this project. O
 
 And that's it! Until you want to propose your changes as a new PR. When that's the case you need to run the tests to make sure nothing has broken, which you can do simply by running `$ tox` in the project's root directory. 
 
+### Cutting a release
+
+Tag-triggered: bump `version` in `pyproject.toml` + `_FALLBACK_VERSION` in `discogs_alert/__init__.py`, commit, tag `vX.Y.Z`, push with `--follow-tags`. CI builds + signs + publishes everything (PyPI, DockerHub, GitHub Release with `.app` + DMG, Sparkle appcast PR). See [`docs/release.md`](docs/release.md) for the full recipe.
+
 ## Author
 
 [**mhsb**](https://github.com/michaelhball)

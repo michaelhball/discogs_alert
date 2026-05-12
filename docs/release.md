@@ -73,8 +73,11 @@ git push origin main --tags
 #   - builds dist/discogs_alert-0.1.1.dmg
 #   - signs it with the EdDSA key from secrets
 #   - creates a GitHub Release v0.1.1, uploads the DMG
-#   - appends a new <item> to docs/appcast.xml
-#   - commits + pushes the appcast change to main
+#   - publishes the wheel + sdist to PyPI (trusted publishing)
+#   - pushes the Docker image to DockerHub (if `vars.DOCKERHUB_USERNAME` is set)
+#   - opens a PR titled `Append vX.Y.Z to appcast` adding a new <item>
+#     to docs/appcast.xml — branch protection blocks the bot from
+#     pushing direct, so this is the only manual step: click Merge.
 #
 # You can watch progress with `gh run watch`.
 
@@ -85,24 +88,33 @@ curl -fsSI "$(gh release view v0.1.1 --json assets --jq '.assets[0].url')"
 
 Existing `.app` installs poll the appcast on launch + once a day,
 download the new DMG, verify the EdDSA signature, and prompt the user
-to install. No more manual upgrade steps for users.
+to install. The appcast PR has to be merged first — until then the
+new `<item>` isn't served from Pages, so existing installs won't see
+the new version.
 
 ## Each release (manual fallback)
 
 If the workflow is broken or you want to ship a hotfix from your own
-machine, the `make` targets cover the same steps:
+machine, the `make` targets cover the same steps. Note the appcast
+commit goes via a branch + PR (direct push to `main` is blocked by
+branch protection):
 
 ```bash
 make app                                                    # → dist/discogs_alert.app
 make dmg                                                    # → dist/discogs_alert-X.Y.Z.dmg
 make sign                                                   # prints sparkle:edSignature="…" length="…"
 gh release create vX.Y.Z dist/discogs_alert-X.Y.Z.dmg --generate-notes
+
+# Appcast update goes via a PR (branch protection blocks direct push to main).
+git checkout -b release/vX.Y.Z-appcast
 python scripts/append_to_appcast.py \
     --version X.Y.Z \
     --signature 'sparkle:edSignature="…" length="…"' \
     --download-url "https://github.com/<owner>/<repo>/releases/download/vX.Y.Z/discogs_alert-X.Y.Z.dmg"
 git commit -am "Append vX.Y.Z to appcast"
-git push
+git push -u origin release/vX.Y.Z-appcast
+gh pr create --base main --title "Append vX.Y.Z to appcast" --fill
+# …then `gh pr merge <N> --squash --delete-branch` once CI is green.
 ```
 
 ## Sanity-checks
