@@ -34,38 +34,38 @@ If you have suggestions or ideas, please reach out! So far I've bought more than
 
 ## Installation & Setup
 
-You can install discogs-alert as a Python package, either via the Python Package Index (PyPI) or from source, or as a docker image from DockerHub.
+Four install paths, pick one:
 
-### Python
+### Python (via pip)
 
-To install using `pip`:
 ```
 pip install discogs-alert
 ```
 
-#### Downloading and installing from source 
-Download the latest version of discogs-alert from PyPI:
+### macOS `.app` (drag-install, no Python required)
 
-[https://pypi.org/project/discogs-alert/](https://pypi.org/project/discogs-alert/)
+Download the latest `.dmg` from [Releases](https://github.com/michaelhball/discogs_alert/releases), open it, drag `discogs_alert.app` into `/Applications`. The app self-updates via Sparkle whenever a new version is published.
 
-You can then  install it by doing the following:
-```
-$ tar xvfz discogs_alert-0.0.x.tar.gz
-$ cd discogs_alert-0.0.x
-$ python setup.py build
-$ python setup.py install 
-```
-The last command must be executed as a privileged user if you aren't currently using a virtualenv.
+> On first launch, macOS Gatekeeper may say "discogs_alert can't be opened because Apple cannot check it for malicious software." Right-click the app → Open → confirm; you only have to do this once.
 
 ### Docker
 
-Assuming you have docker installed, you can pull the latest image via
 ```bash
 docker pull miggleball/discogs_alert:latest
+docker run -d --env-file .env miggleball/discogs_alert:latest
 ```
 
-Calling `docker run discogs_alert:latest` runs the entrypoint `python -m discogs_alert`, so you'll need to pass the
-required arguments, easiest using an environment variable file (`docker run --env-file .env discogs_alert:latest`).
+The container runs `python -m discogs_alert` as its entrypoint; pass your config via env vars (`DA_DISCOGS_TOKEN`, `DA_LIST_ID`, …) in your `.env` file.
+
+### From source
+
+```bash
+git clone https://github.com/michaelhball/discogs_alert
+cd discogs_alert
+pip install -e .
+```
+
+For development you'll also want `pip install -e '.[menubar]'` if you're on a Mac and want the menu-bar app, plus `poetry install` to get the dev deps (`pytest`, `ruff`, `tox`, etc.).
 
 ## Setup
 
