@@ -84,8 +84,11 @@ jobs:
     name: Publish Docker image
     needs: build
     runs-on: ubuntu-latest
-    # Skip if DockerHub credentials aren't configured.
-    if: ${{ vars.DOCKERHUB_USERNAME != '' || secrets.DOCKERHUB_USERNAME != '' }}
+    # Skip if DockerHub credentials aren't configured. (Gate on a repo var
+    # — GH Actions forbids `secrets.*` in `if:` conditions, so to enable
+    # this job you need to set BOTH the `DOCKERHUB_USERNAME` repo variable
+    # AND the matching `secrets.DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN`.)
+    if: ${{ vars.DOCKERHUB_USERNAME != '' }}
     steps:
       - uses: actions/checkout@v4
 
