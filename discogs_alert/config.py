@@ -107,6 +107,9 @@ class RuntimeConfig(BaseModel):
     """Things the runtime cares about that aren't user preferences."""
 
     state_path: Optional[str] = None
+    # Where the per-iteration heartbeat (`last_run.json`, read by `--status`)
+    # is written. Defaults to the directory holding `state_path`.
+    heartbeat_path: Optional[str] = None
     stats_gate: bool = True
     max_concurrency: int = 6
     prune_after_days: int = 90
@@ -193,6 +196,7 @@ _ENV_OVERRIDES = {
     "DA_GMAIL_APP_PASSWORD": "alerter.gmail.app_password",
     "DA_GMAIL_TO": "alerter.gmail.to",
     "DA_STATE_PATH": "runtime.state_path",
+    "DA_HEARTBEAT_PATH": "runtime.heartbeat_path",
     "DA_STATS_GATE": "runtime.stats_gate",
     "DA_MAX_CONCURRENCY": "runtime.max_concurrency",
     "DA_PRUNE_AFTER_DAYS": "runtime.prune_after_days",

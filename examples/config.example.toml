@@ -96,6 +96,10 @@ server = "https://ntfy.sh"
 # ~/.discogs_alert/state.db.
 # state_path = "/Users/me/.discogs_alert/state.db"
 
+# Where the per-iteration heartbeat (`last_run.json`, read by `--status`) goes.
+# Defaults to the directory holding state_path.
+# heartbeat_path = "/Users/me/.discogs_alert/last_run.json"
+
 # Use the cheap /marketplace/stats API to skip the expensive scrape for
 # releases with no listings or above your price threshold. Recommended.
 stats_gate = true

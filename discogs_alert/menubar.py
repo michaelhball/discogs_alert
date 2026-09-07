@@ -28,6 +28,7 @@ from discogs_alert import (
     client as da_client,
     config as da_config,
     entities as da_entities,
+    heartbeat as da_heartbeat,
     loop as da_loop,
     state as da_state,
 )
@@ -154,11 +155,12 @@ class MenubarController:
         user_token_client: da_client.UserTokenClient,
         anon_client: da_client.AnonClient,
     ) -> None:
-        await da_loop.loop(
+        stats = await da_loop.loop(
             **self._build_loop_kwargs(),
             user_token_client=user_token_client,
             client_anon=anon_client,
         )
+        da_heartbeat.write_for_config(self.cfg, stats)
         with self._lock:
             self.last_check_at = datetime.now()
             self.last_error = None
