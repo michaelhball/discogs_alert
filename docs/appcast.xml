@@ -6,6 +6,15 @@
         <description>Most recent macOS releases of discogs_alert.</description>
         <language>en</language>
         <item>
+            <title>0.1.3</title>
+            <pubDate>Mon, 07 Sep 2026 03:52:32 +0000</pubDate>
+            <sparkle:version>0.1.3</sparkle:version>
+            <sparkle:shortVersionString>0.1.3</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
+            <description>&lt;h2&gt;v0.1.3&lt;/h2&gt;</description>
+            <enclosure url="https://github.com/michaelhball/discogs_alert/releases/download/v0.1.3/discogs_alert-0.1.3.dmg" sparkle:edSignature="2vZ+wGTaekK9fIesH8WK+p3Xvlrpa5YwvHT7gja2oLfWMlqEKSdpYLn47UlspLoTlAYXZmVRbCEnUZFW03mvBQ==" length="46010361" type="application/octet-stream" />
+        </item>
+        <item>
             <title>0.1.2</title>
             <pubDate>Mon, 07 Sep 2026 03:41:25 +0000</pubDate>
             <sparkle:version>0.1.2</sparkle:version>
