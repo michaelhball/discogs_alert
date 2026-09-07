@@ -271,7 +271,13 @@ Every line carries a timestamp, level, and the id of the loop iteration it belon
 2026-09-07 05:40:12 INFO    [3f9a1c2e] discogs_alert.loop: Now For Sale: Artist - Title (€34.00) — Listing available: https://www.discogs.com/sell/item/…
 ```
 
-Per-request HTTP chatter from `httpx` / `curl_cffi` is hidden unless you pass `--verbose`. `--log-format json` (or `runtime.log_format = "json"`) switches to one JSON object per line with the same fields plus any structured extras.
+Every iteration ends with one summary line that accounts for every release and listing it touched — grep for `iteration finished`:
+
+```
+2026-09-07 05:41:02 INFO    [3f9a1c2e] discogs_alert.loop: iteration finished in 22.1s (ok); 344 releases; gate skipped 290 (no_listings=280, above_threshold=10); scraped 54 (ok=40, http_403=14); listings 612, filtered 608 (conditions=500, already_alerted=58, price=30, unavailable=20); alerts sent 4, failed 0; api rate limit 52/60 remaining
+```
+
+If a large share of scrapes come back `403`, a WARNING names it for what it is (Cloudflare bot detection on your IP — common on VPN exits) and reminds you those releases were *not* checked. A failed wantlist fetch (bad token, rate limit, outage) is one `ERROR` line, not a traceback. Per-listing decisions (why each listing was or wasn't alerted) are at DEBUG, so `--verbose` shows the full story. Per-request HTTP chatter from `httpx` / `curl_cffi` is hidden unless you pass `--verbose`. `--log-format json` (or `runtime.log_format = "json"`) switches to one JSON object per line with the same fields plus any structured extras.
 
 Each matching listing produces one notification — title is the release's display title, body is the listing URL. Deduplication is local: `discogs_alert` records every successful alert in `~/.discogs_alert/state.db` (configurable via `runtime.state_path` in `config.toml`) and won't re-alert across iterations.
 

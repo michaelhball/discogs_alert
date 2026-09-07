@@ -20,6 +20,7 @@ fan-out of concurrent requests doesn't overshoot the per-minute floor.
 from __future__ import annotations
 
 import logging
+import time
 from typing import Optional, Union
 
 import httpx
@@ -29,6 +30,55 @@ from discogs_alert import entities as da_entities, scrape as da_scrape
 from discogs_alert.util.rate_limit import RateLimitGuard
 
 logger = logging.getLogger(__name__)
+
+
+class DiscogsApiError(Exception):
+    """A ``api.discogs.com`` call failed: non-200 status or a transport error.
+
+    ``status`` is ``None`` for transport errors (timeout, connection reset).
+    The message is a single, log-friendly line with a hint for the two
+    statuses operators actually hit (401 bad token, 429 rate limited).
+    """
+
+    def __init__(self, url: str, status: Optional[int] = None, body: str = "") -> None:
+        self.url = url
+        self.status = status
+        self.body = body
+        path = url.replace(UserTokenClient.BASE_URL, "")
+        if status is None:
+            what = f"transport error ({body})"
+        else:
+            what = f"HTTP {status}"
+            if status == 401:
+                what += " (token rejected — check `discogs_token`)"
+            elif status == 429:
+                what += " (rate limited)"
+            if body:
+                what += f": {body}"
+        super().__init__(f"Discogs API {path} -> {what}")
+
+
+class MarketplaceFetchError(Exception):
+    """A marketplace page fetch (``www.discogs.com/sell/release/…``) failed.
+
+    ``status`` is the HTTP status (403 = Cloudflare bot detection, 5xx = Discogs
+    trouble) or ``None`` for a transport error, in which case ``reason`` says why.
+    """
+
+    def __init__(self, release_id: int, status: Optional[int] = None, reason: str = "") -> None:
+        self.release_id = release_id
+        self.status = status
+        self.reason = reason
+        super().__init__(
+            f"marketplace fetch for release {release_id} failed: "
+            + (f"HTTP {status}" if status is not None else f"transport error ({reason})")
+        )
+
+    @property
+    def kind(self) -> str:
+        """Bucket label for summaries: ``http_403``, ``http_502``, ``transport``."""
+
+        return f"http_{self.status}" if self.status is not None else "transport"
 
 
 class UserTokenClient:
@@ -67,25 +117,27 @@ class UserTokenClient:
     async def __aexit__(self, *_exc) -> None:
         await self.aclose()
 
-    async def _get(self, url: str) -> Union[dict, list, bool]:
+    async def _get(self, url: str) -> Union[dict, list]:
+        """GET a JSON endpoint. Raises ``DiscogsApiError`` on any failure so the
+        caller decides how loud to be (the stats gate swallows 404s quietly; a
+        failed wantlist fetch is fatal for the iteration).
+        """
+
         await self.rate_limit_guard.before_request_async()
         try:
             resp = await self._client.get(url)
         except httpx.HTTPError as exc:
-            logger.info("HTTP error from %s: %s", url, exc)
-            return False
+            raise DiscogsApiError(url, None, f"{type(exc).__name__}: {exc}") from exc
         self.rate_limit_guard.update_from_headers(resp.headers)
         self.rate_limit = self.rate_limit_guard.limit
         self.rate_limit_used = self.rate_limit_guard.used
         self.rate_limit_remaining = self.rate_limit_guard.remaining
         if resp.status_code != 200:
-            logger.info("ERROR: status_code: %s, content: %r", resp.status_code, resp.content[:200])
-            return False
+            raise DiscogsApiError(url, resp.status_code, resp.text[:200].strip())
         try:
             return resp.json()
-        except ValueError:
-            logger.warning("Non-JSON response from %s: %r", url, resp.content[:200])
-            return False
+        except ValueError as exc:
+            raise DiscogsApiError(url, resp.status_code, f"non-JSON body {resp.text[:120]!r}") from exc
 
     async def get_list(self, list_id: int) -> da_entities.UserList:
         data = await self._get(f"{self.BASE_URL}/lists/{list_id}")
@@ -107,7 +159,11 @@ class UserTokenClient:
         ``ReleaseStats``.
         """
 
-        data = await self._get(f"{self.BASE_URL}/marketplace/stats/{release_id}")
+        try:
+            data = await self._get(f"{self.BASE_URL}/marketplace/stats/{release_id}")
+        except DiscogsApiError as exc:
+            logger.debug("stats lookup for release %s failed: %s", release_id, exc)
+            return False
         if not isinstance(data, dict):
             return False
         return da_entities.ReleaseStats.model_validate(data)
@@ -156,15 +212,16 @@ class AnonClient:
         """Fetch the marketplace HTML for a release and parse the listings."""
 
         url = f"{self.BASE_URL}/sell/release/{release_id}?ev=rb&sort=price%2Casc"
+        started = time.monotonic()
         try:
             resp = await self._session.get(url, timeout=self.HTTP_TIMEOUT_SECONDS)
-        except Exception:
-            logger.warning("Marketplace fetch for release %s raised", release_id, exc_info=True)
-            return []
+        except Exception as exc:
+            raise MarketplaceFetchError(release_id, None, f"{type(exc).__name__}: {exc}") from exc
+        logger.debug(
+            "marketplace fetch for release %s: HTTP %s in %.2fs",
+            release_id, resp.status_code, time.monotonic() - started,
+            extra={"release_id": release_id, "status": resp.status_code},
+        )
         if resp.status_code != 200:
-            logger.warning(
-                "Marketplace fetch for release %s failed with status %s",
-                release_id, resp.status_code,
-            )
-            return []
+            raise MarketplaceFetchError(release_id, resp.status_code)
         return da_scrape.scrape_listings_from_marketplace(resp.text, release_id)

@@ -477,3 +477,142 @@ async def test_loop_no_stats_gate_flag_disables_gate(tmp_path: Path, monkeypatch
     )
 
     assert process_calls == [1]
+
+
+class Failing403AnonClient:
+    """Stand-in for `AnonClient` whose fetches are all blocked by Cloudflare."""
+
+    def __init__(self):
+        self.aclose = AsyncMock()
+
+    async def get_marketplace_listings(self, release_id: int):
+        raise da_client.MarketplaceFetchError(release_id, 403)
+
+
+async def test_process_release_counts_every_decision(tmp_path: Path):
+    seller, record, wl, bl = _filters()
+    alerter = RecordingAlerter()
+    listings = [
+        _listing(listing_id=1, value_eur=50),  # alerted
+        _listing(listing_id=2, value_eur=500),  # above the 100 threshold
+        _listing(listing_id=3, value_eur=50),  # already alerted (marked below)
+    ]
+    stats = da_loop.IterationStats()
+    with da_state.AlertStore(tmp_path / "state.db") as store:
+        store.mark_seen(3, 42, "t", "b")
+        sent = await da_loop.process_release(
+            _release(), FakeAnonClient(listings), "EUR", "Germany", seller, record, wl, bl, alerter, store, stats=stats
+        )
+    assert sent == 1
+    assert stats.scrapes_attempted == 1 and stats.scrapes_ok == 1
+    assert stats.listings_seen == 3
+    assert stats.listings_filtered[da_loop.FILTER_PRICE] == 1
+    assert stats.listings_filtered[da_loop.FILTER_ALREADY_ALERTED] == 1
+    assert stats.alerts_sent == 1 and stats.alerts_failed == 0
+
+
+async def test_process_release_counts_failed_alert_sends(tmp_path: Path):
+    seller, record, wl, bl = _filters()
+    stats = da_loop.IterationStats()
+    with da_state.AlertStore(tmp_path / "state.db") as store:
+        sent = await da_loop.process_release(
+            _release(), FakeAnonClient([_listing(1, 50)]), "EUR", "Germany", seller, record, wl, bl,
+            RecordingAlerter(send_returns=False), store, stats=stats,
+        )
+    assert sent == 0 and stats.alerts_failed == 1 and stats.alerts_sent == 0
+
+
+async def test_process_release_buckets_marketplace_403(tmp_path: Path):
+    seller, record, wl, bl = _filters()
+    stats = da_loop.IterationStats()
+    with da_state.AlertStore(tmp_path / "state.db") as store:
+        sent = await da_loop.process_release(
+            _release(), Failing403AnonClient(), "EUR", "Germany", seller, record, wl, bl,
+            RecordingAlerter(), store, stats=stats,
+        )
+    assert sent == 0
+    assert stats.scrapes_attempted == 1 and stats.scrapes_ok == 0
+    assert stats.scrapes_failed["http_403"] == 1
+    assert stats.listings_seen == 0
+
+
+def test_iteration_stats_cloudflare_heuristic_and_summary():
+    stats = da_loop.IterationStats(wantlist_size=10, scrapes_attempted=8, scrapes_ok=2, duration_s=12.34)
+    stats.scrapes_failed["http_403"] = 6
+    stats.gate_skipped["no_listings"] = 2
+    stats.listings_filtered["conditions"] = 5
+    stats.alerts_sent = 1
+    stats.api_rate_limit_remaining, stats.api_rate_limit = 40, 60
+    assert stats.looks_cloudflare_blocked()
+    line = stats.summary()
+    assert line.startswith("iteration finished in 12.3s (ok)")
+    assert "10 releases" in line
+    assert "gate skipped 2 (no_listings=2)" in line
+    assert "scraped 8 (ok=2, http_403=6)" in line
+    assert "listings 0, filtered 5 (conditions=5)" in line
+    assert "alerts sent 1, failed 0" in line
+    assert "api rate limit 40/60 remaining" in line
+    d = stats.as_dict()
+    assert d["scrapes_failed"] == {"http_403": 6} and d["outcome"] == "ok"
+
+
+def test_iteration_stats_no_cloudflare_warning_for_a_few_403s():
+    stats = da_loop.IterationStats(scrapes_attempted=100, scrapes_ok=98)
+    stats.scrapes_failed["http_403"] = 2
+    assert not stats.looks_cloudflare_blocked()
+
+
+def test_skip_category_buckets():
+    assert da_loop.skip_category(da_loop.SKIP_NO_LISTINGS) == "no_listings"
+    assert da_loop.skip_category(da_loop.SKIP_BLOCKED) == "blocked"
+    assert da_loop.skip_category("lowest price 120.00 EUR > threshold 100") == "above_threshold"
+
+
+def test_stats_skip_reason_null_num_for_sale_does_not_gate():
+    stats = da_entities.ReleaseStats(num_for_sale=None)
+    assert da_loop.stats_skip_reason(stats, _release_with_threshold(), "EUR") is None
+
+
+async def test_loop_aborts_cleanly_when_wantlist_fetch_fails(tmp_path: Path, caplog: pytest.LogCaptureFixture):
+    """A 401 from the API must produce one ERROR line and an 'error' outcome,
+    not a pydantic traceback (which is what `UserList.model_validate(False)` gave)."""
+
+    class Rejecting:
+        aclose = AsyncMock()
+        rate_limit_remaining = None
+        rate_limit = None
+
+        async def get_list(self, _list_id):
+            raise da_client.DiscogsApiError("https://api.discogs.com/lists/1", 401, "Invalid consumer token")
+
+    seller, record, wl, bl = _filters()
+    with caplog.at_level("DEBUG"):
+        stats = await da_loop.loop(
+            discogs_token="bad", list_id=1, wantlist_path=None, user_agent="UA", country="Germany",
+            currency="EUR", seller_filters=seller, record_filters=record, country_whitelist=wl,
+            country_blacklist=bl, alerter_type=AlerterType.PUSHBULLET, alerter_kwargs={"pushbullet_token": "x"},
+            state_path=tmp_path / "state.db", user_token_client=Rejecting(), client_anon=FakeAnonClient([]),
+        )
+    assert stats.outcome == "error" and "token rejected" in stats.error
+    errors = [r for r in caplog.records if r.levelname == "ERROR"]
+    assert any("iteration aborted" in r.getMessage() for r in errors)
+    assert any(r.getMessage().startswith("iteration finished") for r in errors)
+    assert not any("Traceback" in (r.exc_text or "") for r in errors)
+
+
+async def test_loop_returns_stats_and_logs_summary(tmp_path: Path, caplog: pytest.LogCaptureFixture):
+    seller, record, wl, bl = _filters()
+    release = _release()
+    client = FakeUserTokenClient(stats=False, list_items=[release])
+    with caplog.at_level("INFO"):
+        stats = await da_loop.loop(
+            discogs_token="t", list_id=1, wantlist_path=None, user_agent="UA", country="Germany",
+            currency="EUR", seller_filters=seller, record_filters=record, country_whitelist=wl,
+            country_blacklist=bl, alerter_type=AlerterType.PUSHBULLET, alerter_kwargs={"pushbullet_token": "x"},
+            state_path=tmp_path / "state.db", user_token_client=client, client_anon=FakeAnonClient([_listing(1, 50)]),
+        )
+    assert stats.outcome == "ok" and stats.wantlist_size == 1 and stats.gate_failed == 1
+    assert stats.api_rate_limit_remaining == 50
+    summary = [r for r in caplog.records if r.getMessage().startswith("iteration finished")]
+    assert len(summary) == 1 and summary[0].levelname == "INFO"
+    assert summary[0].iteration["wantlist_size"] == 1  # structured extra for JSON logs
