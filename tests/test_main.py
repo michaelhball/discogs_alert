@@ -9,12 +9,20 @@ the CLI's job: load → optional `--once` / `--validate-config` /
 
 from __future__ import annotations
 
+import importlib
 import json
 import os
+import sys
 from pathlib import Path
 
+import click
 import pytest
 from click.testing import CliRunner
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:  # pragma: no cover - exercised on the 3.10 CI leg
+    import tomli as tomllib
 
 from discogs_alert import __main__ as da_main
 
@@ -222,3 +230,16 @@ async def test_run_invokes_loop_once_when_run_once_true(monkeypatch: pytest.Monk
     assert len(loop_calls) == 1
     fake_anon.aclose.assert_awaited_once()
     fake_user.aclose.assert_awaited_once()
+
+
+def test_console_script_target_resolves_to_the_cli():
+    """`[tool.poetry.scripts]` must point at the same click command as `python -m discogs_alert`."""
+
+    pyproject = tomllib.loads((Path(__file__).resolve().parents[1] / "pyproject.toml").read_text())
+    scripts = pyproject["tool"]["poetry"]["scripts"]
+    assert "discogs_alert" in scripts
+
+    module_name, _, attr = scripts["discogs_alert"].partition(":")
+    target = getattr(importlib.import_module(module_name), attr)
+    assert isinstance(target, click.Command)
+    assert target is da_main.main

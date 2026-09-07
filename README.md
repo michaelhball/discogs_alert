@@ -36,11 +36,19 @@ If you have suggestions or ideas, please reach out! So far I've bought more than
 
 Four install paths, pick one:
 
-### Python (via pip)
+### Python (via pip / uv / pipx)
 
 ```
 pip install discogs-alert
 ```
+
+or, as an isolated command-line tool:
+
+```
+uv tool install discogs-alert     # or: pipx install discogs-alert
+```
+
+Either way you get a `discogs_alert` command (equivalent to `python -m discogs_alert`).
 
 ### macOS `.app` (drag-install, no Python required)
 
@@ -218,7 +226,7 @@ Configuration lives in `~/.discogs_alert/config.toml` (or wherever `--config` po
 ```bash
 $ cp examples/config.example.toml ~/.discogs_alert/config.toml
 $ $EDITOR ~/.discogs_alert/config.toml   # fill in your token, list_id, alerter
-$ python -m discogs_alert
+$ discogs_alert                          # or: python -m discogs_alert
 ```
 
 A few CLI helpers exist for debugging:
@@ -231,7 +239,7 @@ A few CLI helpers exist for debugging:
 * `--print-config` — load the config, dump the resolved values as JSON, exit.
 * `--version`
 
-Run `python -m discogs_alert --help` for the full list.
+Run `discogs_alert --help` for the full list.
 
 #### Docker
 
