@@ -22,10 +22,12 @@ import contextlib
 import contextvars
 import json
 import logging
+import logging.handlers
 import sys
 import uuid
 from datetime import datetime, timezone
-from typing import IO, Iterator, Optional
+from pathlib import Path
+from typing import IO, Iterator, Optional, Union
 
 TEXT_FORMAT = "%(asctime)s %(levelname)-7s [%(run_id)s] %(name)s: %(message)s"
 TEXT_DATEFMT = "%Y-%m-%d %H:%M:%S"
@@ -37,6 +39,9 @@ LOG_FORMATS = ("text", "json")
 NOISY_LOGGERS = ("httpx", "httpcore", "urllib3", "curl_cffi", "asyncio")
 
 NO_RUN_ID = "-"
+
+DEFAULT_LOG_MAX_BYTES = 10 * 1024 * 1024  # rotate at 10 MiB …
+DEFAULT_LOG_BACKUP_COUNT = 5  # … keeping 5 old files (≈60 MiB worst case)
 
 run_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("discogs_alert_run_id", default=NO_RUN_ID)
 
@@ -100,35 +105,58 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(payload, default=str, ensure_ascii=False)
 
 
+def _formatter(fmt: str) -> logging.Formatter:
+    return JsonFormatter() if fmt == "json" else logging.Formatter(TEXT_FORMAT, datefmt=TEXT_DATEFMT)
+
+
 def configure_logging(
     level: str = "INFO",
     fmt: str = "text",
     verbose: bool = False,
     stream: Optional[IO[str]] = None,
+    log_file: Optional[Union[str, Path]] = None,
+    max_bytes: int = DEFAULT_LOG_MAX_BYTES,
+    backup_count: int = DEFAULT_LOG_BACKUP_COUNT,
 ) -> logging.Handler:
     """(Re)configure the root logger. Idempotent: replaces any handlers a
     previous call (or ``logging.basicConfig``) installed, so tests and the
     menu-bar app can call it more than once.
 
-    Returns the handler so callers can inspect the formatter in tests.
+    Always logs to ``stream`` (stderr). With ``log_file`` set, also appends to
+    that file through a size-based ``RotatingFileHandler`` (``max_bytes``,
+    ``backup_count``), so a long-lived install never fills a disk. Both
+    handlers share the format and the run-id filter.
+
+    Returns the stream handler so callers can inspect the formatter in tests.
     """
 
     if fmt not in LOG_FORMATS:
         raise ValueError(f"log format must be one of {LOG_FORMATS}, got {fmt!r}")
+    if log_file is not None and (max_bytes <= 0 or backup_count < 0):
+        raise ValueError("max_bytes must be positive and backup_count non-negative")
 
     root = logging.getLogger()
     for existing in list(root.handlers):
         root.removeHandler(existing)
+        if isinstance(existing, logging.FileHandler):
+            existing.close()
 
     handler = logging.StreamHandler(stream or sys.stderr)
     handler.addFilter(RunIdFilter())
-    if fmt == "json":
-        handler.setFormatter(JsonFormatter())
-    else:
-        handler.setFormatter(logging.Formatter(TEXT_FORMAT, datefmt=TEXT_DATEFMT))
+    handler.setFormatter(_formatter(fmt))
     root.addHandler(handler)
-    root.setLevel(level.upper())
 
+    if log_file is not None:
+        path = Path(log_file).expanduser()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        file_handler = logging.handlers.RotatingFileHandler(
+            path, maxBytes=max_bytes, backupCount=backup_count, encoding="utf-8"
+        )
+        file_handler.addFilter(RunIdFilter())
+        file_handler.setFormatter(_formatter(fmt))
+        root.addHandler(file_handler)
+
+    root.setLevel(level.upper())
     for name in NOISY_LOGGERS:
         logging.getLogger(name).setLevel(logging.DEBUG if verbose else logging.WARNING)
     return handler

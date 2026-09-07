@@ -99,6 +99,9 @@ rm ~/Library/LaunchAgents/com.discogsalert.plist      # permanently
   If alert sends fail intermittently while everything else works, try another
   server for the alerter (e.g. a different public ntfy instance) or exclude the
   host from the VPN.
-- Log lines are unstructured and the file grows without rotation. Truncate it
-  (`: > ~/Library/Logs/discogs_alert.log`) now and then, or point
-  `StandardOutPath`/`StandardErrorPath` at a `newsyslog`-managed path.
+- The launchd `StandardOutPath` file grows without rotation. Prefer
+  `runtime.log_file = "~/Library/Logs/discogs_alert.log"` in `config.toml`
+  (rotated at 10 MiB, 5 backups) and point the plist's `StandardOutPath` /
+  `StandardErrorPath` at a separate `discogs_alert.crash.log` that only ever
+  sees interpreter-level failures (import errors, tracebacks before logging
+  is configured).

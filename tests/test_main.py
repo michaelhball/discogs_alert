@@ -348,3 +348,14 @@ def test_run_writes_heartbeat_after_each_iteration(tmp_path: Path, monkeypatch: 
     assert len(calls) == 1
     hb = json.loads((tmp_path / "last_run.json").read_text())
     assert hb["iteration"]["wantlist_size"] == 7 and hb["interval_seconds"] == 600 and hb["alerter"] == "NTFY"
+
+
+def test_cli_log_file_flag_adds_rotating_handler(stub_run, config_file, tmp_path: Path):
+    import logging
+
+    log_path = tmp_path / "cli.log"
+    result = CliRunner().invoke(da_main.main, ["--config", str(config_file), "--once", "--log-file", str(log_path)])
+    assert result.exit_code == 0, result.output
+    files = [h for h in logging.getLogger().handlers if isinstance(h, logging.FileHandler)]
+    assert len(files) == 1 and files[0].baseFilename == str(log_path)
+    assert stub_run["cfg"].runtime.log_file == str(log_path)

@@ -117,6 +117,11 @@ class RuntimeConfig(BaseModel):
     log_level: str = "INFO"
     # "text" (timestamped, human-readable) or "json" (one object per line).
     log_format: Literal["text", "json"] = "text"
+    # Optional log file, rotated by size (in addition to stderr). Rotation keeps
+    # `log_backup_count` old files of up to `log_max_bytes` each.
+    log_file: Optional[str] = None
+    log_max_bytes: int = Field(default=10 * 1024 * 1024, gt=0)
+    log_backup_count: int = Field(default=5, ge=0)
 
 
 class Config(BaseModel):
@@ -202,6 +207,9 @@ _ENV_OVERRIDES = {
     "DA_PRUNE_AFTER_DAYS": "runtime.prune_after_days",
     "DA_LOG_LEVEL": "runtime.log_level",
     "DA_LOG_FORMAT": "runtime.log_format",
+    "DA_LOG_FILE": "runtime.log_file",
+    "DA_LOG_MAX_BYTES": "runtime.log_max_bytes",
+    "DA_LOG_BACKUP_COUNT": "runtime.log_backup_count",
 }
 
 

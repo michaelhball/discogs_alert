@@ -123,3 +123,11 @@ log_level = "INFO"
 # object per line (ts, level, logger, run_id, msg, plus structured fields) for
 # jq / log shippers. Overridden by --log-format on the CLI.
 log_format = "text"
+
+# Optional: also append logs to a file, rotated by size so a long-running
+# install never fills the disk (keeps `log_backup_count` files of up to
+# `log_max_bytes` each). stderr still gets every line. --log-file on the CLI
+# overrides `log_file`.
+# log_file = "/Users/me/Library/Logs/discogs_alert.log"
+# log_max_bytes = 10485760   # 10 MiB
+# log_backup_count = 5

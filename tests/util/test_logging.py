@@ -122,3 +122,44 @@ def test_configure_is_idempotent_and_respects_level():
 def test_unknown_format_is_rejected():
     with pytest.raises(ValueError):
         da_logging.configure_logging(fmt="xml", stream=io.StringIO())
+
+
+def test_log_file_gets_the_same_lines_and_rotates(tmp_path):
+    log_path = tmp_path / "logs" / "da.log"
+    stream = io.StringIO()
+    da_logging.configure_logging(fmt="text", stream=stream, log_file=log_path, max_bytes=400, backup_count=2)
+    log = logging.getLogger("discogs_alert.test")
+    with da_logging.run_context("feed0001"):
+        for i in range(40):
+            log.info("line %02d %s", i, "x" * 40)
+    root = logging.getLogger()
+    for h in root.handlers:
+        h.flush()
+    assert log_path.exists()
+    assert "[feed0001]" in log_path.read_text()
+    backups = sorted(p.name for p in log_path.parent.iterdir())
+    assert backups == ["da.log", "da.log.1", "da.log.2"]  # rotated, capped at backup_count
+    assert stream.getvalue().count("\n") == 40  # stderr still gets everything
+
+
+def test_log_file_json_format(tmp_path):
+    log_path = tmp_path / "da.jsonl"
+    da_logging.configure_logging(fmt="json", stream=io.StringIO(), log_file=log_path)
+    logging.getLogger("discogs_alert.test").info("hi", extra={"k": 1})
+    for h in logging.getLogger().handlers:
+        h.flush()
+    payload = json.loads(log_path.read_text().strip())
+    assert payload["msg"] == "hi" and payload["k"] == 1
+
+
+def test_reconfigure_closes_previous_file_handler(tmp_path):
+    da_logging.configure_logging(stream=io.StringIO(), log_file=tmp_path / "a.log")
+    da_logging.configure_logging(stream=io.StringIO(), log_file=tmp_path / "b.log")
+    handlers = logging.getLogger().handlers
+    files = [h for h in handlers if isinstance(h, logging.FileHandler)]
+    assert len(files) == 1 and files[0].baseFilename.endswith("b.log")
+
+
+def test_bad_rotation_settings_rejected(tmp_path):
+    with pytest.raises(ValueError):
+        da_logging.configure_logging(stream=io.StringIO(), log_file=tmp_path / "x.log", max_bytes=0)
