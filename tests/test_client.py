@@ -85,15 +85,33 @@ async def test_user_token_client_tracks_rate_limit_headers():
         await client.aclose()
 
 
-async def test_user_token_client_get_returns_false_on_non_200():
+async def test_user_token_client_get_raises_on_non_200_with_status_and_hint():
     def handler(_request: httpx.Request) -> httpx.Response:
         return httpx.Response(429, content=b'{"error":"rate"}')
 
     client = _make_client_with_transport(handler)
     try:
-        assert await client._get("https://api.discogs.com/anything") is False
+        with pytest.raises(da_client.DiscogsApiError) as excinfo:
+            await client._get("https://api.discogs.com/anything")
     finally:
         await client.aclose()
+    assert excinfo.value.status == 429
+    msg = str(excinfo.value)
+    assert msg.startswith("Discogs API /anything -> HTTP 429 (rate limited)")
+    assert "https://" not in msg  # path only, no token-bearing URLs in log lines
+
+
+async def test_user_token_client_401_message_points_at_the_token():
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(401, content=b'{"message":"Invalid consumer token."}')
+
+    client = _make_client_with_transport(handler)
+    try:
+        with pytest.raises(da_client.DiscogsApiError) as excinfo:
+            await client.get_list(1)
+    finally:
+        await client.aclose()
+    assert "token rejected" in str(excinfo.value) and "discogs_token" in str(excinfo.value)
 
 
 async def test_user_token_client_get_listing_returns_entity():
@@ -129,10 +147,9 @@ async def test_user_token_client_get_release_stats_handles_unknown_release():
         await client.aclose()
 
 
-async def test_user_token_client_get_returns_false_on_network_error():
-    """`httpx.HTTPError` (timeout, connect failure, etc.) should be swallowed
-    by `_get` and surfaced as `False`, just like the previous requests-based
-    implementation.
+async def test_user_token_client_get_raises_on_network_error():
+    """`httpx.HTTPError` (timeout, connect failure, etc.) surfaces as a
+    `DiscogsApiError` with no status, so callers can log one clear line.
     """
 
     def handler(_request: httpx.Request) -> httpx.Response:
@@ -140,6 +157,15 @@ async def test_user_token_client_get_returns_false_on_network_error():
 
     client = _make_client_with_transport(handler)
     try:
-        assert await client._get("https://api.discogs.com/anything") is False
+        with pytest.raises(da_client.DiscogsApiError) as excinfo:
+            await client._get("https://api.discogs.com/anything")
+        assert excinfo.value.status is None
+        assert "transport error (ConnectError: nope)" in str(excinfo.value)
     finally:
         await client.aclose()
+
+
+def test_marketplace_fetch_error_kind_buckets():
+    assert da_client.MarketplaceFetchError(1, 403).kind == "http_403"
+    assert da_client.MarketplaceFetchError(1, None, "timeout").kind == "transport"
+    assert "HTTP 403" in str(da_client.MarketplaceFetchError(7, 403))

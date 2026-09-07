@@ -33,7 +33,7 @@ git status --porcelain            # must be empty apart from untracked files
 git log --oneline main..origin/main   # must be empty after `git pull --ff-only` on main
 gh pr list --state open           # note anything still open; don't release over a half-merged change
 current="$(grep -E '^version = ' pyproject.toml | cut -d'"' -f2)"
-grep _FALLBACK_VERSION discogs_alert/__init__.py   # must equal $current
+grep -E '^_FALLBACK_VERSION = ' discogs_alert/__init__.py   # must equal $current
 gh run list --workflow=release.yml --limit 3       # is a previous release still running/failed?
 ```
 
@@ -131,7 +131,7 @@ launchctl bootstrap gui/$UID ~/Library/LaunchAgents/com.discogsalert.plist
 `RunAtLoad` fires an iteration immediately. Wait for it to finish and check it:
 
 ```bash
-until grep -q "took " ~/Library/Logs/discogs_alert.log; do sleep 5; done   # or watch the tail of the log
+until grep -q "iteration finished" ~/Library/Logs/discogs_alert.log; do sleep 5; done   # or watch the tail of the log
 launchctl print gui/$UID/com.discogsalert | grep -E "state =|last exit"    # last exit code = 0
 grep -ciE "traceback|error" ~/Library/Logs/discogs_alert.log                # explain anything non-zero
 ```

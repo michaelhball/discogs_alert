@@ -149,7 +149,9 @@ class ReleaseStats(_Base):
     Discogs-account currency setting. Populated only when `num_for_sale > 0`.
     """
 
-    num_for_sale: int
+    # Discogs occasionally returns ``null`` here (seen on releases with no
+    # marketplace data); treat that as "unknown" rather than a validation error.
+    num_for_sale: Optional[int] = None
     lowest_price: Optional[ShippingPrice] = None
     blocked_from_sale: bool = False
 

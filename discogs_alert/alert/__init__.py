@@ -101,9 +101,9 @@ def discover_alerters() -> Dict[str, Type[Alerter]]:
     registry: Dict[str, Type[Alerter]] = dict(_BUILTIN_ALERTERS)
     for name, cls in _load_entry_point_alerters().items():
         if name in registry:
-            logger.warning(
-                "Entry-point alerter %r conflicts with a built-in — keeping the built-in", name
-            )
+            # Expected for normal installs: the built-ins are also registered as
+            # entry points in pyproject.toml, so they always "conflict".
+            logger.debug("Entry-point alerter %r is also a built-in — keeping the built-in", name)
             continue
         registry[name] = cls
     return registry
