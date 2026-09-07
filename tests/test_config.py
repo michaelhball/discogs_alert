@@ -217,3 +217,19 @@ def test_set_dotted_rejects_path_through_non_dict():
 def test_default_path_is_under_home():
     assert da_config.DEFAULT_CONFIG_PATH.name == "config.toml"
     assert da_config.DEFAULT_CONFIG_PATH.parent.name == ".discogs_alert"
+
+
+def test_env_override_log_format(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("DA_DISCOGS_TOKEN", "TOK")
+    monkeypatch.setenv("DA_LIST_ID", "1")
+    monkeypatch.setenv("DA_LOG_FORMAT", "json")
+    cfg = da_config.load_config(path=Path("/nonexistent/config.toml"))
+    assert cfg.runtime.log_format == "json"
+
+
+def test_log_format_must_be_text_or_json(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("DA_DISCOGS_TOKEN", "TOK")
+    monkeypatch.setenv("DA_LIST_ID", "1")
+    monkeypatch.setenv("DA_LOG_FORMAT", "xml")
+    with pytest.raises(ValidationError):
+        da_config.load_config(path=Path("/nonexistent/config.toml"))
