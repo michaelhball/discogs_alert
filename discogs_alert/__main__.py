@@ -27,7 +27,9 @@ from discogs_alert import (
     client as da_client,
     config as da_config,
     entities as da_entities,
+    heartbeat as da_heartbeat,
     loop as da_loop,
+    state as da_state,
 )
 from discogs_alert.util import constants as dac, logging as da_logging
 
@@ -159,6 +161,14 @@ def _build_loop_kwargs(cfg: da_config.Config) -> dict:
     help="Log line format: `text` (default, timestamped) or `json` (one object per line).",
 )
 @click.option(
+    "--status",
+    is_flag=True,
+    help=(
+        "Health check: print the last iteration's heartbeat + alert counts and exit "
+        "0 (healthy), 1 (failed or stale), or 2 (never ran). Use from cron / launchd / monitoring."
+    ),
+)
+@click.option(
     "--validate-config",
     is_flag=True,
     help="Load and validate the config, print a one-line summary, and exit.",
@@ -175,6 +185,7 @@ def main(
     verbose: bool,
     log_level: Optional[str],
     log_format: Optional[str],
+    status: bool,
     validate_config: bool,
     print_config: bool,
 ) -> None:
@@ -207,6 +218,9 @@ def main(
     if validate_config:
         click.echo(f"Config valid. Alerter: {cfg.alerter.type}, frequency: {cfg.frequency}/h")
         return
+
+    if status:
+        sys.exit(_status(cfg))
 
     if print_config:
         click.echo(json.dumps(cfg.model_dump(), indent=2, default=str))
@@ -241,28 +255,49 @@ def _log_banner() -> None:
     )
 
 
+def _status(cfg: da_config.Config) -> int:
+    """`--status`: render the heartbeat + alert-store report, return the exit code."""
+
+    hb_path = da_heartbeat.path_for_config(cfg)
+    heartbeat = da_heartbeat.read_heartbeat(hb_path)
+    store_stats = None
+    try:
+        with da_state.AlertStore(cfg.runtime.state_path) as store:
+            store_stats = store.stats()
+    except Exception as exc:  # a missing/locked DB shouldn't hide the heartbeat verdict
+        logger.warning("could not read alert store: %s", exc)
+    interval_seconds = da_heartbeat.interval_seconds_for(cfg)
+    text, code = da_heartbeat.status_report(heartbeat, store_stats, interval_seconds)
+    if cfg.runtime.log_format == "json":
+        payload = {"heartbeat": heartbeat, "heartbeat_path": str(hb_path), "alerts": store_stats, "exit_code": code}
+        click.echo(json.dumps(payload, indent=2))
+        return code
+    click.echo(text)
+    click.echo(f"heartbeat:    {hb_path}")
+    return code
+
+
 async def _run(
     loop_kwargs: dict, run_once: bool, interval_seconds: int, cfg: da_config.Config
 ) -> None:
     """Drive the async loop. Holds a single ``UserTokenClient`` and ``AnonClient``
-    across all iterations so TLS handshakes amortize.
+    across all iterations so TLS handshakes amortize. Writes the heartbeat
+    file after every iteration.
     """
 
     user_token_client = da_client.UserTokenClient(cfg.user_agent, cfg.discogs_token)
     anon_client = da_client.AnonClient(cfg.user_agent)
     try:
-        await da_loop.loop(
-            **loop_kwargs,
-            user_token_client=user_token_client,
-            client_anon=anon_client,
-        )
-        while not run_once:
-            await asyncio.sleep(interval_seconds)
-            await da_loop.loop(
+        while True:
+            stats = await da_loop.loop(
                 **loop_kwargs,
                 user_token_client=user_token_client,
                 client_anon=anon_client,
             )
+            da_heartbeat.write_for_config(cfg, stats)
+            if run_once:
+                break
+            await asyncio.sleep(interval_seconds)
     finally:
         await anon_client.aclose()
         await user_token_client.aclose()

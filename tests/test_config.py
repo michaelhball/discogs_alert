@@ -233,3 +233,11 @@ def test_log_format_must_be_text_or_json(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("DA_LOG_FORMAT", "xml")
     with pytest.raises(ValidationError):
         da_config.load_config(path=Path("/nonexistent/config.toml"))
+
+
+def test_env_override_heartbeat_path(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("DA_DISCOGS_TOKEN", "TOK")
+    monkeypatch.setenv("DA_LIST_ID", "1")
+    monkeypatch.setenv("DA_HEARTBEAT_PATH", "/tmp/hb.json")
+    cfg = da_config.load_config(path=Path("/nonexistent/config.toml"))
+    assert cfg.runtime.heartbeat_path == "/tmp/hb.json"

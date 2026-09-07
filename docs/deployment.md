@@ -63,6 +63,7 @@ record it, exit. Failed sends are *not* recorded, so they retry next run.
 ## Day-to-day
 
 ```bash
+~/.discogs_alert/venv/bin/discogs_alert --status                            # HEALTHY / STALE / UNHEALTHY + last summary; exit 0/1/2
 launchctl print gui/$UID/com.discogsalert | grep -E "state|last exit|runs"   # loaded? last exit code?
 tail -f ~/Library/Logs/discogs_alert.log                                     # follow
 ~/.discogs_alert/venv/bin/python -m discogs_alert --once --verbose           # manual iteration

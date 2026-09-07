@@ -277,3 +277,74 @@ def test_cli_config_log_level_applies_without_flag(stub_run, tmp_path: Path):
     result = runner.invoke(da_main.main, ["--config", str(path), "--once"])
     assert result.exit_code == 0, result.output
     assert logging.getLogger().level == logging.WARNING
+
+
+def _write_config(tmp_path: Path, **runtime) -> Path:
+    body = 'discogs_token = "TOK"\nfrequency = 6\n[wantlist]\nlist_id = 1\n[runtime]\n'
+    body += "".join(f'{k} = "{v}"\n' for k, v in runtime.items())
+    path = tmp_path / "config.toml"
+    path.write_text(body)
+    return path
+
+
+def test_cli_status_exit_2_without_heartbeat(tmp_path: Path):
+    cfg = _write_config(tmp_path, state_path=str(tmp_path / "state.db"))
+    result = CliRunner().invoke(da_main.main, ["--config", str(cfg), "--status"])
+    assert result.exit_code == 2, result.output
+    assert "no heartbeat" in result.output
+
+
+def test_cli_status_healthy_after_a_good_run(tmp_path: Path):
+    from discogs_alert import heartbeat as da_hb
+    from discogs_alert.loop import IterationStats
+
+    cfg = _write_config(tmp_path, state_path=str(tmp_path / "state.db"))
+    da_hb.write_heartbeat(tmp_path / "last_run.json", da_hb.build_heartbeat(IterationStats(), "NTFY", 600))
+    result = CliRunner().invoke(da_main.main, ["--config", str(cfg), "--status"])
+    assert result.exit_code == 0, result.output
+    assert "HEALTHY" in result.output and "alerts sent:  0 in 24h" in result.output
+    assert str(tmp_path / "last_run.json") in result.output
+
+
+def test_cli_status_json_output(tmp_path: Path):
+    from discogs_alert import heartbeat as da_hb
+    from discogs_alert.loop import IterationStats
+
+    cfg = _write_config(tmp_path, state_path=str(tmp_path / "state.db"))
+    failed = IterationStats(outcome="error", error="x")
+    da_hb.write_heartbeat(tmp_path / "last_run.json", da_hb.build_heartbeat(failed, "NTFY", 600))
+    result = CliRunner().invoke(da_main.main, ["--config", str(cfg), "--status", "--log-format", "json"])
+    assert result.exit_code == 1
+    payload = json.loads(result.output)
+    assert payload["heartbeat"]["outcome"] == "error" and payload["alerts"]["total"] == 0
+
+
+def test_run_writes_heartbeat_after_each_iteration(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """`_run` must persist the iteration's stats; `--status` depends on it."""
+
+    import asyncio
+
+    from discogs_alert import client as da_client, config as da_config, loop as da_loop
+    from discogs_alert.loop import IterationStats
+
+    cfg = da_config.load_config(path=_write_config(tmp_path, state_path=str(tmp_path / "state.db")))
+    calls = []
+
+    async def fake_loop(**kwargs):
+        calls.append(kwargs)
+        return IterationStats(wantlist_size=7)
+
+    class _Client:
+        def __init__(self, *a, **k):
+            pass
+
+        async def aclose(self):
+            pass
+
+    monkeypatch.setattr(da_loop, "loop", fake_loop)
+    monkeypatch.setattr(da_client, "UserTokenClient", _Client)
+    monkeypatch.setattr(da_client, "AnonClient", _Client)
+    asyncio.run(da_main._run({}, run_once=True, interval_seconds=600, cfg=cfg))
+    assert len(calls) == 1
+    hb = json.loads((tmp_path / "last_run.json").read_text())
+    assert hb["iteration"]["wantlist_size"] == 7 and hb["interval_seconds"] == 600 and hb["alerter"] == "NTFY"

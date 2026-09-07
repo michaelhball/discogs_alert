@@ -236,6 +236,7 @@ A few CLI helpers exist for debugging:
 * `-V`/`--verbose` — DEBUG-level logs.
 * `-l`/`--log-level=<DEBUG|INFO|WARNING|ERROR>` — explicit log-level override.
 * `--log-format=<text|json>` — `text` (default) is timestamped and human-readable; `json` is one object per line for `jq` / log shippers.
+* `--status` — health check: print the last iteration's heartbeat and alert counts; exit `0` healthy, `1` failed or stale, `2` never ran (see [Monitoring](#monitoring)).
 * `--validate-config` — load the config, print a one-line summary, exit.
 * `--print-config` — load the config, dump the resolved values as JSON, exit.
 * `--version`
@@ -278,6 +279,21 @@ Every iteration ends with one summary line that accounts for every release and l
 ```
 
 If a large share of scrapes come back `403`, a WARNING names it for what it is (Cloudflare bot detection on your IP — common on VPN exits) and reminds you those releases were *not* checked. A failed wantlist fetch (bad token, rate limit, outage) is one `ERROR` line, not a traceback. Per-listing decisions (why each listing was or wasn't alerted) are at DEBUG, so `--verbose` shows the full story. Per-request HTTP chatter from `httpx` / `curl_cffi` is hidden unless you pass `--verbose`. `--log-format json` (or `runtime.log_format = "json"`) switches to one JSON object per line with the same fields plus any structured extras.
+
+#### Monitoring
+
+After every iteration the CLI (and the menu-bar app) writes `last_run.json` next to the state DB (`runtime.heartbeat_path` / `DA_HEARTBEAT_PATH` to move it): version, timestamps, duration, outcome, the full iteration counters, and the summary line — atomically, so a reader never sees a torn file. `discogs_alert --status` turns that into a verdict:
+
+```
+$ discogs_alert --status
+discogs_alert 0.1.2 — HEALTHY
+last run:     2026-09-07T05:41:02+00:00 (4m 12s ago), took 22.1s, alerter NTFY
+summary:      iteration finished in 22.1s (ok); 344 releases; gate skipped 290 (…); alerts sent 4, failed 0; api rate limit 52/60 remaining
+alerts sent:  4 in 24h, 11 in 7d, 663 total
+heartbeat:    /Users/me/.discogs_alert/last_run.json
+```
+
+Exit codes: `0` healthy, `1` the last iteration failed or is stale (older than 2× the interval, minimum 15 minutes), `2` no heartbeat yet. Point a cron job, a launchd watchdog, or a monitoring probe at it; `--status --log-format json` prints the raw heartbeat + counts as JSON instead.
 
 Each matching listing produces one notification — title is the release's display title, body is the listing URL. Deduplication is local: `discogs_alert` records every successful alert in `~/.discogs_alert/state.db` (configurable via `runtime.state_path` in `config.toml`) and won't re-alert across iterations.
 
