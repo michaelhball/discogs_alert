@@ -29,7 +29,7 @@ from discogs_alert import (
     entities as da_entities,
     loop as da_loop,
 )
-from discogs_alert.util import constants as dac
+from discogs_alert.util import constants as dac, logging as da_logging
 
 logger = logging.getLogger(__name__)
 
@@ -152,6 +152,13 @@ def _build_loop_kwargs(cfg: da_config.Config) -> dict:
     help="Override the root log level.",
 )
 @click.option(
+    "--log-format",
+    default=None,
+    envvar="DA_LOG_FORMAT",
+    type=click.Choice(list(da_logging.LOG_FORMATS), case_sensitive=False),
+    help="Log line format: `text` (default, timestamped) or `json` (one object per line).",
+)
+@click.option(
     "--validate-config",
     is_flag=True,
     help="Load and validate the config, print a one-line summary, and exit.",
@@ -167,6 +174,7 @@ def main(
     once: bool,
     verbose: bool,
     log_level: Optional[str],
+    log_format: Optional[str],
     validate_config: bool,
     print_config: bool,
 ) -> None:
@@ -180,16 +188,21 @@ def main(
       python -m discogs_alert
     """
 
-    logging.basicConfig(level=logging.INFO)
     cfg = _load_or_die(config_path)
 
-    # Apply CLI overrides on top of the loaded config.
+    # Apply CLI overrides on top of the loaded config, then configure logging
+    # from the resolved runtime settings (config file < env < CLI flag).
     if verbose:
         cfg.runtime.verbose = True
         if log_level is None:
             log_level = "DEBUG"
     if log_level is not None:
-        logging.getLogger().setLevel(log_level.upper())
+        cfg.runtime.log_level = log_level.upper()
+    if log_format is not None:
+        cfg.runtime.log_format = log_format.lower()
+    da_logging.configure_logging(
+        level=cfg.runtime.log_level, fmt=cfg.runtime.log_format, verbose=cfg.runtime.verbose
+    )
 
     if validate_config:
         click.echo(f"Config valid. Alerter: {cfg.alerter.type}, frequency: {cfg.frequency}/h")
@@ -201,6 +214,19 @@ def main(
 
     loop_kwargs = _build_loop_kwargs(cfg)
 
+    if cfg.runtime.log_format == "text":
+        _log_banner()
+    logger.info(
+        "discogs_alert %s starting: alerter=%s, interval=%ss, stats_gate=%s, max_concurrency=%d, once=%s",
+        __version__, cfg.alerter.type, max(1, int(3600 / cfg.frequency)),
+        cfg.runtime.stats_gate, cfg.runtime.max_concurrency, once,
+    )
+
+    interval_seconds = max(1, int(3600 / cfg.frequency))
+    asyncio.run(_run(loop_kwargs, run_once=once, interval_seconds=interval_seconds, cfg=cfg))
+
+
+def _log_banner() -> None:
     logger.info(
         r"""
 *****************************************************************************
@@ -213,9 +239,6 @@ def main(
 *****************************************************************************
 """
     )
-
-    interval_seconds = max(1, int(3600 / cfg.frequency))
-    asyncio.run(_run(loop_kwargs, run_once=once, interval_seconds=interval_seconds, cfg=cfg))
 
 
 async def _run(

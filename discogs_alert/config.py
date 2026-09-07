@@ -24,7 +24,7 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -112,6 +112,8 @@ class RuntimeConfig(BaseModel):
     prune_after_days: int = 90
     verbose: bool = False
     log_level: str = "INFO"
+    # "text" (timestamped, human-readable) or "json" (one object per line).
+    log_format: Literal["text", "json"] = "text"
 
 
 class Config(BaseModel):
@@ -195,6 +197,7 @@ _ENV_OVERRIDES = {
     "DA_MAX_CONCURRENCY": "runtime.max_concurrency",
     "DA_PRUNE_AFTER_DAYS": "runtime.prune_after_days",
     "DA_LOG_LEVEL": "runtime.log_level",
+    "DA_LOG_FORMAT": "runtime.log_format",
 }
 
 

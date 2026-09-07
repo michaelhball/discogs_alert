@@ -243,3 +243,37 @@ def test_console_script_target_resolves_to_the_cli():
     target = getattr(importlib.import_module(module_name), attr)
     assert isinstance(target, click.Command)
     assert target is da_main.main
+
+
+def test_cli_log_format_json_installs_json_formatter(stub_run, config_file):
+    import logging
+
+    from discogs_alert.util import logging as da_logging
+
+    runner = CliRunner()
+    result = runner.invoke(da_main.main, ["--config", str(config_file), "--once", "--log-format", "json"])
+    assert result.exit_code == 0, result.output
+    assert isinstance(logging.getLogger().handlers[0].formatter, da_logging.JsonFormatter)
+    assert stub_run["cfg"].runtime.log_format == "json"
+
+
+def test_cli_config_log_level_applies_without_flag(stub_run, tmp_path: Path):
+    """`runtime.log_level` in the config file used to be ignored; it must now
+    set the root level when no CLI override is given."""
+
+    import logging
+
+    path = tmp_path / "config.toml"
+    path.write_text(
+        '''
+        discogs_token = "TOK"
+        [wantlist]
+        list_id = 1
+        [runtime]
+        log_level = "WARNING"
+        '''
+    )
+    runner = CliRunner()
+    result = runner.invoke(da_main.main, ["--config", str(path), "--once"])
+    assert result.exit_code == 0, result.output
+    assert logging.getLogger().level == logging.WARNING

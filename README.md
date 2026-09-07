@@ -235,6 +235,7 @@ A few CLI helpers exist for debugging:
 * `-O`/`--once` — run the loop once and exit (use with cron / launchd / systemd-timer).
 * `-V`/`--verbose` — DEBUG-level logs.
 * `-l`/`--log-level=<DEBUG|INFO|WARNING|ERROR>` — explicit log-level override.
+* `--log-format=<text|json>` — `text` (default) is timestamped and human-readable; `json` is one object per line for `jq` / log shippers.
 * `--validate-config` — load the config, print a one-line summary, exit.
 * `--print-config` — load the config, dump the resolved values as JSON, exit.
 * `--version`
@@ -261,6 +262,16 @@ The `-d` flag detaches the container so it runs in the background.
 ### Extras
 
 You can add to or change your wantlist (Discogs list or local JSON) while the service is running; updates are picked up on the next iteration.
+
+#### Logs
+
+Every line carries a timestamp, level, and the id of the loop iteration it belongs to (`[3f9a1c2e]`), so the interleaved output of concurrent per-release work can be grouped and a cron / launchd `--once` run can be matched to its summary:
+
+```
+2026-09-07 05:40:12 INFO    [3f9a1c2e] discogs_alert.loop: Now For Sale: Artist - Title (€34.00) — Listing available: https://www.discogs.com/sell/item/…
+```
+
+Per-request HTTP chatter from `httpx` / `curl_cffi` is hidden unless you pass `--verbose`. `--log-format json` (or `runtime.log_format = "json"`) switches to one JSON object per line with the same fields plus any structured extras.
 
 Each matching listing produces one notification — title is the release's display title, body is the listing URL. Deduplication is local: `discogs_alert` records every successful alert in `~/.discogs_alert/state.db` (configurable via `runtime.state_path` in `config.toml`) and won't re-alert across iterations.
 

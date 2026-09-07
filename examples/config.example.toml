@@ -114,3 +114,8 @@ verbose = false
 
 # Root log level. Overridden by --log-level on the CLI.
 log_level = "INFO"
+
+# Log line format. "text" is timestamped and human-readable; "json" emits one
+# object per line (ts, level, logger, run_id, msg, plus structured fields) for
+# jq / log shippers. Overridden by --log-format on the CLI.
+log_format = "text"

@@ -26,7 +26,7 @@ import httpx
 
 from discogs_alert import client as da_client, entities as da_entities, state as da_state
 from discogs_alert.alert import Alerter, get_alerter
-from discogs_alert.util import constants as dac, currency as da_currency
+from discogs_alert.util import constants as dac, currency as da_currency, logging as da_logging
 from discogs_alert.util.wantlist_directives import apply_directives
 
 logger = logging.getLogger(__name__)
@@ -242,71 +242,72 @@ async def loop(
     iterations.
     """
 
-    start_time = time.time()
-    if verbose:
-        logger.info("running loop")
+    with da_logging.run_context():
+        start_time = time.time()
+        if verbose:
+            logger.info("running loop")
 
-    own_clients = user_token_client is None and client_anon is None
-    if own_clients:
-        client_anon = da_client.AnonClient(user_agent)
-        user_token_client = da_client.UserTokenClient(user_agent, discogs_token)
-
-    try:
-        alerter = get_alerter(alerter_type, alerter_kwargs)
-        with da_state.AlertStore(state_path) as store:
-            if prune_after_days > 0:
-                pruned = store.prune_older_than(prune_after_days)
-                if pruned and verbose:
-                    logger.info(
-                        "pruned %d alert record(s) older than %d days from %s",
-                        pruned, prune_after_days, store.path,
-                    )
-            if verbose:
-                s = store.stats()
-                logger.info(
-                    "alert store at %s: %d total (last 24h: %d, last 7d: %d)",
-                    store.path, s["total"], s["last_24h"], s["last_7d"],
-                )
-            wantlist_items = await load_wantlist(list_id, user_token_client, wantlist_path)
-            random.shuffle(wantlist_items)
-            if verbose:
-                logger.info(
-                    "wantlist: %d releases, max_concurrency=%d, stats_gate=%s",
-                    len(wantlist_items), max_concurrency, use_stats_gate,
-                )
-
-            semaphore = asyncio.Semaphore(max_concurrency)
-            tasks = [
-                _gated_process_release(
-                    semaphore, release, user_token_client, client_anon, currency,
-                    country, seller_filters, record_filters,
-                    country_whitelist, country_blacklist, alerter, store,
-                    use_stats_gate, verbose,
-                )
-                for release in wantlist_items
-            ]
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-            new_alerts_total = 0
-            for release, result in zip(wantlist_items, results):
-                if isinstance(result, Exception):
-                    logger.warning(
-                        "Release %s (%s) raised: %r",
-                        release.id, release.display_title, result,
-                    )
-                else:
-                    new_alerts_total += result
-            if verbose:
-                logger.info("loop iteration sent %d new alert(s)", new_alerts_total)
-
-    except (httpx.NetworkError, httpx.TimeoutException):
-        logger.info("Network error: looping will continue as usual", exc_info=True)
-    except Exception:
-        logger.exception("Unexpected exception in loop; continuing")
-    finally:
+        own_clients = user_token_client is None and client_anon is None
         if own_clients:
-            if client_anon is not None:
-                await client_anon.aclose()
-            if user_token_client is not None:
-                await user_token_client.aclose()
+            client_anon = da_client.AnonClient(user_agent)
+            user_token_client = da_client.UserTokenClient(user_agent, discogs_token)
 
-    logger.info("\t took %.2fs", time.time() - start_time)
+        try:
+            alerter = get_alerter(alerter_type, alerter_kwargs)
+            with da_state.AlertStore(state_path) as store:
+                if prune_after_days > 0:
+                    pruned = store.prune_older_than(prune_after_days)
+                    if pruned and verbose:
+                        logger.info(
+                            "pruned %d alert record(s) older than %d days from %s",
+                            pruned, prune_after_days, store.path,
+                        )
+                if verbose:
+                    s = store.stats()
+                    logger.info(
+                        "alert store at %s: %d total (last 24h: %d, last 7d: %d)",
+                        store.path, s["total"], s["last_24h"], s["last_7d"],
+                    )
+                wantlist_items = await load_wantlist(list_id, user_token_client, wantlist_path)
+                random.shuffle(wantlist_items)
+                if verbose:
+                    logger.info(
+                        "wantlist: %d releases, max_concurrency=%d, stats_gate=%s",
+                        len(wantlist_items), max_concurrency, use_stats_gate,
+                    )
+
+                semaphore = asyncio.Semaphore(max_concurrency)
+                tasks = [
+                    _gated_process_release(
+                        semaphore, release, user_token_client, client_anon, currency,
+                        country, seller_filters, record_filters,
+                        country_whitelist, country_blacklist, alerter, store,
+                        use_stats_gate, verbose,
+                    )
+                    for release in wantlist_items
+                ]
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+                new_alerts_total = 0
+                for release, result in zip(wantlist_items, results):
+                    if isinstance(result, Exception):
+                        logger.warning(
+                            "Release %s (%s) raised: %r",
+                            release.id, release.display_title, result,
+                        )
+                    else:
+                        new_alerts_total += result
+                if verbose:
+                    logger.info("loop iteration sent %d new alert(s)", new_alerts_total)
+
+        except (httpx.NetworkError, httpx.TimeoutException):
+            logger.info("Network error: looping will continue as usual", exc_info=True)
+        except Exception:
+            logger.exception("Unexpected exception in loop; continuing")
+        finally:
+            if own_clients:
+                if client_anon is not None:
+                    await client_anon.aclose()
+                if user_token_client is not None:
+                    await user_token_client.aclose()
+
+        logger.info("\t took %.2fs", time.time() - start_time)
