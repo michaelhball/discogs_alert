@@ -17,7 +17,9 @@ poetry.lock
 .tox
 
 .currency_cache
-.claude
+# Claude Code: keep local settings out, but ship the repo skills (/release etc.)
+.claude/*
+!.claude/skills/
 
 # py2app build artifacts (Makefile output)
 .build-venv
