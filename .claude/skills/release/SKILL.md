@@ -59,7 +59,12 @@ git commit -am "Bump version to X.Y.Z"      # the pre-commit hooks must pass; if
                                             # `uvx --from poetry==1.8.4 poetry lock` first
 git push -u origin release/vX.Y.Z
 gh pr create --base main --title "Bump version to X.Y.Z" --body "Release prep for vX.Y.Z. Tag is pushed after this merges."
-gh pr checks <N> --watch
+# `gh pr checks --watch` returns immediately if GitHub hasn't registered the
+# checks yet (common in the first ~20s after `gh pr create`). Poll until they
+# exist and none are pending, then verify every one passed:
+until gh pr checks <N> 2>/dev/null | grep -q .; do sleep 10; done
+gh pr checks <N> --watch --interval 15
+gh pr checks <N> | awk -F'\t' '{print $2}' | grep -qv pass && echo "NOT GREEN — stop" || echo "all green"
 gh pr merge <N> --squash --delete-branch    # only when every check passed
 git checkout main && git pull --ff-only
 ```
@@ -119,24 +124,29 @@ Only if this machine runs the service (`launchctl print gui/$UID/com.discogsaler
 succeeds). Otherwise skip this section and say so.
 
 ```bash
-uv pip install --python ~/.discogs_alert/venv/bin/python "discogs-alert==X.Y.Z"
-#   fallback when PyPI publish failed:
+# `--refresh`: uv's cached view of PyPI's simple index can lag the JSON API by a
+# few minutes right after publish and report the new version "unsatisfiable".
+uv pip install --refresh --python ~/.discogs_alert/venv/bin/python "discogs-alert==X.Y.Z"
+#   fallback when PyPI publish failed or the index still lags:
+#   gh release download vX.Y.Z -p '*.whl' -D /tmp/da-release
 #   uv pip install --python ~/.discogs_alert/venv/bin/python /tmp/da-release/discogs_alert-X.Y.Z-*.whl
-~/.discogs_alert/venv/bin/python -m discogs_alert --version        # must print X.Y.Z
-~/.discogs_alert/venv/bin/python -m discogs_alert --validate-config
+~/.discogs_alert/venv/bin/discogs_alert --version | grep -q "X.Y.Z" || echo "STOP: venv is not on X.Y.Z"
+~/.discogs_alert/venv/bin/discogs_alert --validate-config
 launchctl bootout gui/$UID/com.discogsalert
 launchctl bootstrap gui/$UID ~/Library/LaunchAgents/com.discogsalert.plist
 ```
 
-`RunAtLoad` fires an iteration immediately. Wait for it to finish and check it:
+`RunAtLoad` fires an iteration immediately. Wait for the run *of the new
+version* (the log already holds older summaries) and check it:
 
 ```bash
-until grep -q "iteration finished" ~/Library/Logs/discogs_alert.log; do sleep 5; done   # or watch the tail of the log
+until grep -q "discogs_alert X.Y.Z starting" ~/Library/Logs/discogs_alert.log && tail -1 ~/Library/Logs/discogs_alert.log | grep -q "iteration finished"; do sleep 5; done
+~/.discogs_alert/venv/bin/discogs_alert --status          # HEALTHY, version X.Y.Z, exit 0
 launchctl print gui/$UID/com.discogsalert | grep -E "state =|last exit"    # last exit code = 0
-grep -ciE "traceback|error" ~/Library/Logs/discogs_alert.log                # explain anything non-zero
+wc -c ~/Library/Logs/discogs_alert.crash.log              # should stay 0 with log_stderr = false
 ```
 
-Do not truncate the log; the user may want the previous runs.
+Do not truncate the main log; the user may want the previous runs.
 
 ## 7. Report
 
