@@ -50,9 +50,12 @@ descriptive title in the past-tense / imperative style the user uses (e.g.
 
 ## Releases
 
-Releases are **automated on tag push**. There is a saved memory note
-at `~/.claude/projects/.../memory/release_process.md` with the exact recipe.
-Short version when the user says "release X.Y.Z":
+Releases are **automated on tag push**. Use the repo skill **`/release [X.Y.Z]`**
+(`.claude/skills/release/SKILL.md`): it bumps the version via a PR, tags
+`main`, waits for the workflow, merges the appcast PR, then upgrades the
+always-on launchd instance (`docs/deployment.md`) to the published build.
+**Default to a patch bump; a minor/major bump needs the user to confirm
+again, even if they named it.** Short version of what the skill does:
 
 1. Bump `version` in `pyproject.toml` and `_FALLBACK_VERSION` in
    `discogs_alert/__init__.py` (both must match the tag).
