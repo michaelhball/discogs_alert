@@ -163,3 +163,21 @@ def test_reconfigure_closes_previous_file_handler(tmp_path):
 def test_bad_rotation_settings_rejected(tmp_path):
     with pytest.raises(ValueError):
         da_logging.configure_logging(stream=io.StringIO(), log_file=tmp_path / "x.log", max_bytes=0)
+
+
+def test_log_stderr_off_writes_only_to_file(tmp_path):
+    stream = io.StringIO()
+    log_path = tmp_path / "only.log"
+    handler = da_logging.configure_logging(stream=stream, log_file=log_path, log_stderr=False)
+    logging.getLogger("discogs_alert.test").info("file only")
+    for h in logging.getLogger().handlers:
+        h.flush()
+    assert stream.getvalue() == ""
+    assert "file only" in log_path.read_text()
+    assert isinstance(handler, logging.FileHandler)
+    assert [type(h).__name__ for h in logging.getLogger().handlers] == ["RotatingFileHandler"]
+
+
+def test_log_stderr_off_without_file_is_refused():
+    with pytest.raises(ValueError):
+        da_logging.configure_logging(stream=io.StringIO(), log_stderr=False)

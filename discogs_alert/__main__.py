@@ -228,6 +228,7 @@ def main(
         log_file=cfg.runtime.log_file,
         max_bytes=cfg.runtime.log_max_bytes,
         backup_count=cfg.runtime.log_backup_count,
+        log_stderr=cfg.runtime.log_stderr,
     )
 
     if validate_config:

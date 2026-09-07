@@ -260,3 +260,14 @@ def test_log_rotation_bounds(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("DA_LOG_MAX_BYTES", "0")
     with pytest.raises(ValidationError):
         da_config.load_config(path=Path("/nonexistent/config.toml"))
+
+
+def test_log_stderr_false_requires_log_file(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("DA_DISCOGS_TOKEN", "TOK")
+    monkeypatch.setenv("DA_LIST_ID", "1")
+    monkeypatch.setenv("DA_LOG_STDERR", "false")
+    with pytest.raises(ValidationError):
+        da_config.load_config(path=Path("/nonexistent/config.toml"))
+    monkeypatch.setenv("DA_LOG_FILE", "/tmp/da.log")
+    cfg = da_config.load_config(path=Path("/nonexistent/config.toml"))
+    assert cfg.runtime.log_stderr is False and cfg.runtime.log_file == "/tmp/da.log"

@@ -26,7 +26,7 @@ import sys
 from pathlib import Path
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -122,6 +122,15 @@ class RuntimeConfig(BaseModel):
     log_file: Optional[str] = None
     log_max_bytes: int = Field(default=10 * 1024 * 1024, gt=0)
     log_backup_count: int = Field(default=5, ge=0)
+    # Set false (only together with log_file) when a supervisor already captures
+    # stderr to a file, so that capture holds only interpreter-level crashes.
+    log_stderr: bool = True
+
+    @model_validator(mode="after")
+    def _check_log_destination(self) -> "RuntimeConfig":
+        if not self.log_stderr and not self.log_file:
+            raise ValueError("runtime.log_stderr = false requires runtime.log_file to be set")
+        return self
 
 
 class Config(BaseModel):
@@ -210,6 +219,7 @@ _ENV_OVERRIDES = {
     "DA_LOG_FILE": "runtime.log_file",
     "DA_LOG_MAX_BYTES": "runtime.log_max_bytes",
     "DA_LOG_BACKUP_COUNT": "runtime.log_backup_count",
+    "DA_LOG_STDERR": "runtime.log_stderr",
 }
 
 

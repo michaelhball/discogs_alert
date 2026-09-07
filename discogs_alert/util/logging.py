@@ -117,23 +117,31 @@ def configure_logging(
     log_file: Optional[Union[str, Path]] = None,
     max_bytes: int = DEFAULT_LOG_MAX_BYTES,
     backup_count: int = DEFAULT_LOG_BACKUP_COUNT,
+    log_stderr: bool = True,
 ) -> logging.Handler:
     """(Re)configure the root logger. Idempotent: replaces any handlers a
     previous call (or ``logging.basicConfig``) installed, so tests and the
     menu-bar app can call it more than once.
 
-    Always logs to ``stream`` (stderr). With ``log_file`` set, also appends to
-    that file through a size-based ``RotatingFileHandler`` (``max_bytes``,
-    ``backup_count``), so a long-lived install never fills a disk. Both
-    handlers share the format and the run-id filter.
+    Logs to ``stream`` (stderr) unless ``log_stderr`` is False. With
+    ``log_file`` set, also appends to that file through a size-based
+    ``RotatingFileHandler`` (``max_bytes``, ``backup_count``), so a long-lived
+    install never fills a disk. Both handlers share the format and the run-id
+    filter. ``log_stderr=False`` is for supervisors (launchd, systemd, cron)
+    that already capture stderr to an unrotated file: with a ``log_file`` set
+    you want that capture to hold only interpreter-level crashes, not a second
+    copy of every line. At least one destination is always kept.
 
-    Returns the stream handler so callers can inspect the formatter in tests.
+    Returns the stream handler (or the file handler when stderr is off) so
+    callers can inspect the formatter in tests.
     """
 
     if fmt not in LOG_FORMATS:
         raise ValueError(f"log format must be one of {LOG_FORMATS}, got {fmt!r}")
     if log_file is not None and (max_bytes <= 0 or backup_count < 0):
         raise ValueError("max_bytes must be positive and backup_count non-negative")
+    if log_file is None and not log_stderr:
+        raise ValueError("log_stderr=False requires a log_file; refusing to configure logging with no destination")
 
     root = logging.getLogger()
     for existing in list(root.handlers):
@@ -141,10 +149,12 @@ def configure_logging(
         if isinstance(existing, logging.FileHandler):
             existing.close()
 
-    handler = logging.StreamHandler(stream or sys.stderr)
-    handler.addFilter(RunIdFilter())
-    handler.setFormatter(_formatter(fmt))
-    root.addHandler(handler)
+    handler: Optional[logging.Handler] = None
+    if log_stderr:
+        handler = logging.StreamHandler(stream or sys.stderr)
+        handler.addFilter(RunIdFilter())
+        handler.setFormatter(_formatter(fmt))
+        root.addHandler(handler)
 
     if log_file is not None:
         path = Path(log_file).expanduser()
@@ -155,6 +165,8 @@ def configure_logging(
         file_handler.addFilter(RunIdFilter())
         file_handler.setFormatter(_formatter(fmt))
         root.addHandler(file_handler)
+        if handler is None:
+            handler = file_handler
 
     root.setLevel(level.upper())
     for name in NOISY_LOGGERS:
