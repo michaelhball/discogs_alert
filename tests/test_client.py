@@ -23,8 +23,7 @@ def _make_client_with_transport(handler, user_token: str = "TOKEN") -> da_client
     # Same params/headers/timeout as the real one.
     client._client = httpx.AsyncClient(
         transport=transport,
-        params={"token": user_token},
-        headers={"User-Agent": "UA"},
+        headers={"User-Agent": "UA", "Authorization": f"Discogs token={user_token}"},
         timeout=da_client.UserTokenClient.HTTP_TIMEOUT_SECONDS,
     )
     return client
@@ -41,12 +40,13 @@ def _ok(body: bytes = b'{"ok":true}', headers: Optional[dict] = None) -> httpx.R
     )
 
 
-async def test_user_token_client_attaches_token_param(monkeypatch: pytest.MonkeyPatch):
+async def test_user_token_client_sends_token_as_authorization_header(monkeypatch: pytest.MonkeyPatch):
     captured = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
         captured["method"] = request.method
         captured["url"] = str(request.url)
+        captured["authorization"] = request.headers.get("Authorization")
         return _ok()
 
     client = _make_client_with_transport(handler)
@@ -56,8 +56,15 @@ async def test_user_token_client_attaches_token_param(monkeypatch: pytest.Monkey
         await client.aclose()
 
     assert captured["method"] == "GET"
-    assert "token=TOKEN" in captured["url"]
-    assert captured["url"].startswith("https://api.discogs.com/lists/1")
+    assert captured["authorization"] == "Discogs token=TOKEN"
+    assert "token" not in captured["url"]  # must never leak into httpx's INFO-level URL logging
+    assert captured["url"] == "https://api.discogs.com/lists/1"
+
+
+def test_user_token_client_real_client_uses_header_not_query_param():
+    client = da_client.UserTokenClient(user_agent="UA", user_token="TOKEN")
+    assert client._client.headers["Authorization"] == "Discogs token=TOKEN"
+    assert "token" not in dict(client._client.params)
 
 
 async def test_user_token_client_tracks_rate_limit_headers():

@@ -47,9 +47,10 @@ class UserTokenClient:
         self.user_agent = user_agent
         self.user_token = user_token
         self.rate_limit_guard = RateLimitGuard()
+        # Token goes in the Authorization header, not `?token=`: httpx logs full request URLs at
+        # INFO, so a query-string token would land in every log line (launchd log, Docker stdout).
         self._client = httpx.AsyncClient(
-            params={"token": user_token},
-            headers={"User-Agent": user_agent},
+            headers={"User-Agent": user_agent, "Authorization": f"Discogs token={user_token}"},
             timeout=self.HTTP_TIMEOUT_SECONDS,
         )
         # Legacy mirrors — older code reads these directly.
