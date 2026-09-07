@@ -308,7 +308,7 @@ See [here](https://www.hostinger.com/tutorials/cron-job) for more on cron / `cro
 
 #### Running as a macOS `launchd` daemon
 
-On macOS, the cleanest "always-on" path is a `launchd` agent — survives logout, doesn't need a terminal open, integrates with macOS power management. A starter template lives at `docker/launchd/com.discogsalert.plist.template`. Replace the placeholder paths, drop the file at `~/Library/LaunchAgents/com.discogsalert.plist`, and `launchctl load` it. See the comments in the template for the exact recipe.
+On macOS, the cleanest "always-on" path is a `launchd` agent — survives logout, doesn't need a terminal open, integrates with macOS power management. A starter template lives at `docker/launchd/com.discogsalert.plist.template`. Replace the placeholder paths, drop the file at `~/Library/LaunchAgents/com.discogsalert.plist`, and `launchctl bootstrap gui/$UID` it. [`docs/deployment.md`](docs/deployment.md) is the full recipe (layout, first run, upgrading, day-to-day checks) as used for the maintainer's own always-on instance.
 
 `launchd` timers pause while the Mac sleeps; for true 24/7 monitoring, run `discogs_alert` on an always-on box (Raspberry Pi, NAS, home server) instead.
 
