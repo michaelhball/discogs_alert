@@ -236,6 +236,7 @@ A few CLI helpers exist for debugging:
 * `-V`/`--verbose` — DEBUG-level logs.
 * `-l`/`--log-level=<DEBUG|INFO|WARNING|ERROR>` — explicit log-level override.
 * `--log-format=<text|json>` — `text` (default) is timestamped and human-readable; `json` is one object per line for `jq` / log shippers.
+* `--log-file=<path>` — also append logs to a file, rotated by size (`runtime.log_max_bytes`, default 10 MiB × `runtime.log_backup_count`, default 5). stderr still gets everything.
 * `--status` — health check: print the last iteration's heartbeat and alert counts; exit `0` healthy, `1` failed or stale, `2` never ran (see [Monitoring](#monitoring)).
 * `--validate-config` — load the config, print a one-line summary, exit.
 * `--print-config` — load the config, dump the resolved values as JSON, exit.

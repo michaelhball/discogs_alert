@@ -161,6 +161,13 @@ def _build_loop_kwargs(cfg: da_config.Config) -> dict:
     help="Log line format: `text` (default, timestamped) or `json` (one object per line).",
 )
 @click.option(
+    "--log-file",
+    default=None,
+    envvar="DA_LOG_FILE",
+    type=click.Path(dir_okay=False, path_type=Path),
+    help="Also append logs to this file, rotated by size (runtime.log_max_bytes / log_backup_count).",
+)
+@click.option(
     "--status",
     is_flag=True,
     help=(
@@ -185,6 +192,7 @@ def main(
     verbose: bool,
     log_level: Optional[str],
     log_format: Optional[str],
+    log_file: Optional[Path],
     status: bool,
     validate_config: bool,
     print_config: bool,
@@ -211,8 +219,15 @@ def main(
         cfg.runtime.log_level = log_level.upper()
     if log_format is not None:
         cfg.runtime.log_format = log_format.lower()
+    if log_file is not None:
+        cfg.runtime.log_file = str(log_file)
     da_logging.configure_logging(
-        level=cfg.runtime.log_level, fmt=cfg.runtime.log_format, verbose=cfg.runtime.verbose
+        level=cfg.runtime.log_level,
+        fmt=cfg.runtime.log_format,
+        verbose=cfg.runtime.verbose,
+        log_file=cfg.runtime.log_file,
+        max_bytes=cfg.runtime.log_max_bytes,
+        backup_count=cfg.runtime.log_backup_count,
     )
 
     if validate_config:

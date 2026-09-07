@@ -241,3 +241,22 @@ def test_env_override_heartbeat_path(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("DA_HEARTBEAT_PATH", "/tmp/hb.json")
     cfg = da_config.load_config(path=Path("/nonexistent/config.toml"))
     assert cfg.runtime.heartbeat_path == "/tmp/hb.json"
+
+
+def test_env_override_log_file_and_rotation(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("DA_DISCOGS_TOKEN", "TOK")
+    monkeypatch.setenv("DA_LIST_ID", "1")
+    monkeypatch.setenv("DA_LOG_FILE", "/tmp/da.log")
+    monkeypatch.setenv("DA_LOG_MAX_BYTES", "1024")
+    monkeypatch.setenv("DA_LOG_BACKUP_COUNT", "2")
+    cfg = da_config.load_config(path=Path("/nonexistent/config.toml"))
+    assert cfg.runtime.log_file == "/tmp/da.log"
+    assert cfg.runtime.log_max_bytes == 1024 and cfg.runtime.log_backup_count == 2
+
+
+def test_log_rotation_bounds(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("DA_DISCOGS_TOKEN", "TOK")
+    monkeypatch.setenv("DA_LIST_ID", "1")
+    monkeypatch.setenv("DA_LOG_MAX_BYTES", "0")
+    with pytest.raises(ValidationError):
+        da_config.load_config(path=Path("/nonexistent/config.toml"))
