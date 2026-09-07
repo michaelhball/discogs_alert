@@ -12,24 +12,24 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.10"
-beautifulsoup4 = "^4.12"
-click = "^8.1"
-curl_cffi = "^0.7"
-httpx = "^0.27"
-pydantic = "^2.6"
-requests = "^2.32"
+beautifulsoup4 = "^4.15"
+click = "^8.5"
+curl_cffi = "^0.16"
+httpx = "^0.28"
+pydantic = "^2.13"
+requests = "^2.34"
 schedule = "^1.2"
-tomli = {version = "^2.0", python = "<3.11"}
+tomli = {version = "^2.4", python = "<3.11"}
 rumps = {version = "^0.4", markers = "sys_platform == 'darwin'", optional = true}
 
 [tool.poetry.dev-dependencies]
-pre-commit = "^3.7"
-pytest = "^8.2"
-pytest-asyncio = "^0.23"
-pytest-cov = "^5.0"
-pytest-sugar = "^1.0"
-ruff = "^0.6"
-tox = "^4.15"
+pre-commit = "^4.6"
+pytest = "^9.1"
+pytest-asyncio = "^1.4"
+pytest-cov = "^7.1"
+pytest-sugar = "^1.1"
+ruff = "^0.16"
+tox = "^4.61"
 
 # `pip install discogs_alert[menubar]` pulls rumps so the macOS menu-bar
 # app (`python -m discogs_alert.menubar`) can run. rumps is gated on
