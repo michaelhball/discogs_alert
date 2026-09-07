@@ -21,13 +21,15 @@ class TelegramAlerter(Alerter):
         self.bot_chat_id = telegram_chat_id
 
     def send_alert(self, message_title: str, message_body: str) -> bool:
-        # The Bot API tolerates a single combined `text` payload; format it lightly.
+        # Plain text on purpose: Discogs titles routinely contain Markdown-significant characters
+        # (e.g. the `*` disambiguation suffix in "Juicy Zone*"), which made `parse_mode=Markdown`
+        # 400 with "can't parse entities" and the alert retry forever. URLs still auto-link.
         text = f"{message_title} ({message_body})"
         url = f"{TELEGRAM_API_BASE}/bot{self.bot_token}/sendMessage"
         try:
             resp = requests.post(
                 url,
-                json={"chat_id": self.bot_chat_id, "parse_mode": "Markdown", "text": text},
+                json={"chat_id": self.bot_chat_id, "text": text},
                 timeout=HTTP_TIMEOUT_SECONDS,
             )
         except requests.exceptions.RequestException:

@@ -35,9 +35,17 @@ def test_send_alert_posts_correct_payload(monkeypatch: pytest.MonkeyPatch, alert
     assert alerter.send_alert("title", "body") is True
     assert captured["url"] == f"{da_telegram.TELEGRAM_API_BASE}/botTEST_TOKEN/sendMessage"
     assert captured["json"]["chat_id"] == "42"
-    assert captured["json"]["parse_mode"] == "Markdown"
+    assert "parse_mode" not in captured["json"]  # plain text: Markdown broke on titles like "Juicy Zone*"
     assert captured["json"]["text"] == "title (body)"
     assert captured["timeout"] == da_telegram.HTTP_TIMEOUT_SECONDS
+
+
+def test_send_alert_markdown_characters_sent_verbatim(monkeypatch: pytest.MonkeyPatch, alerter):
+    post, captured = _fake_post()
+    monkeypatch.setattr(requests, "post", post)
+
+    assert alerter.send_alert("Juicy Zone* - Vol. 03 (€69.00)", "https://www.discogs.com/sell/item/1") is True
+    assert captured["json"]["text"].startswith("Juicy Zone* - Vol. 03")
 
 
 def test_send_alert_returns_false_on_non_200(monkeypatch: pytest.MonkeyPatch, alerter):
