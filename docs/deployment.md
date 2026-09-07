@@ -99,9 +99,17 @@ rm ~/Library/LaunchAgents/com.discogsalert.plist      # permanently
   If alert sends fail intermittently while everything else works, try another
   server for the alerter (e.g. a different public ntfy instance) or exclude the
   host from the VPN.
-- The launchd `StandardOutPath` file grows without rotation. Prefer
-  `runtime.log_file = "~/Library/Logs/discogs_alert.log"` in `config.toml`
-  (rotated at 10 MiB, 5 backups) and point the plist's `StandardOutPath` /
-  `StandardErrorPath` at a separate `discogs_alert.crash.log` that only ever
-  sees interpreter-level failures (import errors, tracebacks before logging
-  is configured).
+- The launchd `StandardOutPath` file grows without rotation. Prefer, in
+  `config.toml`:
+
+  ```toml
+  [runtime]
+  log_file = "/Users/me/Library/Logs/discogs_alert.log"   # rotated at 10 MiB, 5 backups
+  log_stderr = false                                        # don't also spray every line to launchd's capture
+  ```
+
+  and point the plist's `StandardOutPath` / `StandardErrorPath` at a separate
+  `discogs_alert.crash.log`, which then only ever sees interpreter-level
+  failures (import errors, tracebacks before logging is configured). Without
+  `log_stderr = false` that file would silently receive a second, unrotated
+  copy of the whole log.

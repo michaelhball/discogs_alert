@@ -131,3 +131,7 @@ log_format = "text"
 # log_file = "/Users/me/Library/Logs/discogs_alert.log"
 # log_max_bytes = 10485760   # 10 MiB
 # log_backup_count = 5
+# When a supervisor (launchd, systemd, cron) already captures stderr to an
+# unrotated file, turn stderr off so that capture only ever holds interpreter-
+# level crashes instead of a second copy of every line. Requires log_file.
+# log_stderr = false

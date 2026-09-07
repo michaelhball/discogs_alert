@@ -359,3 +359,14 @@ def test_cli_log_file_flag_adds_rotating_handler(stub_run, config_file, tmp_path
     files = [h for h in logging.getLogger().handlers if isinstance(h, logging.FileHandler)]
     assert len(files) == 1 and files[0].baseFilename == str(log_path)
     assert stub_run["cfg"].runtime.log_file == str(log_path)
+
+
+def test_cli_log_stderr_false_leaves_only_the_file_handler(stub_run, tmp_path: Path):
+    import logging
+
+    log_path = tmp_path / "svc.log"
+    cfg = _write_config(tmp_path, log_file=str(log_path))
+    cfg.write_text(cfg.read_text() + "log_stderr = false\n")
+    result = CliRunner().invoke(da_main.main, ["--config", str(cfg), "--once"])
+    assert result.exit_code == 0, result.output
+    assert [type(h).__name__ for h in logging.getLogger().handlers] == ["RotatingFileHandler"]
