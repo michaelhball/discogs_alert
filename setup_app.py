@@ -59,8 +59,9 @@ SPARKLE_FRAMEWORK = "vendor/Sparkle.framework"
 HAVE_SPARKLE = os.path.isdir(SPARKLE_FRAMEWORK)
 
 # Public EdDSA key the bundle uses to verify update signatures. The matching
-# private key lives at ~/.discogs_alert_release/eddsa_priv.key (gitignored)
-# and is used by `make release` to sign each new DMG. See docs/release.md.
+# private key lives in the macOS Keychain (account `discogs_alert`) and in the
+# SPARKLE_PRIVATE_KEY GitHub secret; the release workflow signs each DMG with
+# it. See docs/release.md.
 #
 # Override this env var when you generate your own keypair; the placeholder
 # below is enough to make the .app build succeed but won't accept any
