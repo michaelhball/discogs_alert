@@ -388,7 +388,7 @@ $ make dmg    # build dist/discogs_alert-X.Y.Z.dmg (the user-facing artifact)
 
 The build uses a clean throwaway venv at `.build-venv/` so unrelated packages on your outer Python don't pollute the bundle. End users only need to drag the `.app` from the DMG into `/Applications` — no Python install required.
 
-> **Code signing**: the `.app` is unsigned by default. macOS Gatekeeper will prompt the user to right-click → Open on first launch. Code signing requires an Apple Developer ID ($99/yr); see [Apple's notarization docs](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution) for the recipe.
+> **Code signing**: without the signing secrets described in [`docs/release.md`](docs/release.md), the `.app` is ad-hoc signed and macOS asks you to right-click → Open on first launch. With them, the release workflow signs and notarizes the app and the DMG.
 
 
 ## Contributing
