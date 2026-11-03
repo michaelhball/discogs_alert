@@ -8,7 +8,7 @@
         <img alt="GitHub" src="https://img.shields.io/pypi/v/discogs_alert">
     </a>
     <a href="https://pypi.org/project/discogs_alert">
-        <img alt="GitHub" src="https://img.shields.io/pypi/pyversions/tox.svg">
+        <img alt="Python versions" src="https://img.shields.io/pypi/pyversions/discogs-alert.svg">
     </a>
     <a href="https://github.com/michaelhball/discogs_alert/actions/workflows/pr_checks.yml">
         <img alt="GitHub" src="https://github.com/michaelhball/discogs_alert/actions/workflows/pr_checks.yml/badge.svg">
