@@ -671,3 +671,11 @@ async def test_process_release_sends_multi_line_titles_on_one_line(tmp_path: Pat
             seller, record, wl, bl, alerter, store,
         )
     assert alerter.calls[0][0] == "Now For Sale: Artist Injected: header"
+
+
+def test_iteration_stats_problem():
+    assert da_loop.IterationStats(scrapes_attempted=2, scrapes_ok=1).problem() is None
+    assert da_loop.IterationStats().problem() is None
+    assert da_loop.IterationStats(scrapes_attempted=2).problem() == "all 2 marketplace scrapes failed"
+    assert da_loop.IterationStats(outcome="error", error="HTTP 401").problem() == "HTTP 401"
+    assert da_loop.IterationStats(outcome="error").problem() == "unknown error"

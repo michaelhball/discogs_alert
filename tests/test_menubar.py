@@ -8,6 +8,7 @@ formatting, lifecycle) which is rumps-free.
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
 
 import pytest
 
@@ -226,3 +227,10 @@ def test_module_imports_without_rumps_installed():
     # The fact that the import at the top of this test file succeeded
     # (or that we can reference the module here) is the assertion.
     assert da_menubar.MenubarController is not None
+
+
+def test_open_path_uses_the_macos_open_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    calls: list = []
+    monkeypatch.setattr(da_menubar.subprocess, "run", lambda args, check: calls.append((args, check)))
+    da_menubar._open_path(tmp_path)
+    assert calls == [(["open", str(tmp_path)], False)]

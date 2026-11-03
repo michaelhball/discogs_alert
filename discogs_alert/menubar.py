@@ -11,7 +11,7 @@ error rather than failing somewhere deeper.
 
 For "always-on" notifications when the Mac is asleep or you're away from
 the computer, the menu-bar app is **not** the right tool — see
-``docs/launchd.md`` for the recommended cron-style alternative that uses
+``docs/deployment.md`` for the recommended launchd setup that uses
 the same ``config.toml`` and runs as a system daemon.
 """
 
@@ -20,6 +20,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import subprocess
 import threading
 from datetime import datetime
 from pathlib import Path
@@ -28,6 +29,7 @@ from typing import Optional
 from pydantic import ValidationError
 
 from discogs_alert import (
+    _sparkle,
     client as da_client,
     config as da_config,
     entities as da_entities,
@@ -166,7 +168,7 @@ class MenubarController:
         da_heartbeat.write_for_config(self.cfg, stats)
         with self._lock:
             self.last_check_at = datetime.now()
-            self.last_error = None
+            self.last_error = stats.problem()
             try:
                 with da_state.AlertStore(self.cfg.runtime.state_path) as store:
                     s = store.stats()
@@ -247,6 +249,12 @@ class MenubarController:
 # ---- the actual rumps app ---------------------------------------------------
 
 
+def _open_path(path: Path) -> None:
+    """Open a file or folder with its default macOS app."""
+
+    subprocess.run(["open", str(path)], check=False)
+
+
 def _require_rumps():
     if rumps is None:
         raise RuntimeError(
@@ -276,7 +284,6 @@ class MenubarApp:  # pragma: no cover — wired up to AppKit at runtime, not uni
 
     def _refresh_menu(self, _timer):
         self.app.title = self.controller.status_title()
-        self.app.menu[self.controller.last_check_str()]
         # rumps menu items are keyed by their original title — easier to
         # rebuild than rename. The 5s tick is cheap enough.
         try:
@@ -317,7 +324,7 @@ class MenubarApp:  # pragma: no cover — wired up to AppKit at runtime, not uni
                 "discogs_alert", "Config file not found", str(path)
             )
             return
-        rumps.macos.open_file(str(path))
+        _open_path(path)
 
     def _on_reveal_state(self, _sender):
         path = (
@@ -326,14 +333,13 @@ class MenubarApp:  # pragma: no cover — wired up to AppKit at runtime, not uni
             else da_state.DEFAULT_STATE_PATH
         )
         if path.exists():
-            rumps.macos.open_file(str(path.parent))
+            _open_path(path.parent)
 
     def run(self) -> None:
         self.controller.start()
         # Start Sparkle's auto-updater. No-op when running from source
         # (Sparkle.framework only exists inside the py2app bundle), so this
         # is safe to call unconditionally.
-        from discogs_alert import _sparkle
         _sparkle.start_updater()
         self.app.run()
 
@@ -395,7 +401,7 @@ def _run_first_launch_app(config_path: Path, exc) -> None:  # pragma: no cover
         None,
         rumps.MenuItem(
             "Open config folder…",
-            callback=lambda _s: rumps.macos.open_file(str(config_path.parent)),
+            callback=lambda _s: _open_path(config_path.parent),
         ),
         rumps.MenuItem(
             "Show example config…",

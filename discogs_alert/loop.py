@@ -122,6 +122,15 @@ class IterationStats:
             parts.append(f"api rate limit {self.api_rate_limit_remaining}/{self.api_rate_limit} remaining")
         return "; ".join(parts)
 
+    def problem(self) -> Optional[str]:
+        """Why this iteration checked nothing, in one line, or None if it worked."""
+
+        if self.outcome != "ok":
+            return self.error or "unknown error"
+        if self.scrapes_attempted > 0 and self.scrapes_ok == 0:
+            return f"all {self.scrapes_attempted} marketplace scrapes failed"
+        return None
+
     @property
     def cloudflare_blocked(self) -> int:
         return self.scrapes_failed.get("http_403", 0)
