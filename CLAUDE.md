@@ -31,7 +31,7 @@ with `DA_*` env-var overrides on top. The CLI is intentionally tiny: `--config`,
   Bots can't push direct — they have to PR + you merge.
 - **CI is the source of truth — merge autonomously.** The user does not want
   to manually review every PR. Workflow:
-  1. Open the PR. Wait for the GitHub Actions checks (`ruff`, `tox`,
+  1. Open the PR. Wait for the GitHub Actions checks (`ruff`, `tests`,
      `lfs-warning`).
   2. If CI passes, **squash-merge it yourself** with
      `gh pr merge <PR> --squash --delete-branch`.
@@ -42,7 +42,7 @@ with `DA_*` env-var overrides on top. The CLI is intentionally tiny: `--config`,
      `gh pr edit <child> --base main` first.
 - **Local checks before push** are wired up via pre-commit
   (`.pre-commit-config.yaml`): ruff + offline pytest. CI runs the full
-  tox matrix + coverage gate.
+  Python-version matrix + coverage gate.
 
 When asked to "make a PR", default to: branch off `main`, single concern,
 descriptive title in the past-tense / imperative style the user uses (e.g.
@@ -57,8 +57,9 @@ always-on launchd instance (`docs/deployment.md`) to the published build.
 **Default to a patch bump; a minor/major bump needs the user to confirm
 again, even if they named it.** Short version of what the skill does:
 
-1. Bump `version` in `pyproject.toml` and `_FALLBACK_VERSION` in
-   `discogs_alert/__init__.py` (both must match the tag).
+1. Bump the version with `uv version X.Y.Z` (updates `pyproject.toml` and
+   `uv.lock`) and `_FALLBACK_VERSION` in `discogs_alert/__init__.py` (all must
+   match the tag).
 2. `git commit -am "Bump version to X.Y.Z"`
 3. `git tag vX.Y.Z`
 4. `git push origin main --follow-tags`
@@ -76,7 +77,8 @@ See `docs/release.md` for the full reference.
 1. **Always `git fetch origin main && git log main..origin/main --oneline` first.**
    This repo's `main` moves between sessions.
 2. **Then `git pull --ff-only` on main** before branching.
-3. Sanity-check `pyproject.toml`'s version, the deps, and recent commits.
+3. Sanity-check `pyproject.toml`'s version, the deps, and recent commits. `uv sync`
+   sets up the environment; run everything through `uv run`.
 
 ## Repo layout
 
@@ -104,7 +106,7 @@ discogs_alert/
     wantlist_directives.py  # parses `@max=…` / `@media=…` from Discogs list comments
   py.typed           # PEP 561 marker
 
-docker/              # Dockerfile (poetry-based multi-stage) + launchd plist template
+docker/              # Dockerfile (uv-based multi-stage) + launchd plist template
 docs/                # release.md, appcast.xml (Sparkle feed served via Pages)
 examples/            # config.example.toml
 scripts/             # append_to_appcast.py (used by the release workflow)
@@ -163,13 +165,10 @@ If you spawn a background agent to monitor PRs or do other long-running work:
 - **Coverage matters.** Every PR that touches runtime code must add or update
   tests. CI gate: `--cov-fail-under=88`. Aim to keep it green or rising;
   today ~89%.
-- `tox` runs the full matrix (Python 3.10–3.13). `pytest -m 'not online'`
-  runs the offline suite locally in ~1s.
+- CI runs the suite on Python 3.10-3.14 with the locked dependencies.
+  `uv run pytest` runs the offline suite locally in ~1s.
 - `pytest-asyncio` is in `auto` mode (`asyncio_mode = "auto"` in pyproject) —
   any `async def test_*` runs in an event loop automatically.
-- Some environments have a stale `pytest-lazyfixture` plugin that crashes
-  pytest collection. The pre-commit and CLI invocations include
-  `-p no:lazy-fixture` defensively.
 - Network-gated tests use `@pytest.mark.online` and `--online`. Don't add
   online-only tests without that marker, and don't make them load-bearing.
 - Prefer fixture-based tests over mocks where practical — saved marketplace

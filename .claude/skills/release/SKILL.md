@@ -46,17 +46,15 @@ and the list of commits since the last tag: `git log --oneline v$current..main`)
 ## 2. Version bump via PR
 
 Branch protection blocks bots from pushing to `main` directly, so the bump
-goes through a PR like every other change. Both files must change together;
+goes through a PR like every other change. The version files must change together;
 the release workflow fails fast if the tag and `pyproject.toml` disagree.
 
 ```bash
 git checkout -b release/vX.Y.Z origin/main
-sed -i '' 's/^version = ".*"/version = "X.Y.Z"/' pyproject.toml
+uv version X.Y.Z           # updates pyproject.toml and uv.lock
 sed -i '' 's/^_FALLBACK_VERSION = ".*"/_FALLBACK_VERSION = "X.Y.Z"/' discogs_alert/__init__.py
-git diff --stat            # exactly 2 files, 1 line each
-git commit -am "Bump version to X.Y.Z"      # the pre-commit hooks must pass; if `poetry-check`
-                                            # complains about a stale lock, run
-                                            # `uvx --from poetry==1.8.4 poetry lock` first
+git diff --stat            # exactly 3 files: pyproject.toml, uv.lock, __init__.py
+git commit -am "Bump version to X.Y.Z"      # the pre-commit hooks must pass
 git push -u origin release/vX.Y.Z
 gh pr create --base main --title "Bump version to X.Y.Z" --body "Release prep for vX.Y.Z. Tag is pushed after this merges."
 # `gh pr checks --watch` returns immediately if GitHub hasn't registered the

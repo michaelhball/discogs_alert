@@ -3,17 +3,11 @@
 This file lives alongside ``pyproject.toml`` (which is the source of truth
 for everything else) because py2app reads its config from ``setup.py``-
 style ``setup(...)`` calls. We name it ``setup_app.py`` to avoid clashing
-with the regular package metadata that Poetry owns in ``pyproject.toml``.
+with the regular package metadata in ``pyproject.toml``.
 
 To build a standalone ``discogs_alert.app``::
 
-    # one-time setup
-    pip install 'discogs_alert[menubar]'
-    pip install py2app
-
-    # build
-    python setup_app.py py2app -A   # alias build (fast, dev mode)
-    python setup_app.py py2app      # full build (slow, distributable)
+    make app
 
 The output lives in ``dist/discogs_alert.app``. Drag it to ``/Applications``
 or run it directly. ``LSUIElement = True`` means it shows in the menu bar
@@ -39,7 +33,20 @@ import sys
 # large dep trees.
 sys.setrecursionlimit(50000)
 
+from py2app.build_app import py2app as Py2appCommand  # noqa: E402 — must come after the bump above
 from setuptools import setup  # noqa: E402 — must come after the bump above
+
+
+class Py2appWithoutProjectMetadata(Py2appCommand):
+    """Setuptools copies the ``[project]`` dependencies from ``pyproject.toml`` into
+    ``install_requires``, and py2app refuses to run when that field is set. py2app
+    finds what to bundle from ``OPTIONS`` and the import graph, so clear the field.
+    """
+
+    def finalize_options(self):
+        self.distribution.install_requires = []
+        super().finalize_options()
+
 
 # ---- Sparkle ---------------------------------------------------------------
 # Sparkle.framework lives at vendor/Sparkle.framework after `make sparkle`
@@ -132,5 +139,5 @@ setup(
     app=APP,
     data_files=DATA_FILES,
     options={"py2app": OPTIONS},
-    setup_requires=["py2app"],
+    cmdclass={"py2app": Py2appWithoutProjectMetadata},
 )

@@ -4,31 +4,23 @@ on: [pull_request]
 jobs:
   ruff:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
-    name: "ruff (Python ${{ matrix.python-version }})"
+    name: "ruff"
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-      - run: pip3 install ruff
-      - run: ruff check discogs_alert tests
+      - uses: astral-sh/setup-uv@v6
+      - run: uv run --locked ruff check discogs_alert tests
 
-  tox:
+  tests:
     runs-on: ubuntu-latest
-    name: "tox"
+    name: "tests (${{ matrix.python-version }})"
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-      - run: pip3 install tox
-      - run: tox -e py$(echo ${{ matrix.python-version }} | tr -d .)
+      - uses: astral-sh/setup-uv@v6
+      - run: uv run --locked --python ${{ matrix.python-version }} pytest --cov=discogs_alert --cov-report=term-missing --cov-fail-under=88 tests
 
   windows:
     runs-on: windows-latest
@@ -46,11 +38,18 @@ jobs:
           mkdir $HOME\.discogs_alert
           Copy-Item examples\config.example.toml $HOME\.discogs_alert\config.toml
           py -3.12 -m discogs_alert --validate-config
+      - uses: astral-sh/setup-uv@v6
       - name: Offline tests
         shell: pwsh
-        run: |
-          py -3.12 -m pip install pytest pytest-asyncio pytest-cov
-          py -3.12 -m pytest -m "not online" tests
+        run: uv run --locked --python 3.12 pytest -m "not online" tests
+
+  docker:
+    runs-on: ubuntu-latest
+    name: "docker build"
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f docker/Dockerfile -t discogs_alert:pr .
+      - run: docker run --rm discogs_alert:pr --version
 
   lfs-warning:
     runs-on: ubuntu-latest
