@@ -32,7 +32,7 @@ with `DA_*` env-var overrides on top. The CLI is intentionally tiny: `--config`,
 - **CI is the source of truth — merge autonomously.** The user does not want
   to manually review every PR. Workflow:
   1. Open the PR. Wait for the GitHub Actions checks (`ruff`, `tests`,
-     `lfs-warning`).
+     `large files`).
   2. If CI passes, **squash-merge it yourself** with
      `gh pr merge <PR> --squash --delete-branch`.
   3. If CI fails, push a fix to the same branch; don't open a follow-up PR.

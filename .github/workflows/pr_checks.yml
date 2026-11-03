@@ -1,13 +1,18 @@
 name: check-my-prs
 on: [pull_request]
 
+permissions:
+  contents: read
+
 jobs:
   ruff:
     runs-on: ubuntu-latest
     name: "ruff"
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
       - run: uv run --locked ruff check discogs_alert tests
 
   tests:
@@ -18,16 +23,22 @@ jobs:
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
-      - run: uv run --locked --python ${{ matrix.python-version }} pytest --cov=discogs_alert --cov-report=term-missing --cov-fail-under=88 tests
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
+      - run: uv run --locked --python "$PYTHON_VERSION" pytest --cov=discogs_alert --cov-report=term-missing --cov-fail-under=88 tests
+        env:
+          PYTHON_VERSION: ${{ matrix.python-version }}
 
   windows:
     runs-on: windows-latest
     name: "windows setup + tests"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
         with:
           python-version: "3.12"
       # Follows the README's Windows steps, using this checkout in place of PyPI and the raw GitHub URL.
@@ -38,7 +49,7 @@ jobs:
           mkdir $HOME\.discogs_alert
           Copy-Item examples\config.example.toml $HOME\.discogs_alert\config.toml
           py -3.12 -m discogs_alert --validate-config
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
       - name: Offline tests
         shell: pwsh
         run: uv run --locked --python 3.12 pytest -m "not online" tests
@@ -47,14 +58,29 @@ jobs:
     runs-on: ubuntu-latest
     name: "docker build"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
       - run: docker build -f docker/Dockerfile -t discogs_alert:pr .
       - run: docker run --rm discogs_alert:pr --version
 
-  lfs-warning:
+  large-files:
     runs-on: ubuntu-latest
+    name: "large files"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actionsdesk/lfs-warning@v3.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
-          filesizelimit: 1MB
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Reject files over 1 MB added or changed by this PR
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          status=0
+          while IFS= read -r file; do
+            if [ -f "$file" ] && [ "$(wc -c < "$file")" -gt 1048576 ]; then
+              echo "::error file=$file::$file is larger than 1 MB"
+              status=1
+            fi
+          done < <(git diff --name-only --diff-filter=d "$BASE_SHA" HEAD)
+          exit $status
