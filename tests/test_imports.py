@@ -18,4 +18,4 @@ def test_top_level_modules_import():
     """Each top-level discogs_alert module imports without side-effect errors."""
 
     from discogs_alert import alert, client, entities, loop, scrape  # noqa: F401
-    from discogs_alert.util import click, constants, currency, system  # noqa: F401
+    from discogs_alert.util import constants, currency, system  # noqa: F401

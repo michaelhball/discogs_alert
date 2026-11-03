@@ -98,7 +98,6 @@ discogs_alert/
     __init__.py        # registry + entry-point discovery
     _response.py       # shared HTTP-error logging helper
   util/
-    click.py           # NotRequiredIf / RequiredIf / EnumChoice helpers
     constants.py       # COUNTRIES, CURRENCY_CHOICES, currency symbols
     currency.py        # Frankfurter API + on-disk weekly cache + stale fallback
     rate_limit.py      # X-Discogs-Ratelimit-* tracking (sync + async)
