@@ -29,9 +29,10 @@ DMG := dist/discogs_alert-$(VERSION).dmg
 BUILD_VENV := .build-venv
 BUILD_PY := $(BUILD_VENV)/bin/python
 
-# Sparkle.framework download. Pinned to a release; bump VERSION to
-# upgrade.
-SPARKLE_VERSION := 2.7.2
+# Sparkle.framework download. Pinned to a release and its SHA-256; change both to
+# upgrade. GitHub lists the hash on the release page as the asset's digest.
+SPARKLE_VERSION := 2.10.1
+SPARKLE_SHA256 := 1a856d2a9edb8e628de88121d7be04cf0e2167f8641650b78fca00b14244cf27
 SPARKLE_TARBALL_URL := https://github.com/sparkle-project/Sparkle/releases/download/$(SPARKLE_VERSION)/Sparkle-$(SPARKLE_VERSION).tar.xz
 VENDOR := vendor
 SPARKLE_FRAMEWORK := $(VENDOR)/Sparkle.framework
@@ -87,6 +88,7 @@ $(SPARKLE_FRAMEWORK):
 	@mkdir -p $(VENDOR)
 	@echo "Downloading Sparkle $(SPARKLE_VERSION)…"
 	@curl -fsSL $(SPARKLE_TARBALL_URL) -o $(VENDOR)/sparkle.tar.xz
+	@echo "$(SPARKLE_SHA256)  $(VENDOR)/sparkle.tar.xz" | shasum -a 256 -c -
 	@tar -xJf $(VENDOR)/sparkle.tar.xz -C $(VENDOR)
 	@rm $(VENDOR)/sparkle.tar.xz
 	@# The tarball drops Sparkle.framework + bin/ into vendor/ alongside
