@@ -1,4 +1,4 @@
-"""Currency conversion using Frankfurter (https://www.frankfurter.app).
+"""Currency conversion using Frankfurter (https://frankfurter.dev).
 
 Frankfurter is free, key-less, ECB-backed. We swapped to it from
 `freecurrencyapi` (which required a `DA_CURRENCY_TOKEN` API key) to keep the
@@ -16,6 +16,7 @@ Two layers of caching:
 
 import json
 import logging
+import math
 import os
 import pathlib
 from datetime import datetime
@@ -28,14 +29,12 @@ from discogs_alert.util.system import time_cache
 
 CurrencyRates = dict[str, Union[int, float]]
 
-FRANKFURTER_BASE_URL = "https://api.frankfurter.app"
+FRANKFURTER_BASE_URL = "https://api.frankfurter.dev/v1"
 HTTP_TIMEOUT_SECONDS = 10
 
-# Directory in which to store weekly CurrencyRates JSON caches. Same env-var name
-# as the previous freecurrencyapi-based implementation, for ergonomic continuity.
-CACHE_DIR = pathlib.Path(
-    os.getenv("DA_CURRENCY_CACHE_DIR", pathlib.Path(__file__).parent.parent.parent.resolve() / ".currency_cache")
-)
+# Directory holding the weekly CurrencyRates JSON caches. Lives in the user's data
+# folder so it works from a read-only install such as the .app bundle.
+CACHE_DIR = pathlib.Path(os.getenv("DA_CURRENCY_CACHE_DIR", pathlib.Path.home() / ".discogs_alert" / "currency_cache"))
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +45,24 @@ class InvalidCurrencyException(Exception):
 
 class CurrencyProviderError(Exception):
     """Raised when the upstream currency provider is unreachable or returns an unexpected payload."""
+
+
+def _validated_rates(payload: object) -> CurrencyRates:
+    """Return `payload` if it is a non-empty mapping of finite positive rates, else
+    raise ValueError. A zero or non-numeric rate from a damaged cache file or a bad
+    response would otherwise break or distort every price comparison.
+    """
+
+    if not isinstance(payload, dict) or not payload:
+        raise ValueError("currency rates must be a non-empty mapping")
+    for code, rate in payload.items():
+        if isinstance(rate, bool) or not isinstance(rate, (int, float)) or not math.isfinite(rate) or rate <= 0:
+            raise ValueError(f"invalid currency rate for {code!r}")
+    return payload
+
+
+def _read_cache(path: pathlib.Path) -> CurrencyRates:
+    return _validated_rates(json.loads(path.read_text(encoding="utf-8")))
 
 
 def _disk_cache_path(base_currency: str) -> pathlib.Path:
@@ -102,8 +119,8 @@ def get_currency_rates(base_currency: str) -> CurrencyRates:
     cache_file = _disk_cache_path(base_currency)
     if cache_file.exists():
         try:
-            return json.load(cache_file.open("r"))
-        except (json.JSONDecodeError, OSError):
+            return _read_cache(cache_file)
+        except (ValueError, OSError):
             logger.warning("Failed to read currency cache %s; refetching", cache_file, exc_info=True)
 
     try:
@@ -112,10 +129,8 @@ def get_currency_rates(base_currency: str) -> CurrencyRates:
         )
         response.raise_for_status()
         payload = response.json()
-        rates = payload.get("rates")
-        if not isinstance(rates, dict):
-            raise CurrencyProviderError(f"Frankfurter response missing 'rates': {payload!r}")
-    except (requests.RequestException, ValueError, CurrencyProviderError) as exc:
+        rates = _validated_rates(payload.get("rates") if isinstance(payload, dict) else None)
+    except (requests.RequestException, ValueError) as exc:
         # Upstream is unreachable / errored / returned junk. Fall back to the
         # newest stale cache for this base currency if we have one — rates only
         # drift slowly, and a stale conversion is far better than crashing the
@@ -127,8 +142,8 @@ def get_currency_rates(base_currency: str) -> CurrencyRates:
                     "Frankfurter unreachable (%s); falling back to stale cache %s",
                     exc, stale,
                 )
-                return json.load(stale.open("r"))
-            except (json.JSONDecodeError, OSError):
+                return _read_cache(stale)
+            except (ValueError, OSError):
                 logger.warning("Stale cache %s unreadable", stale, exc_info=True)
         raise CurrencyProviderError(
             f"Failed to reach Frankfurter for base {base_currency} and no usable cache: {exc}"
@@ -140,7 +155,7 @@ def get_currency_rates(base_currency: str) -> CurrencyRates:
 
     try:
         CACHE_DIR.mkdir(parents=True, exist_ok=True)
-        json.dump(rates, cache_file.open("w"))
+        cache_file.write_text(json.dumps(rates), encoding="utf-8")
     except OSError:
         # Caching is best-effort; don't fail the whole request just because we
         # can't write to disk.

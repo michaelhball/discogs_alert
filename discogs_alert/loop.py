@@ -145,7 +145,8 @@ async def load_wantlist(
     so `wantlist.json` users are unaffected.
     """
 
-    assert wantlist_path is not None or (list_id is not None and user_token_client is not None)
+    if wantlist_path is None and (list_id is None or user_token_client is None):
+        raise ValueError("no wantlist configured: set wantlist.list_id or wantlist.path")
     if list_id is not None:
         user_list = await user_token_client.get_list(list_id)
         return [apply_directives(r) for r in user_list.items]
@@ -284,7 +285,9 @@ async def process_release(
             logger.debug("listing %s for %s: already alerted", listing.id, release.display_title, extra=lst)
             continue
 
-        message_title = f"Now For Sale: {release.display_title}"
+        # One line only: a line break in a title is rejected by the email and HTTP
+        # header rules that the Gmail and ntfy alerters send the title through.
+        message_title = " ".join(f"Now For Sale: {release.display_title}".split())
         message_body = f"Listing available: {listing.url}"
         price_string = f"{dac.CURRENCIES_REVERSED[listing.price.currency]}{listing.total_price:.2f}"
         logger.info("%s (%s) — %s", message_title, price_string, message_body, extra=lst)

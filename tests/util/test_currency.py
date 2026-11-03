@@ -203,3 +203,33 @@ def test_currency_choices_subset_of_fixture(rates: da_currency.CurrencyRates):
 
     for code in dac.CURRENCY_CHOICES:
         assert code in rates, f"{code} is in CURRENCY_CHOICES but missing from the rates fixture"
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [{}, [], None, {"USD": 0}, {"USD": -1.0}, {"USD": "1.1"}, {"USD": True}, {"USD": float("inf")}],
+)
+def test_validated_rates_rejects_unusable_payloads(payload):
+    with pytest.raises(ValueError):
+        da_currency._validated_rates(payload)
+
+
+def test_damaged_current_week_cache_is_refetched(monkeypatch: pytest.MonkeyPatch):
+    da_currency.CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    da_currency._disk_cache_path("EUR").write_text(json.dumps({"USD": 0}))
+    monkeypatch.setattr(requests, "get", _fake_response(payload={"rates": {"USD": 1.2}}))
+    assert da_currency.get_currency_rates("EUR")["USD"] == 1.2
+
+
+def test_provider_response_with_a_zero_rate_is_rejected(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(requests, "get", _fake_response(payload={"rates": {"USD": 0}}))
+    with pytest.raises(da_currency.CurrencyProviderError):
+        da_currency.get_currency_rates("EUR")
+
+
+def test_damaged_stale_cache_is_not_used(monkeypatch: pytest.MonkeyPatch):
+    da_currency.CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    (da_currency.CACHE_DIR / "1999-1-EUR.json").write_text(json.dumps({"USD": "junk"}))
+    monkeypatch.setattr(requests, "get", _fake_response(raise_exc=requests.ConnectionError("down")))
+    with pytest.raises(da_currency.CurrencyProviderError):
+        da_currency.get_currency_rates("EUR")

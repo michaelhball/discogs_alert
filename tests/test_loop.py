@@ -207,7 +207,7 @@ async def test_load_wantlist_from_user_token_client():
 
 
 async def test_load_wantlist_requires_a_source():
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError, match="no wantlist configured"):
         await da_loop.load_wantlist(list_id=None, user_token_client=None, wantlist_path=None)
 
 
@@ -659,3 +659,15 @@ async def test_load_wantlist_reads_utf8_regardless_of_the_locale(tmp_path: Path,
     monkeypatch.setattr(Path, "read_text", strict_read_text)
     wantlist = await da_loop.load_wantlist(wantlist_path=str(path))
     assert wantlist[0].display_title == "Déep² — Ÿ"
+
+
+async def test_process_release_sends_multi_line_titles_on_one_line(tmp_path: Path):
+    seller, record, wl, bl = _filters()
+    alerter = RecordingAlerter()
+    release = da_entities.Release(id=42, display_title="Artist\r\nInjected: header", price_threshold=100)
+    with da_state.AlertStore(tmp_path / "state.db") as store:
+        await da_loop.process_release(
+            release, FakeAnonClient([_listing(listing_id=1, value_eur=50)]), "EUR", "Germany",
+            seller, record, wl, bl, alerter, store,
+        )
+    assert alerter.calls[0][0] == "Now For Sale: Artist Injected: header"
