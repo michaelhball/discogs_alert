@@ -5,16 +5,20 @@ on:
     tags:
       - "v*.*.*"
 
+permissions:
+  contents: read
+
 jobs:
   build:
     name: Build distribution
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
-          fetch-depth: 0  # full history so generated release notes work
+          fetch-depth: 0
+          persist-credentials: false
 
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
 
       - name: Sanity-check the tag matches pyproject.toml
         run: |
@@ -28,7 +32,7 @@ jobs:
       - name: Build sdist + wheel
         run: uv build
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: dist
           path: dist/
@@ -48,12 +52,12 @@ jobs:
     # PyPI out-of-band if they want.
     continue-on-error: true
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
         with:
           name: dist
           path: dist/
 
-      - uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086  # v1.14.3
 
   github-release:
     name: Create GitHub Release
@@ -62,11 +66,12 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
         with:
           name: dist
           path: dist/
@@ -89,18 +94,20 @@ jobs:
     # login uses) and `DOCKERHUB_TOKEN` as a SECRET.
     if: ${{ vars.DOCKERHUB_USERNAME != '' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1  # v4.4.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069  # v4.4.1
 
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6  # v4.7.0
         with:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # v7.4.0
         with:
           context: .
           file: docker/Dockerfile
@@ -123,15 +130,16 @@ jobs:
       contents: write       # push the appcast branch
       pull-requests: write  # open the appcast PR
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
-          fetch-depth: 0  # need full history to push back to main later
+          fetch-depth: 0
+          persist-credentials: false
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
         with:
           python-version: "3.12"
 
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
 
       - name: Download Sparkle.framework
         run: make sparkle
@@ -139,10 +147,12 @@ jobs:
       - name: Stage public key
         # The build reads the public key from this file via DA_SPARKLE_PUBLIC_KEY.
         # `printf %s` (no newline) keeps the base64 clean.
+        env:
+          SPARKLE_PUBLIC_KEY: ${{ secrets.SPARKLE_PUBLIC_KEY }}
         run: |
           mkdir -p ~/.discogs_alert_release
           chmod 700 ~/.discogs_alert_release
-          printf '%s' "${{ secrets.SPARKLE_PUBLIC_KEY }}" > ~/.discogs_alert_release/eddsa_pub.key
+          printf '%s' "$SPARKLE_PUBLIC_KEY" > ~/.discogs_alert_release/eddsa_pub.key
           chmod 600 ~/.discogs_alert_release/eddsa_pub.key
 
       - name: Build .app
@@ -175,54 +185,57 @@ jobs:
       - name: Upload DMG to the GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DMG: ${{ steps.sign.outputs.dmg }}
         run: |
-          gh release upload "$GITHUB_REF_NAME" "${{ steps.sign.outputs.dmg }}" --clobber
+          gh release upload "$GITHUB_REF_NAME" "$DMG" --clobber
 
       - name: Open PR to append <item> to docs/appcast.xml
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DMG: ${{ steps.sign.outputs.dmg }}
+          VERSION: ${{ steps.sign.outputs.version }}
+          SIGNATURE: ${{ steps.sign.outputs.signature }}
         run: |
           set -euo pipefail
-          # Direct pushes to `main` are blocked by branch protection. Open a
-          # PR instead; the maintainer one-click-merges it. (auto-merge
-          # would need branch protection rules to allow github-actions[bot]
-          # past the required-PR-review rule, which isn't worth the
-          # admin-burden trade-off for a one-line file change.)
+          # Direct pushes to `main` are blocked by branch protection, so this opens a PR
+          # for the maintainer to merge. The checkout keeps no credentials on disk, because
+          # the build steps above run third-party code. `gh` gives git the token for the push.
+          gh auth setup-git
           git stash --include-untracked --quiet || true
           git fetch origin main
           git checkout main
           git pull --ff-only
 
-          DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/$(basename '${{ steps.sign.outputs.dmg }}')"
+          DOWNLOAD_URL="https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/$(basename "$DMG")"
           python scripts/append_to_appcast.py \
-              --version "${{ steps.sign.outputs.version }}" \
-              --signature '${{ steps.sign.outputs.signature }}' \
+              --version "$VERSION" \
+              --signature "$SIGNATURE" \
               --download-url "$DOWNLOAD_URL" \
-              --notes "<h2>${{ github.ref_name }}</h2>"
+              --notes "<h2>$GITHUB_REF_NAME</h2>"
 
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
           git add docs/appcast.xml
           if git diff --cached --quiet; then
-            echo "::notice::appcast already contains ${{ github.ref_name }}; nothing to do."
+            echo "::notice::appcast already contains $GITHUB_REF_NAME; nothing to do."
             exit 0
           fi
 
-          BRANCH="release/${{ github.ref_name }}-appcast"
+          BRANCH="release/$GITHUB_REF_NAME-appcast"
           git checkout -b "$BRANCH"
-          git commit -m "Append ${{ github.ref_name }} to appcast"
+          git commit -m "Append $GITHUB_REF_NAME to appcast"
           git push -u origin "$BRANCH"
 
           # Build the PR body via printf so we don't need to worry about
           # YAML block-scalar indentation rules eating multi-line strings.
           printf '%s\n\n%s\n\n%s\n' \
-              "Auto-generated by the release workflow on push of ${{ github.ref_name }}." \
+              "Auto-generated by the release workflow on push of $GITHUB_REF_NAME." \
               "The corresponding GitHub Release and signed DMG are already published. Merging this PR makes existing \`.app\` installs notice the update via Sparkle on their next poll." \
               "DMG: ${DOWNLOAD_URL}" \
-              > /tmp/pr_body.md
+              > "$RUNNER_TEMP/pr_body.md"
 
           gh pr create \
               --base main \
               --head "$BRANCH" \
-              --title "Append ${{ github.ref_name }} to appcast" \
-              --body-file /tmp/pr_body.md
+              --title "Append $GITHUB_REF_NAME to appcast" \
+              --body-file "$RUNNER_TEMP/pr_body.md"
