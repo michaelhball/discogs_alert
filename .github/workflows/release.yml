@@ -32,6 +32,12 @@ jobs:
       - name: Build sdist + wheel
         run: uv build
 
+      - name: Install the wheel into a clean environment and run it
+        run: |
+          uv venv "$RUNNER_TEMP/wheel-venv"
+          uv pip install --python "$RUNNER_TEMP/wheel-venv/bin/python" dist/*.whl
+          "$RUNNER_TEMP/wheel-venv/bin/discogs_alert" --version | grep -F "${GITHUB_REF_NAME#v}"
+
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: dist
@@ -139,6 +145,12 @@ jobs:
         with:
           python-version: "3.12"
 
+      # py2app bundles the interpreter it runs under; the toolcache build is a
+      # macOS framework build, which is what a double-clickable .app needs.
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
+        with:
+          python-version: "3.12"
+
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
 
       - name: Download Sparkle.framework
@@ -154,17 +166,28 @@ jobs:
           chmod 700 ~/.discogs_alert_release
           printf '%s' "$SPARKLE_PUBLIC_KEY" > ~/.discogs_alert_release/eddsa_pub.key
           chmod 600 ~/.discogs_alert_release/eddsa_pub.key
+          if [ ! -s ~/.discogs_alert_release/eddsa_pub.key ]; then
+            echo "::error::SPARKLE_PUBLIC_KEY secret is empty; the app would reject every update"
+            exit 1
+          fi
 
       - name: Build .app
         run: make app
 
-      - name: Check the bundle reports the tagged version
+      - name: Check the bundle reports the tagged version and carries the public key
         run: |
-          bundled="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' dist/discogs_alert.app/Contents/Info.plist)"
+          plist=dist/discogs_alert.app/Contents/Info.plist
+          bundled="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$plist")"
           if [ "$bundled" != "${GITHUB_REF_NAME#v}" ]; then
             echo "::error::bundle version $bundled does not match tag $GITHUB_REF_NAME"
             exit 1
           fi
+          key="$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "$plist")"
+          if [ "$key" != "$(cat ~/.discogs_alert_release/eddsa_pub.key)" ]; then
+            echo "::error::SUPublicEDKey in Info.plist is not the staged public key"
+            exit 1
+          fi
+          test -d dist/discogs_alert.app/Contents/Frameworks/Sparkle.framework
 
       - name: Build .dmg
         run: make dmg
