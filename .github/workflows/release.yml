@@ -158,6 +158,14 @@ jobs:
       - name: Build .app
         run: make app
 
+      - name: Check the bundle reports the tagged version
+        run: |
+          bundled="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' dist/discogs_alert.app/Contents/Info.plist)"
+          if [ "$bundled" != "${GITHUB_REF_NAME#v}" ]; then
+            echo "::error::bundle version $bundled does not match tag $GITHUB_REF_NAME"
+            exit 1
+          fi
+
       - name: Build .dmg
         run: make dmg
 

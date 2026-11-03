@@ -25,6 +25,9 @@ dist/discogs_alert.app/Contents/Frameworks/...`` to see whether the
 
 import os
 import sys
+from pathlib import Path
+
+import tomllib
 
 # py2app's modulegraph traversal recurses through every dep's AST. With
 # pydantic / curl_cffi / httpx in the picture, the default 1000-frame
@@ -71,6 +74,8 @@ APPCAST_URL = os.environ.get(
     "https://michaelhball.github.io/discogs_alert/appcast.xml",
 )
 
+VERSION = tomllib.loads(Path(__file__).with_name("pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
+
 APP = ["discogs_alert/menubar.py"]
 DATA_FILES = [
     # The example config gets bundled inside the .app so a first-run
@@ -81,8 +86,9 @@ PLIST = {
     "CFBundleName": "discogs_alert",
     "CFBundleDisplayName": "discogs_alert",
     "CFBundleIdentifier": "com.discogsalert.menubar",
-    "CFBundleShortVersionString": "0.1.0",
-    "CFBundleVersion": "0.1.0",
+    # Sparkle compares these with the appcast to decide whether an update is newer.
+    "CFBundleShortVersionString": VERSION,
+    "CFBundleVersion": VERSION,
     "LSUIElement": True,  # menu-bar app, no dock icon
     "NSHumanReadableCopyright": "MIT",
 }
