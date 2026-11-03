@@ -129,9 +129,10 @@ def test_cli_print_config_emits_json(stub_run, config_file):
     result = runner.invoke(da_main.main, ["--config", str(config_file), "--print-config"])
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
-    assert payload["discogs_token"] == "TOK"
+    assert payload["discogs_token"] == "***"
     assert payload["alerter"]["type"] == "NTFY"
-    assert payload["alerter"]["ntfy"]["topic"] == "x"
+    assert payload["alerter"]["ntfy"]["topic"] == "***"
+    assert payload["alerter"]["ntfy"]["server"] == "https://ntfy.sh"
     assert "loop_kwargs" not in stub_run
 
 

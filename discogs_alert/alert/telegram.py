@@ -32,8 +32,9 @@ class TelegramAlerter(Alerter):
                 json={"chat_id": self.bot_chat_id, "text": text},
                 timeout=HTTP_TIMEOUT_SECONDS,
             )
-        except requests.exceptions.RequestException:
-            logger.error("Exception sending telegram message", exc_info=True)
+        except requests.exceptions.RequestException as exc:
+            # No traceback or exception text: both contain the request URL, which holds the bot token.
+            logger.error("Exception sending telegram message: %s", type(exc).__name__)
             return False
         if resp.status_code != 200:
             log_alerter_failure("Telegram", resp.status_code, resp.text, resp.headers)

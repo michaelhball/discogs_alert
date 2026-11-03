@@ -58,3 +58,13 @@ def test_send_alert_returns_false_on_request_exception(monkeypatch: pytest.Monke
     post, _ = _fake_post(raise_exc=requests.ConnectionError("nope"))
     monkeypatch.setattr(requests, "post", post)
     assert alerter.send_alert("title", "body") is False
+
+
+def test_connection_error_log_omits_the_bot_token(monkeypatch: pytest.MonkeyPatch, alerter, caplog):
+    error = requests.exceptions.ConnectionError("POST /botTEST_TOKEN/sendMessage failed")
+    post, _ = _fake_post(raise_exc=error)
+    monkeypatch.setattr(requests, "post", post)
+
+    assert alerter.send_alert("title", "body") is False
+    assert "ConnectionError" in caplog.text
+    assert "TEST_TOKEN" not in caplog.text

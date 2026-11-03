@@ -181,3 +181,32 @@ def test_log_stderr_off_writes_only_to_file(tmp_path):
 def test_log_stderr_off_without_file_is_refused():
     with pytest.raises(ValueError):
         da_logging.configure_logging(stream=io.StringIO(), log_stderr=False)
+
+
+@pytest.mark.parametrize("fmt", ["text", "json"])
+def test_secrets_are_masked_in_messages_and_tracebacks(fmt):
+    stream = io.StringIO()
+    da_logging.configure_logging(fmt=fmt, stream=stream, secrets=["SECRET_TOKEN", "ab"])
+    log = logging.getLogger("discogs_alert.test")
+    log.info("POST /botSECRET_TOKEN/sendMessage")
+    try:
+        raise ConnectionError("url: /botSECRET_TOKEN/sendMessage")
+    except ConnectionError:
+        log.exception("send failed")
+    output = stream.getvalue()
+    assert "SECRET_TOKEN" not in output
+    assert "/bot***/sendMessage" in output
+
+
+def test_short_values_are_not_masked():
+    stream = io.StringIO()
+    da_logging.configure_logging(stream=stream, secrets=["ab"])
+    logging.getLogger("discogs_alert.test").info("cabbage")
+    assert "cabbage" in stream.getvalue()
+
+
+def test_secrets_are_masked_in_the_log_file(tmp_path):
+    path = tmp_path / "x.log"
+    da_logging.configure_logging(log_file=path, log_stderr=False, secrets=["SECRET_TOKEN"])
+    logging.getLogger("discogs_alert.test").info("value SECRET_TOKEN")
+    assert "SECRET_TOKEN" not in path.read_text()

@@ -19,10 +19,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+
+from pydantic import ValidationError
 
 from discogs_alert import (
     client as da_client,
@@ -32,7 +35,7 @@ from discogs_alert import (
     loop as da_loop,
     state as da_state,
 )
-from discogs_alert.util import constants as dac
+from discogs_alert.util import constants as dac, logging as da_logging
 
 logger = logging.getLogger(__name__)
 
@@ -350,11 +353,7 @@ def main() -> None:
     crashing with a pydantic stack trace.
     """
 
-    import os
-
-    from pydantic import ValidationError
-
-    logging.basicConfig(level=logging.INFO)
+    da_logging.configure_logging(level="INFO")
 
     config_path = os.environ.get("DA_CONFIG_PATH")
     resolved = Path(config_path) if config_path else da_config.DEFAULT_CONFIG_PATH
@@ -365,7 +364,16 @@ def main() -> None:
         _run_first_launch_app(resolved, exc)
         return
 
-    logging.getLogger().setLevel(cfg.runtime.log_level.upper())
+    da_logging.configure_logging(
+        level=cfg.runtime.log_level,
+        fmt=cfg.runtime.log_format,
+        verbose=cfg.runtime.verbose,
+        log_file=cfg.runtime.log_file,
+        max_bytes=cfg.runtime.log_max_bytes,
+        backup_count=cfg.runtime.log_backup_count,
+        log_stderr=cfg.runtime.log_stderr,
+        secrets=cfg.secret_values(),
+    )
     MenubarApp(cfg).run()
 
 
