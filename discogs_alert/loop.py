@@ -471,6 +471,11 @@ async def loop(
                 "runtime.max_concurrency.",
                 stats.cloudflare_blocked, stats.scrapes_attempted,
             )
+        elif stats.scrapes_attempted > 0 and stats.scrapes_ok == 0:
+            logger.warning(
+                "all %d marketplace scrapes failed this iteration, so no listings were checked (%s)",
+                stats.scrapes_attempted, stats._fmt(stats.scrapes_failed),
+            )
         logger.log(
             logging.INFO if stats.outcome == "ok" else logging.ERROR,
             "%s", stats.summary(), extra={"iteration": stats.as_dict()},

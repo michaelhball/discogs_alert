@@ -294,7 +294,7 @@ alerts sent:  4 in 24h, 11 in 7d, 663 total
 heartbeat:    /Users/me/.discogs_alert/last_run.json
 ```
 
-Exit codes: `0` healthy, `1` the last iteration failed or is stale (older than 2× the interval, minimum 15 minutes), `2` no heartbeat yet. Point a cron job, a launchd watchdog, or a monitoring probe at it; `--status --log-format json` prints the raw heartbeat + counts as JSON instead.
+Exit codes: `0` healthy, `1` the last iteration failed, read no marketplace page at all, or is stale (older than 2× the interval, minimum 15 minutes), `2` no heartbeat yet. Point a cron job, a launchd watchdog, or a monitoring probe at it; `--status --log-format json` prints the raw heartbeat + counts as JSON instead.
 
 Each matching listing produces one notification — title is the release's display title, body is the listing URL. Deduplication is local: `discogs_alert` records every successful alert in `~/.discogs_alert/state.db` (configurable via `runtime.state_path` in `config.toml`) and won't re-alert across iterations.
 

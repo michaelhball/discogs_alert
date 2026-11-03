@@ -56,6 +56,27 @@ def test_status_healthy():
     assert "alerts sent:  1 in 24h, 2 in 7d, 5 total" in text
 
 
+def test_status_unhealthy_when_every_scrape_failed():
+    stats = IterationStats(wantlist_size=3, scrapes_attempted=2, scrapes_ok=0, outcome="ok")
+    stats.scrapes_failed["http_403"] = 2
+    hb = da_hb.build_heartbeat(stats, "NTFY", 600, now=1000.0)
+    text, code = da_hb.status_report(hb, None, 600, now=1000.0 + 60)
+    assert code == da_hb.EXIT_UNHEALTHY
+    assert "all 2 marketplace scrapes failed" in text.splitlines()[0]
+
+
+def test_status_healthy_when_some_scrapes_succeeded():
+    stats = IterationStats(wantlist_size=3, scrapes_attempted=2, scrapes_ok=1, outcome="ok")
+    hb = da_hb.build_heartbeat(stats, "NTFY", 600, now=1000.0)
+    assert da_hb.status_report(hb, None, 600, now=1000.0 + 60)[1] == da_hb.EXIT_HEALTHY
+
+
+def test_status_healthy_when_the_gate_skipped_every_scrape():
+    stats = IterationStats(wantlist_size=3, scrapes_attempted=0, scrapes_ok=0, outcome="ok")
+    hb = da_hb.build_heartbeat(stats, "NTFY", 600, now=1000.0)
+    assert da_hb.status_report(hb, None, 600, now=1000.0 + 60)[1] == da_hb.EXIT_HEALTHY
+
+
 def test_status_stale():
     hb = da_hb.build_heartbeat(_stats(), "NTFY", 600, now=1000.0)
     text, code = da_hb.status_report(hb, None, 600, now=1000.0 + 3 * 3600)

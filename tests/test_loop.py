@@ -616,3 +616,31 @@ async def test_loop_returns_stats_and_logs_summary(tmp_path: Path, caplog: pytes
     summary = [r for r in caplog.records if r.getMessage().startswith("iteration finished")]
     assert len(summary) == 1 and summary[0].levelname == "INFO"
     assert summary[0].iteration["wantlist_size"] == 1  # structured extra for JSON logs
+
+
+async def test_loop_warns_when_a_small_wantlist_has_every_scrape_blocked(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+):
+    wl = tmp_path / "wl.json"
+    wl.write_text(json.dumps([{"id": 1, "display_title": "A"}]))
+    monkeypatch.setattr(da_client, "AnonClient", lambda *_a, **_kw: Failing403AnonClient())
+    monkeypatch.setattr(da_client, "UserTokenClient", lambda *_a, **_kw: FakeUserTokenClient(stats=False))
+
+    stats = await da_loop.loop(
+        discogs_token="X",
+        list_id=None,
+        wantlist_path=str(wl),
+        user_agent="UA",
+        country="Germany",
+        currency="EUR",
+        seller_filters=da_entities.SellerFilters(),
+        record_filters=da_entities.RecordFilters(),
+        country_whitelist=set(),
+        country_blacklist=set(),
+        alerter_type=AlerterType.PUSHBULLET,
+        alerter_kwargs={"pushbullet_token": "T"},
+        state_path=tmp_path / "state.db",
+    )
+
+    assert stats.scrapes_attempted == 1 and stats.scrapes_ok == 0
+    assert "all 1 marketplace scrapes failed" in caplog.text
