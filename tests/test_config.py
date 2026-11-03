@@ -45,6 +45,19 @@ def test_missing_discogs_token_raises(tmp_path: Path):
     assert "discogs_token" in str(exc.value)
 
 
+def test_invalid_toml_raises_config_file_error(tmp_path: Path):
+    path = tmp_path / "c.toml"
+    path.write_text("x = [")
+    with pytest.raises(da_config.ConfigFileError, match="not valid TOML"):
+        da_config.load_config(path=path, env={"DA_DISCOGS_TOKEN": "T"})
+
+
+def test_unreadable_config_raises_config_file_error(tmp_path: Path):
+    # A directory at the config path fails on open() on every platform.
+    with pytest.raises(da_config.ConfigFileError, match="can't read"):
+        da_config.load_config(path=tmp_path, env={"DA_DISCOGS_TOKEN": "T"})
+
+
 # -- TOML parsing ------------------------------------------------------------
 
 

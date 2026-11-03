@@ -35,29 +35,35 @@ from discogs_alert.util import constants as dac, logging as da_logging
 
 logger = logging.getLogger(__name__)
 
+EXAMPLE_CONFIG_URL = "https://github.com/michaelhball/discogs_alert/blob/main/examples/config.example.toml"
+
 
 def _load_or_die(config_path: Optional[Path]) -> da_config.Config:
-    """Load the config file (or env-var defaults) and exit cleanly with a
-    helpful message on validation failure.
+    """Load the config, or print what is wrong in plain words and exit 2.
 
-    `load_config` doesn't raise on a missing file — it just falls through
-    to env-var defaults. The only failure shape we wrap here is the
-    `ValidationError` you get when neither the file nor env vars supply
-    the required fields (e.g. `discogs_token`).
+    A missing file is only fatal when the environment doesn't supply the
+    required fields either, so the file check happens after validation fails.
     """
 
+    resolved = config_path or da_config.DEFAULT_CONFIG_PATH
     try:
         return da_config.load_config(path=config_path)
+    except da_config.ConfigFileError as exc:
+        click.echo(f"Invalid config: {exc}", err=True)
     except ValidationError as exc:
-        click.echo("Invalid config:", err=True)
-        click.echo(str(exc), err=True)
-        click.echo(
-            f"\nTip: copy examples/config.example.toml to "
-            f"{da_config.DEFAULT_CONFIG_PATH} and edit, or set the "
-            "required DA_* environment variables.",
-            err=True,
-        )
-        sys.exit(2)
+        if resolved.exists():
+            click.echo(f"Invalid config in {resolved}:", err=True)
+            click.echo(str(exc), err=True)
+        else:
+            click.echo(
+                f"Config file not found: {resolved}\n\n"
+                f"Create the folder {resolved.parent} and put a config.toml file in it. Start from "
+                f"{EXAMPLE_CONFIG_URL}\n"
+                "and fill in your Discogs token, list_id and alerter. "
+                "You can also set the required DA_* environment variables.",
+                err=True,
+            )
+    sys.exit(2)
 
 
 def _build_loop_kwargs(cfg: da_config.Config) -> dict:

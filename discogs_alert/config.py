@@ -10,13 +10,6 @@ Three layers, applied in priority order:
 2. **TOML file** at the resolved config path.
 3. **Environment variables** (e.g. ``DA_DISCOGS_TOKEN`` for ``discogs_token``).
    Env vars win because they're how Docker / CI / launchd inject secrets.
-
-The Mac menu-bar app, when it ships, will write the same TOML file from a
-settings panel — same shape, same loader, same validation. The runtime
-doesn't care which produced it.
-
-Phase A (this module) only adds the schema and loader; the CLI hasn't
-shrunk yet. Phase B will replace most CLI options with ``--config``.
 """
 
 from __future__ import annotations
@@ -38,6 +31,10 @@ DEFAULT_CONFIG_DIR = Path.home() / ".discogs_alert"
 DEFAULT_CONFIG_PATH = DEFAULT_CONFIG_DIR / "config.toml"
 
 DEFAULT_USER_AGENT = "DiscogsAlert/0.0.1 +http://discogsalert.com"
+
+
+class ConfigFileError(Exception):
+    """The config file exists but can't be read or parsed."""
 
 
 class WantlistConfig(BaseModel):
@@ -284,18 +281,22 @@ def load_config(
         env: env var mapping (defaults to ``os.environ``). Useful for tests.
 
     Raises:
-        FileNotFoundError: if neither the file exists nor the env vars supply
-            ``discogs_token`` (and the other required fields).
+        ConfigFileError: if the file exists but can't be read or isn't valid TOML.
         pydantic.ValidationError: if the resolved config doesn't match the
-            schema (missing required fields, wrong types, etc.).
+            schema (missing required fields, wrong types, etc.). A missing
+            file is not an error on its own: env vars can supply everything.
     """
 
     resolved_path = path or DEFAULT_CONFIG_PATH
+    data: dict = {}
     if resolved_path.exists():
-        with open(resolved_path, "rb") as f:
-            data = tomllib.load(f)
-    else:
-        data = {}
+        try:
+            with open(resolved_path, "rb") as f:
+                data = tomllib.load(f)
+        except tomllib.TOMLDecodeError as exc:
+            raise ConfigFileError(f"{resolved_path} is not valid TOML: {exc}") from exc
+        except OSError as exc:
+            raise ConfigFileError(f"can't read {resolved_path}: {exc.strerror}") from exc
 
     data = _apply_env_overrides(data, env=env)
     return Config.model_validate(data)

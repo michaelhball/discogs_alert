@@ -24,7 +24,7 @@ if sys.version_info >= (3, 11):
 else:  # pragma: no cover - exercised on the 3.10 CI leg
     import tomli as tomllib
 
-from discogs_alert import __main__ as da_main
+from discogs_alert import __main__ as da_main, config as da_config
 
 
 @pytest.fixture(autouse=True)
@@ -86,11 +86,33 @@ def test_cli_loads_config_and_starts_loop(stub_run, config_file):
     assert stub_run["cfg"].discogs_token == "TOK"
 
 
-def test_cli_missing_config_exits_2(tmp_path: Path):
-    runner = CliRunner()
-    result = runner.invoke(da_main.main, ["--config", str(tmp_path / "no.toml")])
+def test_cli_missing_config_names_the_file_and_folder(tmp_path: Path):
+    path = tmp_path / "sub" / "no.toml"
+    result = CliRunner().invoke(da_main.main, ["--config", str(path)])
     assert result.exit_code == 2
-    assert "Invalid config" in result.output or "Config file not found" in result.output
+    assert f"Config file not found: {path}" in result.output
+    assert str(path.parent) in result.output
+    assert da_main.EXAMPLE_CONFIG_URL in result.output
+    assert "Field required" not in result.output
+
+
+def test_cli_incomplete_config_file_reports_validation_error(tmp_path: Path):
+    path = tmp_path / "c.toml"
+    path.write_text('country = "France"\n')
+    result = CliRunner().invoke(da_main.main, ["--config", str(path)])
+    assert result.exit_code == 2
+    assert f"Invalid config in {path}" in result.output
+    assert "discogs_token" in result.output
+    assert "not found" not in result.output
+
+
+def test_cli_invalid_toml_exits_2_without_traceback(tmp_path: Path):
+    path = tmp_path / "c.toml"
+    path.write_text("x = [")
+    result = CliRunner().invoke(da_main.main, ["--config", str(path)])
+    assert result.exit_code == 2
+    assert "is not valid TOML" in result.output
+    assert not isinstance(result.exception, da_config.tomllib.TOMLDecodeError)
 
 
 def test_cli_validate_config_short_circuits(stub_run, config_file):
@@ -169,8 +191,6 @@ def test_cli_config_via_env_var(stub_run, config_file, monkeypatch):
 
 
 def test_build_loop_kwargs_pushbullet():
-    from discogs_alert import config as da_config
-
     cfg = da_config.Config.model_validate(
         {
             "discogs_token": "T",
