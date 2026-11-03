@@ -17,9 +17,9 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
-from typing import List, Literal, Optional
+from typing import List, Literal, Optional, Tuple
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -37,7 +37,19 @@ class ConfigFileError(Exception):
     """The config file exists but can't be read or parsed."""
 
 
-class WantlistConfig(BaseModel):
+REDACTED = "***"
+
+
+class _ConfigModel(BaseModel):
+    """Base for every config section. Validation errors omit the input values,
+    because those values can include tokens and passwords and the errors reach
+    stderr and log files.
+    """
+
+    model_config = ConfigDict(hide_input_in_errors=True)
+
+
+class WantlistConfig(_ConfigModel):
     """Where the wantlist comes from. Set exactly one of ``list_id`` (a Discogs
     list) or ``path`` (a local JSON file).
     """
@@ -46,17 +58,17 @@ class WantlistConfig(BaseModel):
     path: Optional[str] = None
 
 
-class SellerConfig(BaseModel):
+class SellerConfig(_ConfigModel):
     min_rating: int = 99
     min_sales: Optional[int] = None
 
 
-class RecordConfig(BaseModel):
+class RecordConfig(_ConfigModel):
     min_media_condition: str = "VERY_GOOD"
     min_sleeve_condition: str = "NOT_GRADED"
 
 
-class CountryFiltersConfig(BaseModel):
+class CountryFiltersConfig(_ConfigModel):
     """Two-character ISO codes (or whichever names appear in
     ``discogs_alert.util.constants.COUNTRIES``).
     """
@@ -65,28 +77,30 @@ class CountryFiltersConfig(BaseModel):
     blacklist: List[str] = Field(default_factory=list)
 
 
-class PushbulletConfig(BaseModel):
-    token: Optional[str] = None
+class PushbulletConfig(_ConfigModel):
+    token: Optional[str] = Field(default=None, repr=False)
 
 
-class TelegramConfig(BaseModel):
-    token: Optional[str] = None
+class TelegramConfig(_ConfigModel):
+    token: Optional[str] = Field(default=None, repr=False)
     chat_id: Optional[str] = None
 
 
-class NtfyConfig(BaseModel):
-    topic: Optional[str] = None
+class NtfyConfig(_ConfigModel):
+    # Anyone who knows the topic name can read and publish to it, so the topic is a secret too.
+    topic: Optional[str] = Field(default=None, repr=False)
     server: str = "https://ntfy.sh"
-    token: Optional[str] = None
+    token: Optional[str] = Field(default=None, repr=False)
 
 
-class GmailConfig(BaseModel):
+class GmailConfig(_ConfigModel):
     user: Optional[str] = None         # full Gmail address
-    app_password: Optional[str] = None # 16-char app password, not the account password
+    # 16-char app password, not the account password
+    app_password: Optional[str] = Field(default=None, repr=False)
     to: Optional[str] = None           # destination address
 
 
-class AlerterConfig(BaseModel):
+class AlerterConfig(_ConfigModel):
     """Choice of alerter and per-alerter configuration.
 
     Only the section corresponding to ``type`` is used; the others are kept
@@ -100,7 +114,7 @@ class AlerterConfig(BaseModel):
     gmail: GmailConfig = Field(default_factory=GmailConfig)
 
 
-class RuntimeConfig(BaseModel):
+class RuntimeConfig(_ConfigModel):
     """Things the runtime cares about that aren't user preferences."""
 
     state_path: Optional[str] = None
@@ -130,7 +144,7 @@ class RuntimeConfig(BaseModel):
         return self
 
 
-class Config(BaseModel):
+class Config(_ConfigModel):
     """Top-level config schema.
 
     Mirrors the TOML layout::
@@ -162,7 +176,7 @@ class Config(BaseModel):
         max_concurrency = 6
     """
 
-    discogs_token: str
+    discogs_token: str = Field(repr=False)
     user_agent: str = DEFAULT_USER_AGENT
     country: str = "Germany"
     currency: str = "EUR"
@@ -174,6 +188,31 @@ class Config(BaseModel):
     country_filters: CountryFiltersConfig = Field(default_factory=CountryFiltersConfig)
     alerter: AlerterConfig = Field(default_factory=AlerterConfig)
     runtime: RuntimeConfig = Field(default_factory=RuntimeConfig)
+
+    def _secret_slots(self) -> List[Tuple[_ConfigModel, str]]:
+        alerter = self.alerter
+        return [
+            (self, "discogs_token"),
+            (alerter.pushbullet, "token"),
+            (alerter.telegram, "token"),
+            (alerter.ntfy, "topic"),
+            (alerter.ntfy, "token"),
+            (alerter.gmail, "app_password"),
+        ]
+
+    def secret_values(self) -> List[str]:
+        """Every configured secret, so logging can mask them."""
+
+        return [value for section, name in self._secret_slots() if (value := getattr(section, name))]
+
+    def redacted_dump(self) -> dict:
+        """The resolved config as plain data, with each configured secret masked."""
+
+        redacted = self.model_copy(deep=True)
+        for section, name in redacted._secret_slots():
+            if getattr(section, name):
+                setattr(section, name, REDACTED)
+        return redacted.model_dump()
 
 
 # -- env var override surface ------------------------------------------------

@@ -189,7 +189,7 @@ def _build_loop_kwargs(cfg: da_config.Config) -> dict:
 @click.option(
     "--print-config",
     is_flag=True,
-    help="Load the config, dump the resolved values as JSON, and exit.",
+    help="Load the config, dump the resolved values as JSON with secrets masked, and exit.",
 )
 @click.version_option(__version__)
 def main(
@@ -236,6 +236,7 @@ def main(
         max_bytes=cfg.runtime.log_max_bytes,
         backup_count=cfg.runtime.log_backup_count,
         log_stderr=cfg.runtime.log_stderr,
+        secrets=cfg.secret_values(),
     )
 
     if validate_config:
@@ -246,7 +247,7 @@ def main(
         sys.exit(_status(cfg))
 
     if print_config:
-        click.echo(json.dumps(cfg.model_dump(), indent=2, default=str))
+        click.echo(json.dumps(cfg.redacted_dump(), indent=2, default=str))
         return
 
     loop_kwargs = _build_loop_kwargs(cfg)

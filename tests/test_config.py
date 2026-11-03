@@ -58,6 +58,52 @@ def test_unreadable_config_raises_config_file_error(tmp_path: Path):
         da_config.load_config(path=tmp_path, env={"DA_DISCOGS_TOKEN": "T"})
 
 
+def test_validation_error_omits_input_values(tmp_path: Path):
+    env = {"DA_NTFY_TOKEN": "SECRET_NTFY", "DA_PUSHBULLET_TOKEN": "SECRET_PB", "DA_GMAIL_APP_PASSWORD": "SECRET_GM"}
+    with pytest.raises(ValidationError) as exc:
+        da_config.load_config(path=tmp_path / "none.toml", env=env)
+    assert "discogs_token" in str(exc.value)
+    assert "SECRET" not in str(exc.value)
+
+
+def _config_with_every_secret() -> da_config.Config:
+    return da_config.load_config(
+        path=Path("/nonexistent/config.toml"),
+        env={
+            "DA_DISCOGS_TOKEN": "SECRET_DISCOGS",
+            "DA_PUSHBULLET_TOKEN": "SECRET_PB",
+            "DA_TELEGRAM_TOKEN": "SECRET_TG",
+            "DA_NTFY_TOPIC": "SECRET_TOPIC",
+            "DA_NTFY_TOKEN": "SECRET_NTFY",
+            "DA_GMAIL_APP_PASSWORD": "SECRET_GM",
+        },
+    )
+
+
+def test_secret_values_lists_every_configured_secret():
+    assert set(_config_with_every_secret().secret_values()) == {
+        "SECRET_DISCOGS", "SECRET_PB", "SECRET_TG", "SECRET_TOPIC", "SECRET_NTFY", "SECRET_GM",
+    }
+
+
+def test_redacted_dump_masks_secrets_and_leaves_the_config_intact():
+    cfg = _config_with_every_secret()
+    dump = cfg.redacted_dump()
+    assert "SECRET" not in str(dump)
+    assert dump["discogs_token"] == "***"
+    assert dump["alerter"]["ntfy"]["token"] == "***"
+    assert cfg.discogs_token == "SECRET_DISCOGS"
+
+
+def test_redacted_dump_leaves_unset_secrets_empty():
+    cfg = da_config.load_config(path=Path("/nonexistent/config.toml"), env={"DA_DISCOGS_TOKEN": "SECRET_DISCOGS"})
+    assert cfg.redacted_dump()["alerter"]["telegram"]["token"] is None
+
+
+def test_repr_omits_secrets():
+    assert "SECRET" not in repr(_config_with_every_secret())
+
+
 # -- TOML parsing ------------------------------------------------------------
 
 

@@ -27,7 +27,7 @@ import sys
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import IO, Iterator, Optional, Union
+from typing import IO, Iterable, Iterator, Optional, Union
 
 TEXT_FORMAT = "%(asctime)s %(levelname)-7s [%(run_id)s] %(name)s: %(message)s"
 TEXT_DATEFMT = "%Y-%m-%d %H:%M:%S"
@@ -39,6 +39,10 @@ LOG_FORMATS = ("text", "json")
 NOISY_LOGGERS = ("httpx", "httpcore", "urllib3", "curl_cffi", "asyncio")
 
 NO_RUN_ID = "-"
+
+REDACTED = "***"
+# Shorter values are skipped: masking a two-letter value would garble ordinary words.
+MIN_REDACTED_LENGTH = 6
 
 DEFAULT_LOG_MAX_BYTES = 10 * 1024 * 1024  # rotate at 10 MiB …
 DEFAULT_LOG_BACKUP_COUNT = 5  # … keeping 5 old files (≈60 MiB worst case)
@@ -105,8 +109,29 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(payload, default=str, ensure_ascii=False)
 
 
-def _formatter(fmt: str) -> logging.Formatter:
-    return JsonFormatter() if fmt == "json" else logging.Formatter(TEXT_FORMAT, datefmt=TEXT_DATEFMT)
+class RedactingFormatter(logging.Formatter):
+    """Masks secret strings in the finished line, tracebacks included. Secrets can
+    reach a log line inside a library's message: Telegram's bot token is part of the
+    request URL, and `requests` and `urllib3` both print that URL.
+    """
+
+    def __init__(self, inner: logging.Formatter, secrets: Iterable[str]) -> None:
+        super().__init__()
+        self._inner = inner
+        # Longest first, so a secret that contains another is masked whole.
+        self._secrets = sorted(secrets, key=len, reverse=True)
+
+    def format(self, record: logging.LogRecord) -> str:
+        line = self._inner.format(record)
+        for secret in self._secrets:
+            line = line.replace(secret, REDACTED)
+        return line
+
+
+def _formatter(fmt: str, secrets: Iterable[str] = ()) -> logging.Formatter:
+    inner = JsonFormatter() if fmt == "json" else logging.Formatter(TEXT_FORMAT, datefmt=TEXT_DATEFMT)
+    maskable = [s for s in secrets if len(s) >= MIN_REDACTED_LENGTH]
+    return RedactingFormatter(inner, maskable) if maskable else inner
 
 
 def configure_logging(
@@ -118,6 +143,7 @@ def configure_logging(
     max_bytes: int = DEFAULT_LOG_MAX_BYTES,
     backup_count: int = DEFAULT_LOG_BACKUP_COUNT,
     log_stderr: bool = True,
+    secrets: Iterable[str] = (),
 ) -> logging.Handler:
     """(Re)configure the root logger. Idempotent: replaces any handlers a
     previous call (or ``logging.basicConfig``) installed, so tests and the
@@ -130,7 +156,8 @@ def configure_logging(
     filter. ``log_stderr=False`` is for supervisors (launchd, systemd, cron)
     that already capture stderr to an unrotated file: with a ``log_file`` set
     you want that capture to hold only interpreter-level crashes, not a second
-    copy of every line. At least one destination is always kept.
+    copy of every line. At least one destination is always kept. Both handlers
+    mask every string in ``secrets``.
 
     Returns the stream handler (or the file handler when stderr is off) so
     callers can inspect the formatter in tests.
@@ -143,6 +170,7 @@ def configure_logging(
     if log_file is None and not log_stderr:
         raise ValueError("log_stderr=False requires a log_file; refusing to configure logging with no destination")
 
+    secrets = list(secrets)
     root = logging.getLogger()
     for existing in list(root.handlers):
         root.removeHandler(existing)
@@ -153,7 +181,7 @@ def configure_logging(
     if log_stderr:
         handler = logging.StreamHandler(stream or sys.stderr)
         handler.addFilter(RunIdFilter())
-        handler.setFormatter(_formatter(fmt))
+        handler.setFormatter(_formatter(fmt, secrets))
         root.addHandler(handler)
 
     if log_file is not None:
@@ -163,7 +191,7 @@ def configure_logging(
             path, maxBytes=max_bytes, backupCount=backup_count, encoding="utf-8"
         )
         file_handler.addFilter(RunIdFilter())
-        file_handler.setFormatter(_formatter(fmt))
+        file_handler.setFormatter(_formatter(fmt, secrets))
         root.addHandler(file_handler)
         if handler is None:
             handler = file_handler
