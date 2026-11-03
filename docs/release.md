@@ -16,19 +16,18 @@ existing installs upgrade themselves automatically.
    make keys
    ```
    Sparkle 2 stores the private key in the macOS Keychain (account name
-   `discogs_alert`); `make sign` finds it there automatically. The
-   target also writes:
-   - A **backup of the private key** at
-     `~/.discogs_alert_release/eddsa_priv.key`. Back this up
-     somewhere safe (1Password, encrypted USB, …) — losing both the
-     keychain entry AND this file means existing installs can never
-     auto-update.
-   - The **public key** at `~/.discogs_alert_release/eddsa_pub.key`,
-     which the build reads into the `.app`'s `Info.plist`.
+   `discogs_alert`); `make sign` and `make secrets` read it from there. The
+   target writes only the **public key**, to
+   `~/.discogs_alert_release/eddsa_pub.key`, which the build reads into the
+   `.app`'s `Info.plist`. Nothing writes the private key to disk.
 
-   `make keys` is idempotent: re-running it on a machine with an
-   existing key for the `discogs_alert` account just re-extracts the
-   public key and refreshes the backup file.
+   Keep one copy of the private key outside this Mac: `make export-key`
+   puts it on the clipboard for pasting into a password manager. Losing the
+   Keychain entry, that copy and the GitHub secret means existing installs
+   can never auto-update.
+
+   `make keys` is idempotent: re-running it on a machine with an existing
+   key for the `discogs_alert` account just re-extracts the public key.
 
 3. **Set up GitHub Pages** for the appcast feed (one-time):
    - This repo already has Pages enabled on `main` / `docs/`. New
@@ -44,9 +43,10 @@ existing installs upgrade themselves automatically.
    ```bash
    make secrets
    ```
-   That just runs `gh secret set SPARKLE_PUBLIC_KEY < ~/…/eddsa_pub.key`
-   and `gh secret set SPARKLE_PRIVATE_KEY < ~/…/eddsa_priv.key`. The
-   release workflow reads both at runtime.
+   That runs `gh secret set SPARKLE_PUBLIC_KEY` from the public-key file
+   and `gh secret set SPARKLE_PRIVATE_KEY` from a temporary export of the
+   Keychain entry, which it deletes afterwards. The release workflow reads
+   both at runtime.
 
    *Re-running `make secrets` overwrites the secrets in place, so you
    can do this again any time (e.g. after rotating keys).*
