@@ -244,6 +244,8 @@ py -m discogs_alert
 
 Check the config without starting the loop: `py -m discogs_alert --validate-config`.
 
+Write Windows paths in the config with forward slashes: `path = "C:/Users/me/wantlist.json"`.
+
 The first run alerts on every listing that matches your filters. `country` and `currency` default to Germany and EUR, so set yours.
 
 A few CLI helpers exist for debugging:
