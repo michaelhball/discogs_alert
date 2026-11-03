@@ -301,7 +301,8 @@ def test_cli_config_log_level_applies_without_flag(stub_run, tmp_path: Path):
 
 def _write_config(tmp_path: Path, **runtime) -> Path:
     body = 'discogs_token = "TOK"\nfrequency = 6\n[wantlist]\nlist_id = 1\n[runtime]\n'
-    body += "".join(f'{k} = "{v}"\n' for k, v in runtime.items())
+    # JSON string quoting is valid TOML, and it escapes the backslashes in Windows paths.
+    body += "".join(f"{k} = {json.dumps(v)}\n" for k, v in runtime.items())
     path = tmp_path / "config.toml"
     path.write_text(body)
     return path

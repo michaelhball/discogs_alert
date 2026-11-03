@@ -208,6 +208,7 @@ def main(
     Quick start:
 
       \b
+      mkdir -p ~/.discogs_alert
       cp examples/config.example.toml ~/.discogs_alert/config.toml
       $EDITOR ~/.discogs_alert/config.toml
       python -m discogs_alert

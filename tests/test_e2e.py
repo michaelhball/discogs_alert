@@ -18,7 +18,7 @@ from discogs_alert import client as da_client, entities as da_entities, loop as 
 from discogs_alert.alert import AlerterType
 
 FIXTURES = Path(__file__).parent / "data"
-REAL_MARKETPLACE_HTML = (FIXTURES / "marketplace_listing_real.html").read_text()
+REAL_MARKETPLACE_HTML = (FIXTURES / "marketplace_listing_real.html").read_text(encoding="utf-8")
 
 
 class _RecordingAlerter:
