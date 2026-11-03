@@ -41,15 +41,14 @@ SPARKLE_FRAMEWORK := $(VENDOR)/Sparkle.framework
 # name so they don't collide with any existing keys.
 SPARKLE_ACCOUNT := discogs_alert
 
-# EdDSA keypair files outside the repo. The PUB_KEY file is what the
-# build reads via DA_SPARKLE_PUBLIC_KEY → Info.plist. The PRIV_KEY file
-# is a backup of the keychain entry; the actual signing uses the
-# keychain by default (`sign_update --account $(SPARKLE_ACCOUNT)`).
+# The public key file is what the build reads via DA_SPARKLE_PUBLIC_KEY
+# into Info.plist. The private key stays in the macOS Keychain; nothing
+# here writes it to disk except `make secrets`, which exports it to a
+# temporary file for `gh secret set` and deletes that file afterwards.
 RELEASE_DIR := $(HOME)/.discogs_alert_release
-PRIV_KEY := $(RELEASE_DIR)/eddsa_priv.key
 PUB_KEY := $(RELEASE_DIR)/eddsa_pub.key
 
-.PHONY: all app dmg sparkle keys sign appcast secrets clean clean-build clean-venv clean-vendor
+.PHONY: all app dmg sparkle keys export-key sign appcast secrets clean clean-build clean-venv clean-vendor
 
 all: dmg
 
@@ -104,11 +103,11 @@ $(SPARKLE_FRAMEWORK):
 #
 # Sparkle 2's `generate_keys` stores the *private* key in the macOS
 # Keychain under an account name (we use `discogs_alert`). What we add:
-# parse the public key out of the tool's stdout, save it to a file the
-# build can read, and export the private key to a backup file.
+# parse the public key out of the tool's stdout and save it to a file
+# the build can read.
 #
 # Idempotent: re-running just re-extracts the public key from the
-# existing keychain entry and refreshes the backup file.
+# existing keychain entry.
 keys: $(SPARKLE_FRAMEWORK)
 	@mkdir -p $(RELEASE_DIR)
 	@chmod 700 $(RELEASE_DIR)
@@ -118,16 +117,20 @@ keys: $(SPARKLE_FRAMEWORK)
 		| awk '/<string>/{ gsub(/^[[:space:]]*<string>|<\/string>.*$$/, ""); print; exit }' \
 		> $(PUB_KEY)
 	@chmod 600 $(PUB_KEY)
-	@# Best-effort backup of the private key.
-	@$(VENDOR)/bin/generate_keys --account $(SPARKLE_ACCOUNT) -x $(PRIV_KEY) >/dev/null 2>&1 || true
-	@if [ -f $(PRIV_KEY) ]; then chmod 600 $(PRIV_KEY); fi
 	@echo
 	@echo "✅ EdDSA keypair ready (Sparkle account '$(SPARKLE_ACCOUNT)')."
 	@echo "   Public key  → $(PUB_KEY)  (baked into the next 'make app')"
 	@echo "   Private key → macOS Keychain (account=$(SPARKLE_ACCOUNT))"
-	@if [ -f $(PRIV_KEY) ]; then \
-		echo "   Backup file → $(PRIV_KEY)  (BACK THIS UP)"; \
-	fi
+	@echo "   Keep one copy outside this Mac: 'make export-key' puts it on the clipboard for your password manager."
+
+# Copy the private key to the clipboard so it can be pasted into a password
+# manager. The clipboard is cleared again after 60 seconds.
+export-key: $(SPARKLE_FRAMEWORK)
+	@tmp="$$(mktemp)"; \
+	$(VENDOR)/bin/generate_keys --account $(SPARKLE_ACCOUNT) -x "$$tmp" >/dev/null; \
+	pbcopy < "$$tmp"; rm -P "$$tmp"
+	@echo "Private key copied to the clipboard. Paste it into your password manager now; the clipboard clears in 60s."
+	@(sleep 60; pbcopy </dev/null) &
 
 # Sign the most recently built DMG with the keychain-stored private key.
 # Prints the `sparkle:edSignature="…" length="…"` line you paste into
@@ -173,10 +176,12 @@ clean-vendor:
 # tag-triggered release workflow can build + sign on a macOS runner.
 # Only the maintainer ever runs this; it just calls `gh secret set` for
 # each key. Idempotent — re-running overwrites the secret in place.
-secrets: $(PUB_KEY) $(PRIV_KEY)
+secrets: $(PUB_KEY) $(SPARKLE_FRAMEWORK)
 	@echo "Pushing Sparkle keys to GitHub repo secrets…"
 	@gh secret set SPARKLE_PUBLIC_KEY < $(PUB_KEY)
-	@gh secret set SPARKLE_PRIVATE_KEY < $(PRIV_KEY)
+	@tmp="$$(mktemp)"; \
+	$(VENDOR)/bin/generate_keys --account $(SPARKLE_ACCOUNT) -x "$$tmp" >/dev/null; \
+	gh secret set SPARKLE_PRIVATE_KEY < "$$tmp"; rm -P "$$tmp"
 	@echo
 	@echo "✅ Secrets installed:"
 	@echo "   SPARKLE_PUBLIC_KEY"
