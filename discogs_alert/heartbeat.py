@@ -9,7 +9,8 @@ never sees a half-written file.
 a short report and exits with a code a supervisor can act on:
 
 - ``0`` healthy — last iteration succeeded and is not stale
-- ``1`` unhealthy — last iteration failed, or is older than the stale threshold
+- ``1`` unhealthy — last iteration failed, read no marketplace page at all, or
+  is older than the stale threshold
 - ``2`` no heartbeat yet (never ran, or a different ``state_path``)
 
 "Stale" means older than twice the configured interval, with a floor of 15
@@ -142,14 +143,19 @@ def status_report(
     threshold = stale_after_seconds(interval_seconds)
     stale = age > threshold
     outcome = heartbeat.get("outcome", "unknown")
-    healthy = outcome == "ok" and not stale
+    iteration = heartbeat.get("iteration") or {}
+    scrapes_attempted = iteration.get("scrapes_attempted", 0)
+    none_scraped = scrapes_attempted > 0 and iteration.get("scrapes_ok", 0) == 0
+    healthy = outcome == "ok" and not stale and not none_scraped
 
     if healthy:
         verdict = "HEALTHY"
     elif stale:
         verdict = f"STALE (last run {_humanize(age)} ago > {_humanize(threshold)} threshold)"
-    else:
+    elif outcome != "ok":
         verdict = f"UNHEALTHY (last run {outcome}: {heartbeat.get('error') or 'unknown error'})"
+    else:
+        verdict = f"UNHEALTHY (all {scrapes_attempted} marketplace scrapes failed, so no listings were checked)"
 
     lines = [
         f"discogs_alert {heartbeat.get('version', '?')} — {verdict}",
