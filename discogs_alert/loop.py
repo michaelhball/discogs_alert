@@ -154,7 +154,7 @@ async def load_wantlist(
     # (e.g. "VERY_GOOD"); pydantic's `Release.model_validate` accepts both the
     # IntEnum value and the name, so we can pass the dict through directly.
     wantlist: list = []
-    for release_dict in json.load(Path(wantlist_path).open("r")):
+    for release_dict in json.loads(Path(wantlist_path).read_text(encoding="utf-8")):
         if (mmc := release_dict.get("min_media_condition")) is not None and isinstance(mmc, str):
             release_dict["min_media_condition"] = da_entities.CONDITION[mmc]
         if (msc := release_dict.get("min_sleeve_condition")) is not None and isinstance(msc, str):

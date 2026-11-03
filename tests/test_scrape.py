@@ -22,8 +22,8 @@ from discogs_alert import entities as da_entities, scrape as da_scrape
 from discogs_alert.util import constants as dac
 
 FIXTURES = Path(__file__).parent / "data"
-MARKETPLACE_HTML = (FIXTURES / "marketplace_listing.html").read_text()
-REAL_MARKETPLACE_HTML = (FIXTURES / "marketplace_listing_real.html").read_text()
+MARKETPLACE_HTML = (FIXTURES / "marketplace_listing.html").read_text(encoding="utf-8")
+REAL_MARKETPLACE_HTML = (FIXTURES / "marketplace_listing_real.html").read_text(encoding="utf-8")
 
 
 # -- _parse_price_string ----------------------------------------------------

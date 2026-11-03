@@ -644,3 +644,18 @@ async def test_loop_warns_when_a_small_wantlist_has_every_scrape_blocked(
 
     assert stats.scrapes_attempted == 1 and stats.scrapes_ok == 0
     assert "all 1 marketplace scrapes failed" in caplog.text
+
+
+async def test_load_wantlist_reads_utf8_regardless_of_the_locale(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    # Windows defaults to cp1252 for text files, which misreads UTF-8 titles.
+    path = tmp_path / "wantlist.json"
+    path.write_bytes(json.dumps([{"id": 1, "display_title": "Déep² — Ÿ"}], ensure_ascii=False).encode("utf-8"))
+    original = Path.read_text
+
+    def strict_read_text(self, encoding=None, errors=None):
+        assert encoding == "utf-8"
+        return original(self, encoding=encoding, errors=errors)
+
+    monkeypatch.setattr(Path, "read_text", strict_read_text)
+    wantlist = await da_loop.load_wantlist(wantlist_path=str(path))
+    assert wantlist[0].display_title == "Déep² — Ÿ"
