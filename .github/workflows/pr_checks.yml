@@ -30,6 +30,28 @@ jobs:
       - run: pip3 install tox
       - run: tox -e py$(echo ${{ matrix.python-version }} | tr -d .)
 
+  windows:
+    runs-on: windows-latest
+    name: "windows setup + tests"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # Follows the README's Windows steps, using this checkout in place of PyPI and the raw GitHub URL.
+      - name: README steps
+        shell: pwsh
+        run: |
+          py -3.12 -m pip install .
+          mkdir $HOME\.discogs_alert
+          Copy-Item examples\config.example.toml $HOME\.discogs_alert\config.toml
+          py -3.12 -m discogs_alert --validate-config
+      - name: Offline tests
+        shell: pwsh
+        run: |
+          py -3.12 -m pip install pytest pytest-asyncio pytest-cov
+          py -3.12 -m pytest -m "not online" tests
+
   lfs-warning:
     runs-on: ubuntu-latest
     steps:

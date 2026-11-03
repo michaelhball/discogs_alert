@@ -224,10 +224,27 @@ Configuration lives in `~/.discogs_alert/config.toml` (or wherever `--config` po
 #### Python
 
 ```bash
-$ cp examples/config.example.toml ~/.discogs_alert/config.toml
+$ mkdir -p ~/.discogs_alert
+$ curl -o ~/.discogs_alert/config.toml https://raw.githubusercontent.com/michaelhball/discogs_alert/main/examples/config.example.toml
 $ $EDITOR ~/.discogs_alert/config.toml   # fill in your token, list_id, alerter
 $ discogs_alert                          # or: python -m discogs_alert
 ```
+
+#### Windows
+
+Run these in PowerShell. Your config goes in `C:\Users\<you>\.discogs_alert\config.toml`.
+
+```powershell
+py -m pip install discogs-alert
+mkdir $HOME\.discogs_alert
+curl.exe -o $HOME\.discogs_alert\config.toml https://raw.githubusercontent.com/michaelhball/discogs_alert/main/examples/config.example.toml
+notepad $HOME\.discogs_alert\config.toml   # fill in your token, list_id, alerter
+py -m discogs_alert
+```
+
+Check the config without starting the loop: `py -m discogs_alert --validate-config`.
+
+The first run alerts on every listing that matches your filters. `country` and `currency` default to Germany and EUR, so set yours.
 
 A few CLI helpers exist for debugging:
 
