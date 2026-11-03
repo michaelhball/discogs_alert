@@ -239,6 +239,9 @@ def main(
         secrets=cfg.secret_values(),
     )
 
+    for warning in da_config.config_warnings(cfg, config_path):
+        logger.warning("%s", warning)
+
     if validate_config:
         click.echo(f"Config valid. Alerter: {cfg.alerter.type}, frequency: {cfg.frequency}/h")
         return

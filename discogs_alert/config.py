@@ -259,6 +259,27 @@ _ENV_OVERRIDES = {
 }
 
 
+def config_warnings(cfg: Config, path: Optional[Path] = None) -> List[str]:
+    """Settings that work but leave a secret exposed. The CLI logs each one at
+    WARNING after loading the config.
+    """
+
+    warnings: List[str] = []
+    resolved_path = path or DEFAULT_CONFIG_PATH
+    # Windows has no POSIX permission bits; its ACLs are out of scope here.
+    if os.name != "nt" and resolved_path.exists() and resolved_path.stat().st_mode & 0o077:
+        warnings.append(
+            f"{resolved_path} is readable by other users on this machine and holds your Discogs token; "
+            f"run: chmod 600 {resolved_path}"
+        )
+    ntfy = cfg.alerter.ntfy
+    if cfg.alerter.type.upper() == "NTFY" and ntfy.token and ntfy.server.lower().startswith("http://"):
+        warnings.append(
+            f"alerter.ntfy.server is {ntfy.server}, so the ntfy token travels unencrypted; use an https:// server"
+        )
+    return warnings
+
+
 def _coerce_env_value(env_name: str, raw: str) -> object:
     """Best-effort coerce a string env var to the right type.
 

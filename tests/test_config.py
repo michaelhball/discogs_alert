@@ -4,6 +4,7 @@ Covers schema defaults, TOML parsing, env-var overrides, and the priority
 order between the two.
 """
 
+import sys
 from pathlib import Path
 
 import pytest
@@ -330,3 +331,43 @@ def test_log_stderr_false_requires_log_file(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("DA_LOG_FILE", "/tmp/da.log")
     cfg = da_config.load_config(path=Path("/nonexistent/config.toml"))
     assert cfg.runtime.log_stderr is False and cfg.runtime.log_file == "/tmp/da.log"
+
+
+# -- warnings ----------------------------------------------------------------
+
+
+def _write_minimal(path: Path, mode: int) -> Path:
+    path.write_text('discogs_token = "TOK"\n')
+    path.chmod(mode)
+    return path
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX permission bits")
+def test_warns_when_config_is_readable_by_others(tmp_path: Path):
+    path = _write_minimal(tmp_path / "c.toml", 0o644)
+    cfg = da_config.load_config(path=path, env={})
+    warnings = da_config.config_warnings(cfg, path)
+    assert len(warnings) == 1
+    assert str(path) in warnings[0] and "chmod 600" in warnings[0]
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX permission bits")
+def test_no_warning_for_private_config(tmp_path: Path):
+    path = _write_minimal(tmp_path / "c.toml", 0o600)
+    cfg = da_config.load_config(path=path, env={})
+    assert da_config.config_warnings(cfg, path) == []
+
+
+def test_no_permission_warning_without_a_file(tmp_path: Path):
+    cfg = da_config.load_config(path=tmp_path / "none.toml", env={"DA_DISCOGS_TOKEN": "T"})
+    assert da_config.config_warnings(cfg, tmp_path / "none.toml") == []
+
+
+def test_warns_when_an_ntfy_token_goes_over_plain_http(tmp_path: Path):
+    env = {"DA_DISCOGS_TOKEN": "T", "DA_NTFY_TOKEN": "SECRET", "DA_NTFY_SERVER": "http://ntfy.example.com"}
+    cfg = da_config.load_config(path=tmp_path / "none.toml", env=env)
+    warnings = da_config.config_warnings(cfg, tmp_path / "none.toml")
+    assert len(warnings) == 1 and "unencrypted" in warnings[0]
+    env["DA_NTFY_SERVER"] = "https://ntfy.example.com"
+    cfg = da_config.load_config(path=tmp_path / "none.toml", env=env)
+    assert da_config.config_warnings(cfg, tmp_path / "none.toml") == []

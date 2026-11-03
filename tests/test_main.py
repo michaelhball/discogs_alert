@@ -128,7 +128,7 @@ def test_cli_print_config_emits_json(stub_run, config_file):
     runner = CliRunner()
     result = runner.invoke(da_main.main, ["--config", str(config_file), "--print-config"])
     assert result.exit_code == 0, result.output
-    payload = json.loads(result.output)
+    payload = json.loads(result.stdout)
     assert payload["discogs_token"] == "***"
     assert payload["alerter"]["type"] == "NTFY"
     assert payload["alerter"]["ntfy"]["topic"] == "***"
@@ -337,7 +337,7 @@ def test_cli_status_json_output(tmp_path: Path):
     da_hb.write_heartbeat(tmp_path / "last_run.json", da_hb.build_heartbeat(failed, "NTFY", 600))
     result = CliRunner().invoke(da_main.main, ["--config", str(cfg), "--status", "--log-format", "json"])
     assert result.exit_code == 1
-    payload = json.loads(result.output)
+    payload = json.loads(result.stdout)
     assert payload["heartbeat"]["outcome"] == "error" and payload["alerts"]["total"] == 0
 
 
@@ -392,3 +392,11 @@ def test_cli_log_stderr_false_leaves_only_the_file_handler(stub_run, tmp_path: P
     result = CliRunner().invoke(da_main.main, ["--config", str(cfg), "--once"])
     assert result.exit_code == 0, result.output
     assert [type(h).__name__ for h in logging.getLogger().handlers] == ["RotatingFileHandler"]
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX permission bits")
+def test_cli_warns_about_a_world_readable_config(stub_run, config_file):
+    config_file.chmod(0o644)
+    result = CliRunner().invoke(da_main.main, ["--config", str(config_file), "--validate-config"])
+    assert result.exit_code == 0, result.output
+    assert "chmod 600" in result.output

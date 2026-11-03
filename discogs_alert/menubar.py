@@ -380,6 +380,8 @@ def main() -> None:
         log_stderr=cfg.runtime.log_stderr,
         secrets=cfg.secret_values(),
     )
+    for warning in da_config.config_warnings(cfg, resolved):
+        logger.warning("%s", warning)
     MenubarApp(cfg).run()
 
 
