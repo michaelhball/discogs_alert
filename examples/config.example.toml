@@ -17,7 +17,7 @@ discogs_token = "REPLACE_ME"
 country = "Germany"
 
 # Preferred currency for price comparisons. Listings in other currencies
-# are converted via Frankfurter (https://www.frankfurter.app).
+# are converted via Frankfurter (https://frankfurter.dev).
 currency = "EUR"
 
 # How many times per hour to query the marketplace. 60 = once a minute.
