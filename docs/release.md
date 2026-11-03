@@ -61,7 +61,7 @@ need to bump the version, commit, tag, push:
 # 1. Bump the version in pyproject.toml AND discogs_alert/__init__.py.
 #    Both must match the tag, or the `release` workflow's sanity-check
 #    fails fast.
-$EDITOR pyproject.toml             # bump [tool.poetry] version
+uv version 0.1.1                   # bumps pyproject.toml and uv.lock
 $EDITOR discogs_alert/__init__.py  # bump _FALLBACK_VERSION to match
 
 # 2. Commit, tag, push.

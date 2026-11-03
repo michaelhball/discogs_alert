@@ -1,11 +1,11 @@
 """``discogs_alert`` — Customised, real-time alerts for your Discogs wantlist.
 
 The version comes from the installed package's metadata when available
-(normal pip / poetry install) and falls back to ``_FALLBACK_VERSION`` for
+(normal pip / uv install) and falls back to ``_FALLBACK_VERSION`` for
 environments where metadata isn't available — most importantly the py2app
 ``.app`` bundle, which doesn't ship the dist-info directory.
 
-Keep ``_FALLBACK_VERSION`` in sync with ``[tool.poetry] version`` in
+Keep ``_FALLBACK_VERSION`` in sync with ``[project] version`` in
 ``pyproject.toml`` (the release bump PR touches both).
 """
 

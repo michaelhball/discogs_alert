@@ -4,7 +4,7 @@ All alerters live in this package and are registered in two places:
 
 1. ``_BUILTIN_ALERTERS`` (below) — used by tests / editable installs that
    don't have the metadata for entry-point discovery.
-2. ``[tool.poetry.plugins."discogs_alert.alerters"]`` in ``pyproject.toml``
+2. ``[project.entry-points."discogs_alert.alerters"]`` in ``pyproject.toml``
    — used by installed-wheel / pip runtimes; discovered at startup via
    ``importlib.metadata.entry_points``.
 

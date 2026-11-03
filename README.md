@@ -70,10 +70,11 @@ The container runs `python -m discogs_alert` as its entrypoint; pass your config
 ```bash
 git clone https://github.com/michaelhball/discogs_alert
 cd discogs_alert
-pip install -e .
+uv sync
+uv run discogs_alert
 ```
 
-For development you'll also want `pip install -e '.[menubar]'` if you're on a Mac and want the menu-bar app, plus `poetry install` to get the dev deps (`pytest`, `ruff`, `tox`, etc.).
+Add `--extra menubar` to `uv sync` if you're on a Mac and want the menu-bar app. `uv sync` also installs the dev deps (`pytest`, `ruff`, etc.).
 
 ## Setup
 
@@ -400,12 +401,13 @@ The build uses a clean throwaway venv at `.build-venv/` so unrelated packages on
 
 ### Setting up the dev environment
 
-Ideally, you should work inside a virtual environment set up for this project. Once that's the case, simply run the following two commands to install all dependencies:
+The project uses [uv](https://docs.astral.sh/uv/). `uv.lock` pins every dependency. Install everything with:
 
-* `$ pip install --user poetry`
-* `$ poetry install` 
+* `$ uv sync`
 
-And that's it! Until you want to propose your changes as a new PR. When that's the case you need to run the tests to make sure nothing has broken, which you can do simply by running `$ tox` in the project's root directory. 
+Run the tests before you open a PR:
+
+* `$ uv run pytest`
 
 ### Cutting a release
 

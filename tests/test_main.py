@@ -254,10 +254,10 @@ async def test_run_invokes_loop_once_when_run_once_true(monkeypatch: pytest.Monk
 
 
 def test_console_script_target_resolves_to_the_cli():
-    """`[tool.poetry.scripts]` must point at the same click command as `python -m discogs_alert`."""
+    """`[project.scripts]` must point at the same click command as `python -m discogs_alert`."""
 
     pyproject = tomllib.loads((Path(__file__).resolve().parents[1] / "pyproject.toml").read_text())
-    scripts = pyproject["tool"]["poetry"]["scripts"]
+    scripts = pyproject["project"]["scripts"]
     assert "discogs_alert" in scripts
 
     module_name, _, attr = scripts["discogs_alert"].partition(":")

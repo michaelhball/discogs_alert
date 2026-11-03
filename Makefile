@@ -1,6 +1,6 @@
 # Build / package recipes for the discogs_alert macOS menu-bar app.
 #
-# The Python project itself uses Poetry (see pyproject.toml). This Makefile
+# The Python project itself uses uv (see pyproject.toml, uv.lock). This Makefile
 # is for the Mac-specific build pipeline that turns the Python package
 # into a draggable .dmg.
 #
@@ -53,10 +53,8 @@ PUB_KEY := $(RELEASE_DIR)/eddsa_pub.key
 all: dmg
 
 $(BUILD_VENV):
-	$(PYTHON) -m venv $(BUILD_VENV)
-	$(BUILD_PY) -m pip install --upgrade pip
-	$(BUILD_PY) -m pip install -e '.[menubar]'
-	$(BUILD_PY) -m pip install py2app
+	uv venv --python-preference only-system --python $(PYTHON) $(BUILD_VENV)
+	UV_PROJECT_ENVIRONMENT=$(BUILD_VENV) uv sync --locked --no-dev --extra menubar --group app
 
 # Build the standalone .app bundle. Full build (not alias) so the
 # resulting bundle is portable to any Mac without a Python install.

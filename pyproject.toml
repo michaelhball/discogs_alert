@@ -1,52 +1,39 @@
-[tool.poetry]
+[project]
 name = "discogs_alert"
 version = "0.1.3"
 description = "Configurable, real-time alerts for your discogs wantlist"
 license = "MIT"
-authors = ["mhsb <michael.h.s.ball@gmail.com>"]
-homepage = 'https://github.com/michaelhball/discogs_alert'
-repository = 'https://github.com/michaelhball/discogs_alert'
-keywords = ['discogs', 'dig', 'digger']
-include = ["LICENSE", "discogs_alert/py.typed"]
+license-files = ["LICENSE"]
+authors = [{ name = "mhsb", email = "michael.h.s.ball@gmail.com" }]
+keywords = ["discogs", "dig", "digger"]
 readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "beautifulsoup4>=4.15,<5",
+    "click>=8.5,<9",
+    "curl_cffi>=0.17,<0.18",
+    "httpx>=0.28,<0.29",
+    "pydantic>=2.14,<3",
+    "requests>=2.34,<3",
+    "tomli>=2.4,<3; python_version < '3.11'",
+]
 
-[tool.poetry.dependencies]
-python = "^3.10"
-beautifulsoup4 = "^4.15"
-click = "^8.5"
-curl_cffi = "^0.16"
-httpx = "^0.28"
-pydantic = "^2.13"
-requests = "^2.34"
-schedule = "^1.2"
-tomli = {version = "^2.4", python = "<3.11"}
-rumps = {version = "^0.4", markers = "sys_platform == 'darwin'", optional = true}
-
-[tool.poetry.dev-dependencies]
-pre-commit = "^4.6"
-pytest = "^9.1"
-pytest-asyncio = "^1.4"
-pytest-cov = "^7.1"
-pytest-sugar = "^1.1"
-ruff = "^0.16"
-tox = "^4.61"
+[project.urls]
+Homepage = "https://github.com/michaelhball/discogs_alert"
+Repository = "https://github.com/michaelhball/discogs_alert"
 
 # `pip install discogs_alert[menubar]` pulls rumps so the macOS menu-bar
 # app (`python -m discogs_alert.menubar`) can run. rumps is gated on
 # `sys_platform == "darwin"` so non-Mac installs of the extra silently
 # skip it rather than failing.
-[tool.poetry.extras]
-menubar = ["rumps"]
+[project.optional-dependencies]
+menubar = ["rumps>=0.4,<0.5; sys_platform == 'darwin'"]
 
 # Console script so `pip install discogs-alert` / `uv tool install discogs-alert`
 # / `pipx install discogs-alert` expose a `discogs_alert` command. Same click
 # entry point as `python -m discogs_alert`.
-[tool.poetry.scripts]
+[project.scripts]
 discogs_alert = "discogs_alert.__main__:main"
-
-[build-system]
-requires = ["poetry-core>=1.9.0"]
-build-backend = "poetry.core.masonry.api"
 
 # Built-in alerters are registered both here (so `pip install discogs-alert`
 # exposes them via entry points) and in
@@ -54,24 +41,39 @@ build-backend = "poetry.core.masonry.api"
 # tests work without entry-point installation). The entry-point group keeps
 # the alerter lookup table dynamic; new alerters land here as part of a
 # regular in-tree PR.
-[tool.poetry.plugins."discogs_alert.alerters"]
+[project.entry-points."discogs_alert.alerters"]
 GMAIL = "discogs_alert.alert.gmail:GmailAlerter"
 NTFY = "discogs_alert.alert.ntfy:NtfyAlerter"
 PUSHBULLET = "discogs_alert.alert.pushbullet:PushbulletAlerter"
 TELEGRAM = "discogs_alert.alert.telegram:TelegramAlerter"
 
+[dependency-groups]
+dev = [
+    "pre-commit>=4.7; python_version >= '3.11'",
+    "pytest>=9.2",
+    "pytest-asyncio>=1.4",
+    "pytest-cov>=7.1",
+    "ruff>=0.17",
+]
+# The tools `make app` needs to build the macOS bundle.
+app = [
+    "py2app>=0.28; sys_platform == 'darwin'",
+    "setuptools>=80; sys_platform == 'darwin'",
+]
+
+[build-system]
+requires = ["uv_build>=0.13,<0.14"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = ""
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-# Only collect from tests/. The plugin-alerter-template under examples/ has
-# its own tests that target its own package; running them from the project
-# root breaks because the example's package isn't on sys.path here.
 testpaths = ["tests"]
 markers = [
     "online: marks tests as requiring internet access (select with '--online')",
 ]
-
-[tool.black]
-line-length = 120
 
 [tool.ruff]
 exclude = [".git", ".ruff_cache", "dist", "docker", "img"]

@@ -14,24 +14,19 @@ jobs:
         with:
           fetch-depth: 0  # full history so generated release notes work
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install Poetry
-        run: pip install "poetry==1.8.0"
+      - uses: astral-sh/setup-uv@v6
 
       - name: Sanity-check the tag matches pyproject.toml
         run: |
           tag="${GITHUB_REF#refs/tags/v}"
-          pyver="$(poetry version --short)"
+          pyver="$(uv version --short)"
           if [ "$tag" != "$pyver" ]; then
             echo "::error::tag v$tag does not match pyproject.toml version $pyver"
             exit 1
           fi
 
       - name: Build sdist + wheel
-        run: poetry build
+        run: uv build
 
       - uses: actions/upload-artifact@v4
         with:
@@ -136,10 +131,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install build deps
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e '.[menubar]' py2app
+      - uses: astral-sh/setup-uv@v6
 
       - name: Download Sparkle.framework
         run: make sparkle
