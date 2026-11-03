@@ -1,42 +1,42 @@
-# Creating a python base with shared environment variables
-FROM python:3.12-slim as python-base
+# Two stages: `builder` installs the locked dependencies with uv, `final` holds
+# only the Python runtime and that environment, and runs as an unprivileged user.
+FROM python:3.13-alpine@sha256:7984cf56ceaddebe4fefeb75d64000b9f45d8b77b11a09b24524da6cdc3af0c8 AS python-base
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONFAULTHANDLER=1
 
 
-# create 'builder' stage to install the locked dependencies and `discogs_alert`
-FROM python-base as builder
+FROM python-base AS builder
 
-ENV PIP_DEFAULT_TIMEOUT=100 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PIP_NO_CACHE_DIR=1 \
-    UV_PROJECT_ENVIRONMENT=/venv \
-    UV_PYTHON_PREFERENCE=only-system
+ENV UV_PROJECT_ENVIRONMENT=/venv \
+    UV_PYTHON_PREFERENCE=only-system \
+    UV_VERSION=0.13.7
+RUN pip install --no-cache-dir "uv==$UV_VERSION"
 
-ENV UV_VERSION=0.13.7
-RUN pip install "uv==$UV_VERSION"
-
-# No browser or webdriver needed: `curl_cffi` handles the marketplace scrape directly.
+# `curl_cffi` ships musl wheels, so no browser, webdriver or compiler is needed.
 WORKDIR /src
 COPY pyproject.toml uv.lock README.md LICENSE ./
 COPY discogs_alert ./discogs_alert
 RUN uv sync --locked --no-dev --no-editable
 
 
-# create lightweight 'final' stage with which to run discogs alert
-FROM python-base as final
+FROM python-base AS final
+
+# pip and setuptools are only needed to build; dropping them removes their
+# vendored copies of urllib3 and msgpack from the image.
+RUN pip uninstall -y pip setuptools 2>/dev/null; \
+    rm -rf /usr/local/lib/python3.13/site-packages/pip* /usr/local/lib/python3.13/site-packages/setuptools* \
+    && adduser -D -h /home/app app
 
 COPY --from=builder /venv /venv
 
-# Create a directory in which to cache currency conversion dicts
-ENV DA_CURRENCY_CACHE_DIR=/.currency_cache
-RUN mkdir $DA_CURRENCY_CACHE_DIR
+# `state.db`, the heartbeat and the currency cache live under /home/app/.discogs_alert.
+# Mount a volume there to keep alerts deduplicated across container restarts.
+ENV HOME=/home/app \
+    DA_CURRENCY_CACHE_DIR=/home/app/.discogs_alert/currency_cache \
+    IN_DA_DOCKER="true"
+USER app
+WORKDIR /home/app
 
-# Set env variable so we can distinguish whether or not we're running in Docker
-ENV IN_DA_DOCKER="true"
-
-# run entrypoint
-COPY ./docker/docker-entrypoint.sh ./
-ENTRYPOINT ["./docker-entrypoint.sh"]
+ENTRYPOINT ["/venv/bin/discogs_alert"]

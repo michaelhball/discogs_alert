@@ -63,6 +63,12 @@ jobs:
           persist-credentials: false
       - run: docker build -f docker/Dockerfile -t discogs_alert:pr .
       - run: docker run --rm discogs_alert:pr --version
+      - name: Fail on a fixable HIGH or CRITICAL vulnerability in the image
+        run: |
+          docker save discogs_alert:pr -o "$RUNNER_TEMP/image.tar"
+          docker run --rm -v "$RUNNER_TEMP/image.tar:/image.tar:ro" \
+              aquasec/trivy:0.76.1@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c \
+              image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --input /image.tar
 
   large-files:
     runs-on: ubuntu-latest

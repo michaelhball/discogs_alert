@@ -60,10 +60,10 @@ Download the latest `.dmg` from [Releases](https://github.com/michaelhball/disco
 
 ```bash
 docker pull miggleball/discogs_alert:latest
-docker run -d --env-file .env miggleball/discogs_alert:latest
+docker run -d --env-file .env -v discogs_alert:/home/app/.discogs_alert miggleball/discogs_alert:latest
 ```
 
-The container runs `python -m discogs_alert` as its entrypoint; pass your config via env vars (`DA_DISCOGS_TOKEN`, `DA_LIST_ID`, …) in your `.env` file.
+The container runs `discogs_alert` as its entrypoint, as an unprivileged user; pass your config via env vars (`DA_DISCOGS_TOKEN`, `DA_LIST_ID`, …) in your `.env` file. The volume keeps the alert history, so a restarted container does not alert again on listings it already sent.
 
 ### From source
 
