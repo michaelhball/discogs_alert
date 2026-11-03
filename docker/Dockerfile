@@ -39,4 +39,10 @@ ENV HOME=/home/app \
 USER app
 WORKDIR /home/app
 
+# `docker ps` shows the container as unhealthy when the last iteration failed,
+# read no marketplace page, or is older than twice the interval. `--status`
+# exits 2 before the first iteration, so the start period covers that.
+HEALTHCHECK --interval=5m --timeout=30s --start-period=3m \
+    CMD /venv/bin/discogs_alert --status >/dev/null 2>&1 || exit 1
+
 ENTRYPOINT ["/venv/bin/discogs_alert"]
