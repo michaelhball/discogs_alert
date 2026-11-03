@@ -361,7 +361,7 @@ def main() -> None:
 
     try:
         cfg = da_config.load_config(path=resolved)
-    except ValidationError as exc:
+    except (ValidationError, da_config.ConfigFileError) as exc:
         _run_first_launch_app(resolved, exc)
         return
 
