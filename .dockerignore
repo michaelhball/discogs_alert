@@ -1,4 +1,9 @@
 dist/
 .pytest_cache/
 .ruff_cache/
-.tox/
+.venv/
+.build-venv/
+build/
+vendor/
+*.env
+.git/

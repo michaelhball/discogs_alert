@@ -106,7 +106,7 @@ discogs_alert/
     wantlist_directives.py  # parses `@max=…` / `@media=…` from Discogs list comments
   py.typed           # PEP 561 marker
 
-docker/              # Dockerfile (uv-based multi-stage) + launchd plist template
+docker/              # Dockerfile (Alpine, uv-based multi-stage, non-root) + launchd plist template
 docs/                # release.md, appcast.xml (Sparkle feed served via Pages)
 examples/            # config.example.toml
 scripts/             # append_to_appcast.py (used by the release workflow)
