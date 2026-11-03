@@ -117,6 +117,12 @@ Makefile             # make app / dmg / sparkle / keys / sign / secrets
 setup_app.py         # py2app config for the .app bundle
 ```
 
+## Dependencies
+
+`uv.lock` pins every package. Dependabot (`.github/dependabot.yml`) opens one grouped PR per ecosystem each
+month: Python packages, GitHub Actions, the Docker base image and pre-commit hooks. Treat these like any other
+PR: squash-merge when CI passes. Update by hand with `uv lock --upgrade`.
+
 ## Things to be careful about
 
 - **Rate limits matter.** Patterns the user has been bitten by:
