@@ -6,10 +6,9 @@ longer this alerter's concern — see `discogs_alert.state.AlertStore`.
 
 from __future__ import annotations
 
-import json
 import logging
 
-import requests
+import httpx
 
 from discogs_alert.alert._response import log_alerter_failure
 from discogs_alert.alert.base import Alerter
@@ -25,13 +24,11 @@ class PushbulletAlerter(Alerter):
         self.pushbullet_token = pushbullet_token
 
     def send_alert(self, message_title: str, message_body: str) -> bool:
-        headers = {"Authorization": f"Bearer {self.pushbullet_token}", "Content-Type": "application/json"}
+        headers = {"Authorization": f"Bearer {self.pushbullet_token}"}
         message = {"type": "note", "title": message_title, "body": message_body}
         try:
-            resp = requests.post(
-                PUSHBULLET_API_URL, data=json.dumps(message), headers=headers, timeout=HTTP_TIMEOUT_SECONDS
-            )
-        except requests.exceptions.RequestException:
+            resp = httpx.post(PUSHBULLET_API_URL, json=message, headers=headers, timeout=HTTP_TIMEOUT_SECONDS)
+        except httpx.HTTPError:
             logger.error("Exception sending pushbullet push", exc_info=True)
             return False
         if resp.status_code != 200:

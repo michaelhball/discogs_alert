@@ -16,7 +16,7 @@ from __future__ import annotations
 import base64
 import logging
 
-import requests
+import httpx
 
 from discogs_alert.alert._response import log_alerter_failure
 from discogs_alert.alert.base import Alerter
@@ -30,7 +30,7 @@ HTTP_TIMEOUT_SECONDS = 10
 def encode_header(value: str) -> str:
     """Return `value` as an HTTP header value that ntfy shows unchanged.
 
-    HTTP headers carry ASCII only, and `requests` rejects anything else. ntfy
+    HTTP headers carry ASCII only, and `httpx` rejects anything else. ntfy
     reads RFC 2047 encoded words (``=?UTF-8?B?<base64>?=``) in any header, so
     a title with characters such as "²" or "—" is sent that way. ASCII titles
     pass through untouched.
@@ -55,10 +55,10 @@ class NtfyAlerter(Alerter):
         if self.ntfy_token:
             headers["Authorization"] = f"Bearer {self.ntfy_token}"
         try:
-            resp = requests.post(
-                url, data=message_body.encode("utf-8"), headers=headers, timeout=HTTP_TIMEOUT_SECONDS
+            resp = httpx.post(
+                url, content=message_body.encode("utf-8"), headers=headers, timeout=HTTP_TIMEOUT_SECONDS
             )
-        except requests.exceptions.RequestException:
+        except httpx.HTTPError:
             logger.error("Exception sending ntfy push", exc_info=True)
             return False
         if resp.status_code >= 400:

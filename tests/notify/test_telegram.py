@@ -1,7 +1,7 @@
 from unittest.mock import MagicMock
 
+import httpx
 import pytest
-import requests
 
 from discogs_alert.alert import telegram as da_telegram
 
@@ -30,7 +30,7 @@ def _fake_post(status_code: int = 200, raise_exc=None):
 
 def test_send_alert_posts_correct_payload(monkeypatch: pytest.MonkeyPatch, alerter):
     post, captured = _fake_post()
-    monkeypatch.setattr(requests, "post", post)
+    monkeypatch.setattr(httpx, "post", post)
 
     assert alerter.send_alert("title", "body") is True
     assert captured["url"] == f"{da_telegram.TELEGRAM_API_BASE}/botTEST_TOKEN/sendMessage"
@@ -42,7 +42,7 @@ def test_send_alert_posts_correct_payload(monkeypatch: pytest.MonkeyPatch, alert
 
 def test_send_alert_markdown_characters_sent_verbatim(monkeypatch: pytest.MonkeyPatch, alerter):
     post, captured = _fake_post()
-    monkeypatch.setattr(requests, "post", post)
+    monkeypatch.setattr(httpx, "post", post)
 
     assert alerter.send_alert("Juicy Zone* - Vol. 03 (€69.00)", "https://www.discogs.com/sell/item/1") is True
     assert captured["json"]["text"].startswith("Juicy Zone* - Vol. 03")
@@ -50,21 +50,21 @@ def test_send_alert_markdown_characters_sent_verbatim(monkeypatch: pytest.Monkey
 
 def test_send_alert_returns_false_on_non_200(monkeypatch: pytest.MonkeyPatch, alerter):
     post, _ = _fake_post(status_code=400)
-    monkeypatch.setattr(requests, "post", post)
+    monkeypatch.setattr(httpx, "post", post)
     assert alerter.send_alert("title", "body") is False
 
 
 def test_send_alert_returns_false_on_request_exception(monkeypatch: pytest.MonkeyPatch, alerter):
-    post, _ = _fake_post(raise_exc=requests.ConnectionError("nope"))
-    monkeypatch.setattr(requests, "post", post)
+    post, _ = _fake_post(raise_exc=httpx.ConnectError("nope"))
+    monkeypatch.setattr(httpx, "post", post)
     assert alerter.send_alert("title", "body") is False
 
 
 def test_connection_error_log_omits_the_bot_token(monkeypatch: pytest.MonkeyPatch, alerter, caplog):
-    error = requests.exceptions.ConnectionError("POST /botTEST_TOKEN/sendMessage failed")
+    error = httpx.ConnectError("POST /botTEST_TOKEN/sendMessage failed")
     post, _ = _fake_post(raise_exc=error)
-    monkeypatch.setattr(requests, "post", post)
+    monkeypatch.setattr(httpx, "post", post)
 
     assert alerter.send_alert("title", "body") is False
-    assert "ConnectionError" in caplog.text
+    assert "ConnectError" in caplog.text
     assert "TEST_TOKEN" not in caplog.text

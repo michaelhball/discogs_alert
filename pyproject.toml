@@ -23,7 +23,6 @@ dependencies = [
     "curl_cffi>=0.17,<0.18",
     "httpx>=0.28,<0.29",
     "pydantic>=2.14,<3",
-    "requests>=2.34,<3",
 ]
 
 [project.urls]

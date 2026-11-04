@@ -22,7 +22,7 @@ import pathlib
 from datetime import datetime
 from typing import Union
 
-import requests
+import httpx
 
 from discogs_alert.util.constants import CURRENCY_CHOICES
 from discogs_alert.util.system import time_cache
@@ -124,13 +124,13 @@ def get_currency_rates(base_currency: str) -> CurrencyRates:
             logger.warning("Failed to read currency cache %s; refetching", cache_file, exc_info=True)
 
     try:
-        response = requests.get(
+        response = httpx.get(
             f"{FRANKFURTER_BASE_URL}/latest", params={"base": base_currency}, timeout=HTTP_TIMEOUT_SECONDS
         )
         response.raise_for_status()
         payload = response.json()
         rates = _validated_rates(payload.get("rates") if isinstance(payload, dict) else None)
-    except (requests.RequestException, ValueError) as exc:
+    except (httpx.HTTPError, ValueError) as exc:
         # Upstream is unreachable / errored / returned junk. Fall back to the
         # newest stale cache for this base currency if we have one — rates only
         # drift slowly, and a stale conversion is far better than crashing the
