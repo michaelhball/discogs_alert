@@ -37,6 +37,14 @@ grep -E '^_FALLBACK_VERSION = ' discogs_alert/__init__.py   # must equal $curren
 gh run list --workflow=release.yml --limit 3       # is a previous release still running/failed?
 ```
 
+If `release.yml` changed since the last tag (`git log --oneline v$current..main -- .github/workflows/release.yml`),
+run the workflow by hand first and wait for it; a manual run builds and checks everything and publishes nothing:
+
+```bash
+gh workflow run release.yml --ref main
+gh run watch "$(gh run list --workflow=release.yml --limit 1 --json databaseId --jq '.[0].databaseId')" --exit-status
+```
+
 Decide the target version per section 0. Check it doesn't already exist:
 `git tag -l vX.Y.Z` must print nothing and `gh release view vX.Y.Z` must fail.
 
@@ -90,7 +98,7 @@ Jobs and what "done" means:
 | job | must be | notes |
 |---|---|---|
 | Build distribution | success | |
-| Publish to PyPI | success | `continue-on-error: true` — a failure does NOT fail the run. Check it explicitly. |
+| Publish to PyPI | success | a failure fails the run; the other jobs still finish |
 | Create GitHub Release | success | `gh release view vX.Y.Z` shows sdist + wheel |
 | Publish Docker image | success or skipped | skipped when `vars.DOCKERHUB_USERNAME` is unset |
 | Build macOS .app + .dmg, sign, append to appcast | success | uploads the DMG and opens the appcast PR |
