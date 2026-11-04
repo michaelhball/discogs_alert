@@ -13,16 +13,12 @@ import importlib
 import json
 import os
 import sys
+import tomllib
 from pathlib import Path
 
 import click
 import pytest
 from click.testing import CliRunner
-
-if sys.version_info >= (3, 11):
-    import tomllib
-else:  # pragma: no cover - exercised on the 3.10 CI leg
-    import tomli as tomllib
 
 from discogs_alert import __main__ as da_main, config as da_config
 

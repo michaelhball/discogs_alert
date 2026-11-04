@@ -170,7 +170,7 @@ If you spawn a background agent to monitor PRs or do other long-running work:
 - **Coverage matters.** Every PR that touches runtime code must add or update
   tests. CI gate: `--cov-fail-under=88`. Aim to keep it green or rising;
   today ~89%.
-- CI runs the suite on Python 3.10-3.14 with the locked dependencies.
+- CI runs the suite on Python 3.11-3.14 with the locked dependencies.
   `uv run pytest` runs the offline suite locally in ~1s.
 - `pytest-asyncio` is in `auto` mode (`asyncio_mode = "auto"` in pyproject) —
   any `async def test_*` runs in an event loop automatically.

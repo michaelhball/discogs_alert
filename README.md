@@ -30,7 +30,7 @@ If you have suggestions or ideas, please reach out! So far I've bought more than
 
 ## Requirements
 
-- Python >= 3.10
+- Python >= 3.11
 
 ## Installation & Setup
 
