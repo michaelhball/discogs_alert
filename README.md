@@ -391,7 +391,7 @@ $ make dmg        # build dist/discogs_alert-X.Y.Z.dmg (the user-facing artifact
 
 The build uses a clean throwaway venv at `.build-venv/`, filled from `uv.lock`, so unrelated packages on your outer Python don't pollute the bundle. End users only need to drag the `.app` from the DMG into `/Applications` — no Python install required.
 
-> **Code signing**: without the signing secrets described in [`docs/release.md`](docs/release.md), the `.app` is ad-hoc signed and macOS asks you to right-click → Open on first launch. With them, the release workflow signs and notarizes the app and the DMG.
+> **Code signing**: the `.app` is ad-hoc signed, not notarized, so macOS asks you to right-click → Open on first launch. Sparkle verifies every update with its own EdDSA signature, which does not depend on Apple signing.
 
 
 ## Contributing

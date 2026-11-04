@@ -129,45 +129,12 @@ After a release:
   and offers to upgrade. The "Update available" dialog is Sparkle's
   built-in UI — no work on our side.
 
-## Code signing and notarization (optional)
-
-Without the secrets below, the DMG ships ad-hoc signed and macOS warns on
-first launch (right-click → Open). With them, the release workflow signs the
-app with the hardened runtime, has Apple notarize the app and then the DMG,
-and staples both tickets, so the app opens without a warning.
-
-One-time setup:
-
-1. Join the Apple Developer Program ($99/yr) and create a **Developer ID
-   Application** certificate (Xcode → Settings → Accounts → Manage
-   Certificates, or developer.apple.com → Certificates).
-2. Export it from Keychain Access as a `.p12` with a password, then:
-   ```bash
-   base64 -i DeveloperID.p12 | gh secret set MACOS_CERTIFICATE_P12_BASE64
-   gh secret set MACOS_CERTIFICATE_PASSWORD
-   ```
-3. Create an app-specific password at https://account.apple.com (Sign-In
-   and Security → App-Specific Passwords) and set:
-   ```bash
-   gh secret set APPLE_ID                      # the Apple ID email address
-   gh secret set APPLE_TEAM_ID                 # 10 characters, shown next to the certificate name
-   gh secret set APPLE_APP_SPECIFIC_PASSWORD
-   ```
-
-`scripts/sign_app.sh` does the signing: inside-out, never `--deep`, Sparkle's
-XPC services and helpers in the order Sparkle documents, and the entitlements
-from `scripts/entitlements.plist` that the bundled Python needs under the
-hardened runtime. `make sign-app SIGNING_IDENTITY="…"` runs it on a local
-build.
-
-Sparkle updates work without notarization: Sparkle's own EdDSA signature
-guarantees update authenticity.
-
 ## Things that go wrong
 
 - **"discogs_alert can't be opened because Apple cannot check it for
-  malicious software"** on first launch — Gatekeeper, not notarized.
-  Right-click → Open, or set up the signing secrets above.
+  malicious software"** on first launch — Gatekeeper, because the app is
+  ad-hoc signed and not notarized (the project has no Apple Developer
+  Program membership). Right-click → Open, once per install.
 - **Sparkle says "Update is improperly signed"** — your Info.plist has
   a different `SUPublicEDKey` than the private key that signed the
   release. Re-build the `.app` against the correct public key, or
