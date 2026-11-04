@@ -117,6 +117,15 @@ step 6 instead (`gh release download vX.Y.Z -p '*.whl' -D /tmp/da-release`).
 The macOS job opens a PR titled `Append vX.Y.Z to appcast`. Merging it is what
 lets existing `.app` installs see the update.
 
+If that job failed at its last step with "GitHub Actions is not permitted to
+create or approve pull requests", the branch is already pushed; open the PR
+yourself and carry on, and tell the user to turn on "Allow GitHub Actions to
+create and approve pull requests" (Settings → Actions → General) for next time:
+
+```bash
+gh pr create --base main --head release/vX.Y.Z-appcast --title "Append vX.Y.Z to appcast" --fill
+```
+
 ```bash
 gh pr list --search "Append vX.Y.Z to appcast" --json number --jq '.[0].number'
 gh pr checks <M> --watch

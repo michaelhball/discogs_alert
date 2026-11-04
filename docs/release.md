@@ -51,6 +51,16 @@ existing installs upgrade themselves automatically.
    *Re-running `make secrets` overwrites the secrets in place, so you
    can do this again any time (e.g. after rotating keys).*
 
+5. **Let the workflow open the appcast PR** (one-time). The last step of the
+   macOS job opens a pull request with the repository's own Actions token,
+   which GitHub only allows when the setting "Allow GitHub Actions to create
+   and approve pull requests" is on (Settings → Actions → General → Workflow
+   permissions), or:
+   ```bash
+   gh api -X PUT repos/OWNER/REPO/actions/permissions/workflow \
+       -f default_workflow_permissions=read -F can_approve_pull_request_reviews=true
+   ```
+
 ## Each release (automated)
 
 The release workflow at `.github/workflows/release.yml` builds, signs,
@@ -143,6 +153,14 @@ After a release:
 
 ## Things that go wrong
 
+- **`pull request create failed: GraphQL: GitHub Actions is not permitted to
+  create or approve pull requests`** as the last step of the macOS job — the
+  setting from prereq 5 is off. Everything else is published and the branch
+  `release/vX.Y.Z-appcast` is already pushed, so open the PR by hand and merge
+  it, then turn the setting on for the next release:
+  ```bash
+  gh pr create --base main --head release/vX.Y.Z-appcast --title "Append vX.Y.Z to appcast" --fill
+  ```
 - **"discogs_alert can't be opened because Apple cannot check it for
   malicious software"** on first launch — Gatekeeper, because the app is
   ad-hoc signed and not notarized (the project has no Apple Developer
