@@ -23,10 +23,10 @@ currency = "EUR"
 # How many times per hour to query the marketplace. 60 = once a minute.
 frequency = 60
 
-# Optional: override the user-agent string sent on anonymous marketplace
-# requests. The default identifies discogs_alert and a placeholder URL;
-# customising it is polite to Discogs.
-# user_agent = "DiscogsAlert/0.1.0 +http://my-site.example.com"
+# Optional: the User-Agent sent with every Discogs request. The default names
+# this program, its version and its GitHub page, as Discogs asks. Set your own
+# to identify your instance instead.
+# user_agent = "my-discogs-bot/1.0 +https://example.com/contact"
 
 # ---- wantlist ---------------------------------------------------------------
 

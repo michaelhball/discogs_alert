@@ -21,10 +21,14 @@ from typing import List, Literal, Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from discogs_alert import __version__
+
 DEFAULT_CONFIG_DIR = Path.home() / ".discogs_alert"
 DEFAULT_CONFIG_PATH = DEFAULT_CONFIG_DIR / "config.toml"
 
-DEFAULT_USER_AGENT = "DiscogsAlert/0.0.1 +http://discogsalert.com"
+# Discogs asks every client for a User-Agent that names the program, its version
+# and a page about it. `user_agent` in config.toml or DA_USER_AGENT replaces it.
+DEFAULT_USER_AGENT = f"discogs_alert/{__version__} +https://github.com/michaelhball/discogs_alert"
 
 
 class ConfigFileError(Exception):
