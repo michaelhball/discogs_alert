@@ -20,8 +20,8 @@ Entry points:
 
 Configuration lives in `~/.discogs_alert/config.toml` (TOML, pydantic-validated)
 with `DA_*` env-var overrides on top. The CLI is intentionally tiny: `--config`,
-`--once`, `--verbose`, `--log-level`, `--validate-config`, `--print-config`,
-`--version`.
+`--once`, `--verbose`, `--log-level`, `--log-format`, `--log-file`, `--status`,
+`--validate-config`, `--print-config`, `--version`.
 
 ## How the user works
 

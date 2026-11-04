@@ -15,7 +15,6 @@ dist
 nohup.out
 .tox
 
-.currency_cache
 # Claude Code: keep local settings out, but ship the repo skills (/release etc.)
 .claude/*
 !.claude/skills/

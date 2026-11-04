@@ -187,7 +187,7 @@ class AnonClient:
 
     BASE_URL = "https://www.discogs.com"
     HTTP_TIMEOUT_SECONDS = 20
-    # `chrome124` is the highest target supported across curl_cffi 0.5–0.7.
+    # The browser whose TLS fingerprint the session presents to Cloudflare.
     DEFAULT_IMPERSONATE = "chrome124"
 
     def __init__(self, user_agent: str, impersonate: str = DEFAULT_IMPERSONATE) -> None:
