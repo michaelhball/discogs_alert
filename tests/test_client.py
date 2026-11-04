@@ -4,7 +4,6 @@ Both clients are async now and use httpx / curl_cffi. We mock the underlying
 HTTP layer with `httpx.MockTransport` so tests are fully offline.
 """
 
-from typing import Optional
 
 import httpx
 import pytest
@@ -29,7 +28,7 @@ def _make_client_with_transport(handler, user_token: str = "TOKEN") -> da_client
     return client
 
 
-def _ok(body: bytes = b'{"ok":true}', headers: Optional[dict] = None) -> httpx.Response:
+def _ok(body: bytes = b'{"ok":true}', headers: dict | None = None) -> httpx.Response:
     return httpx.Response(
         200, content=body,
         headers=headers or {

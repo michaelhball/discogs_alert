@@ -233,4 +233,4 @@ def test_open_path_uses_the_macos_open_command(monkeypatch: pytest.MonkeyPatch, 
     calls: list = []
     monkeypatch.setattr(da_menubar.subprocess, "run", lambda args, check: calls.append((args, check)))
     da_menubar._open_path(tmp_path)
-    assert calls == [(["open", str(tmp_path)], False)]
+    assert calls == [(["/usr/bin/open", str(tmp_path)], False)]

@@ -20,7 +20,7 @@ Construction: ``Release.model_validate(dict)`` (replaces
 from __future__ import annotations
 
 import enum
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
@@ -70,13 +70,13 @@ class _Base(BaseModel):
 
 
 class SellerFilters(_Base):
-    min_seller_rating: Optional[float] = None
-    min_seller_sales: Optional[int] = None
+    min_seller_rating: float | None = None
+    min_seller_sales: int | None = None
 
 
 class RecordFilters(_Base):
-    min_media_condition: Optional[CONDITION] = None
-    min_sleeve_condition: Optional[CONDITION] = None
+    min_media_condition: CONDITION | None = None
+    min_sleeve_condition: CONDITION | None = None
 
 
 class Release(_Base):
@@ -89,23 +89,23 @@ class Release(_Base):
     # `@key=value` directives in a Discogs list-item comment). Threshold is a
     # float because internal currency conversion produces non-integer values;
     # whole-number inputs (the common case) coerce automatically.
-    min_media_condition: Optional[CONDITION] = None
-    min_sleeve_condition: Optional[CONDITION] = None
-    price_threshold: Optional[float] = None
+    min_media_condition: CONDITION | None = None
+    min_sleeve_condition: CONDITION | None = None
+    price_threshold: float | None = None
 
     # Other fields that come back from the Discogs list API (mostly ignored
     # by us but stored so we can round-trip).
-    comment: Optional[str] = None
-    uri: Optional[str] = None
-    resource_url: Optional[str] = None
-    image_url: Optional[str] = None
-    type: Optional[str] = None
-    stats: Optional[Dict[str, Any]] = None
+    comment: str | None = None
+    uri: str | None = None
+    resource_url: str | None = None
+    image_url: str | None = None
+    type: str | None = None
+    stats: dict[str, Any] | None = None
 
 
 class UserList(_Base):
     id: int
-    user: Dict[str, Any]
+    user: dict[str, Any]
     name: str
     description: str
     public: bool
@@ -114,14 +114,14 @@ class UserList(_Base):
     uri: str
     resource_url: str
     image_url: str
-    items: List[Release]
+    items: list[Release]
 
 
 class ShippingPrice(_Base):
     currency: str
     value: float
 
-    def convert_currency(self, new_currency: str) -> "ShippingPrice":
+    def convert_currency(self, new_currency: str) -> ShippingPrice:
         if self.currency != new_currency:
             self.value = da_currency.convert_currency(self.value, self.currency, new_currency)
             self.currency = new_currency
@@ -131,9 +131,9 @@ class ShippingPrice(_Base):
 class ListingPrice(_Base):
     currency: str
     value: float
-    shipping: Optional[ShippingPrice] = None
+    shipping: ShippingPrice | None = None
 
-    def convert_currency(self, new_currency: str) -> "ListingPrice":
+    def convert_currency(self, new_currency: str) -> ListingPrice:
         if self.currency != new_currency:
             self.value = da_currency.convert_currency(self.value, self.currency, new_currency)
             self.currency = new_currency
@@ -151,8 +151,8 @@ class ReleaseStats(_Base):
 
     # Discogs occasionally returns ``null`` here (seen on releases with no
     # marketplace data); treat that as "unknown" rather than a validation error.
-    num_for_sale: Optional[int] = None
-    lowest_price: Optional[ShippingPrice] = None
+    num_for_sale: int | None = None
+    lowest_price: ShippingPrice | None = None
     blocked_from_sale: bool = False
 
 
@@ -160,12 +160,12 @@ class Listing(_Base):
     """A specific instance of a record for sale on the Discogs marketplace."""
 
     id: int
-    availability: Optional[str] = None  # absent if the seller didn't set this attribute
+    availability: str | None = None  # absent if the seller didn't set this attribute
     media_condition: CONDITION
     sleeve_condition: CONDITION
     comment: str
     seller_num_ratings: int
-    seller_avg_rating: Optional[float] = None  # None if new seller
+    seller_avg_rating: float | None = None  # None if new seller
     seller_ships_from: str
     price: ListingPrice
 
@@ -180,15 +180,15 @@ class Listing(_Base):
     def is_definitely_unavailable(self, country: str) -> bool:
         return self.availability == f"Unavailable in {country}"
 
-    def price_is_above_threshold(self, price_threshold: Optional[float] = None) -> bool:
+    def price_is_above_threshold(self, price_threshold: float | None = None) -> bool:
         return price_threshold is not None and self.total_price > price_threshold
 
-    def convert_currency(self, new_currency: str) -> "Listing":
+    def convert_currency(self, new_currency: str) -> Listing:
         self.price = self.price.convert_currency(new_currency)
         return self
 
 
-Listings = List[Listing]
+Listings = list[Listing]
 
 
 def conditions_satisfied(
@@ -196,8 +196,8 @@ def conditions_satisfied(
     release: Release,
     seller_filters: SellerFilters,
     record_filters: RecordFilters,
-    country_whitelist: Set[str],
-    country_blacklist: Set[str],
+    country_whitelist: set[str],
+    country_blacklist: set[str],
 ) -> bool:
     """Validate that a given listing satisfies all configured filters, including
     both globals (CLI flags / env vars) and per-release overrides (wantlist.json

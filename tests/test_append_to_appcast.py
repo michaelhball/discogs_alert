@@ -8,7 +8,7 @@ importing the module directly.
 from __future__ import annotations
 
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
@@ -80,7 +80,7 @@ def test_append_inserts_new_item(appcast: Path):
         signature="SIG=",
         length="123",
         notes="<h2>0.1.0</h2>",
-        pub_date=datetime(2026, 5, 9, 18, 30, 0, tzinfo=timezone.utc),
+        pub_date=datetime(2026, 5, 9, 18, 30, 0, tzinfo=UTC),
     )
     items = _items(appcast)
     assert len(items) == 1
@@ -105,7 +105,7 @@ def test_append_pubdate_is_rfc822(appcast: Path):
         signature="x",
         length="0",
         notes="",
-        pub_date=datetime(2026, 5, 9, 18, 30, 0, tzinfo=timezone.utc),
+        pub_date=datetime(2026, 5, 9, 18, 30, 0, tzinfo=UTC),
     )
     pub_date = _items(appcast)[0].find("pubDate").text
     assert pub_date == "Sat, 09 May 2026 18:30:00 +0000"

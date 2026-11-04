@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Optional, Union
 
 import httpx
 from curl_cffi.requests import AsyncSession as CurlAsyncSession
@@ -40,7 +39,7 @@ class DiscogsApiError(Exception):
     statuses operators actually hit (401 bad token, 429 rate limited).
     """
 
-    def __init__(self, url: str, status: Optional[int] = None, body: str = "") -> None:
+    def __init__(self, url: str, status: int | None = None, body: str = "") -> None:
         self.url = url
         self.status = status
         self.body = body
@@ -65,7 +64,7 @@ class MarketplaceFetchError(Exception):
     trouble) or ``None`` for a transport error, in which case ``reason`` says why.
     """
 
-    def __init__(self, release_id: int, status: Optional[int] = None, reason: str = "") -> None:
+    def __init__(self, release_id: int, status: int | None = None, reason: str = "") -> None:
         self.release_id = release_id
         self.status = status
         self.reason = reason
@@ -104,20 +103,20 @@ class UserTokenClient:
             timeout=self.HTTP_TIMEOUT_SECONDS,
         )
         # Legacy mirrors — older code reads these directly.
-        self.rate_limit: Optional[int] = None
-        self.rate_limit_used: Optional[int] = None
-        self.rate_limit_remaining: Optional[int] = None
+        self.rate_limit: int | None = None
+        self.rate_limit_used: int | None = None
+        self.rate_limit_remaining: int | None = None
 
     async def aclose(self) -> None:
         await self._client.aclose()
 
-    async def __aenter__(self) -> "UserTokenClient":
+    async def __aenter__(self) -> UserTokenClient:
         return self
 
     async def __aexit__(self, *_exc) -> None:
         await self.aclose()
 
-    async def _get(self, url: str) -> Union[dict, list]:
+    async def _get(self, url: str) -> dict | list:
         """GET a JSON endpoint. Raises ``DiscogsApiError`` on any failure so the
         caller decides how loud to be (the stats gate swallows 404s quietly; a
         failed wantlist fetch is fatal for the iteration).
@@ -153,7 +152,7 @@ class UserTokenClient:
 
     async def get_release_stats(
         self, release_id: int
-    ) -> Union[da_entities.ReleaseStats, bool]:
+    ) -> da_entities.ReleaseStats | bool:
         """Fetch the marketplace stats for a release. Returns False if the API
         call fails (e.g. a 404 on a non-existent release), otherwise a
         ``ReleaseStats``.
@@ -202,7 +201,7 @@ class AnonClient:
         except Exception:
             logger.warning("error closing curl_cffi async session", exc_info=True)
 
-    async def __aenter__(self) -> "AnonClient":
+    async def __aenter__(self) -> AnonClient:
         return self
 
     async def __aexit__(self, *_exc) -> None:

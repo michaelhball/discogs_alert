@@ -17,7 +17,7 @@ from __future__ import annotations
 import os
 import tomllib
 from pathlib import Path
-from typing import List, Literal, Optional, Tuple
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -52,13 +52,13 @@ class WantlistConfig(_ConfigModel):
     list) or ``path`` (a local JSON file).
     """
 
-    list_id: Optional[int] = None
-    path: Optional[str] = None
+    list_id: int | None = None
+    path: str | None = None
 
 
 class SellerConfig(_ConfigModel):
     min_rating: int = 99
-    min_sales: Optional[int] = None
+    min_sales: int | None = None
 
 
 class RecordConfig(_ConfigModel):
@@ -71,31 +71,31 @@ class CountryFiltersConfig(_ConfigModel):
     ``discogs_alert.util.constants.COUNTRIES``).
     """
 
-    whitelist: List[str] = Field(default_factory=list)
-    blacklist: List[str] = Field(default_factory=list)
+    whitelist: list[str] = Field(default_factory=list)
+    blacklist: list[str] = Field(default_factory=list)
 
 
 class PushbulletConfig(_ConfigModel):
-    token: Optional[str] = Field(default=None, repr=False)
+    token: str | None = Field(default=None, repr=False)
 
 
 class TelegramConfig(_ConfigModel):
-    token: Optional[str] = Field(default=None, repr=False)
-    chat_id: Optional[str] = None
+    token: str | None = Field(default=None, repr=False)
+    chat_id: str | None = None
 
 
 class NtfyConfig(_ConfigModel):
     # Anyone who knows the topic name can read and publish to it, so the topic is a secret too.
-    topic: Optional[str] = Field(default=None, repr=False)
+    topic: str | None = Field(default=None, repr=False)
     server: str = "https://ntfy.sh"
-    token: Optional[str] = Field(default=None, repr=False)
+    token: str | None = Field(default=None, repr=False)
 
 
 class GmailConfig(_ConfigModel):
-    user: Optional[str] = None         # full Gmail address
+    user: str | None = None         # full Gmail address
     # 16-char app password, not the account password
-    app_password: Optional[str] = Field(default=None, repr=False)
-    to: Optional[str] = None           # destination address
+    app_password: str | None = Field(default=None, repr=False)
+    to: str | None = None           # destination address
 
 
 class AlerterConfig(_ConfigModel):
@@ -115,10 +115,10 @@ class AlerterConfig(_ConfigModel):
 class RuntimeConfig(_ConfigModel):
     """Things the runtime cares about that aren't user preferences."""
 
-    state_path: Optional[str] = None
+    state_path: str | None = None
     # Where the per-iteration heartbeat (`last_run.json`, read by `--status`)
     # is written. Defaults to the directory holding `state_path`.
-    heartbeat_path: Optional[str] = None
+    heartbeat_path: str | None = None
     stats_gate: bool = True
     max_concurrency: int = 6
     prune_after_days: int = 90
@@ -131,7 +131,7 @@ class RuntimeConfig(_ConfigModel):
     log_format: Literal["text", "json"] = "text"
     # Optional log file, rotated by size (in addition to stderr). Rotation keeps
     # `log_backup_count` old files of up to `log_max_bytes` each.
-    log_file: Optional[str] = None
+    log_file: str | None = None
     log_max_bytes: int = Field(default=10 * 1024 * 1024, gt=0)
     log_backup_count: int = Field(default=5, ge=0)
     # Set false (only together with log_file) when a supervisor already captures
@@ -139,7 +139,7 @@ class RuntimeConfig(_ConfigModel):
     log_stderr: bool = True
 
     @model_validator(mode="after")
-    def _check_log_destination(self) -> "RuntimeConfig":
+    def _check_log_destination(self) -> RuntimeConfig:
         if not self.log_stderr and not self.log_file:
             raise ValueError("runtime.log_stderr = false requires runtime.log_file to be set")
         return self
@@ -190,7 +190,7 @@ class Config(_ConfigModel):
     alerter: AlerterConfig = Field(default_factory=AlerterConfig)
     runtime: RuntimeConfig = Field(default_factory=RuntimeConfig)
 
-    def _secret_slots(self) -> List[Tuple[_ConfigModel, str]]:
+    def _secret_slots(self) -> list[tuple[_ConfigModel, str]]:
         alerter = self.alerter
         return [
             (self, "discogs_token"),
@@ -201,7 +201,7 @@ class Config(_ConfigModel):
             (alerter.gmail, "app_password"),
         ]
 
-    def secret_values(self) -> List[str]:
+    def secret_values(self) -> list[str]:
         """Every configured secret, so logging can mask them."""
 
         return [value for section, name in self._secret_slots() if (value := getattr(section, name))]
@@ -261,12 +261,12 @@ _ENV_OVERRIDES = {
 }
 
 
-def config_warnings(cfg: Config, path: Optional[Path] = None) -> List[str]:
+def config_warnings(cfg: Config, path: Path | None = None) -> list[str]:
     """Settings that work but leave a secret exposed. The CLI logs each one at
     WARNING after loading the config.
     """
 
-    warnings: List[str] = []
+    warnings: list[str] = []
     resolved_path = path or DEFAULT_CONFIG_PATH
     # Windows has no POSIX permission bits; its ACLs are out of scope here.
     if os.name != "nt" and resolved_path.exists() and resolved_path.stat().st_mode & 0o077:
@@ -315,7 +315,7 @@ def _set_dotted(target: dict, dotted: str, value: object) -> None:
     cur[parts[-1]] = value
 
 
-def _apply_env_overrides(data: dict, env: Optional[dict] = None) -> dict:
+def _apply_env_overrides(data: dict, env: dict | None = None) -> dict:
     """Layer ``DA_*`` env vars on top of a parsed-TOML dict.
 
     Returns a new dict; doesn't mutate the input.
@@ -331,8 +331,8 @@ def _apply_env_overrides(data: dict, env: Optional[dict] = None) -> dict:
 
 
 def load_config(
-    path: Optional[Path] = None,
-    env: Optional[dict] = None,
+    path: Path | None = None,
+    env: dict | None = None,
 ) -> Config:
     """Load and validate the config from ``path`` (default
     ``~/.discogs_alert/config.toml``), applying ``DA_*`` env-var overrides on

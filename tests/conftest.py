@@ -1,7 +1,6 @@
 import json
 import os
 import pathlib
-from typing import List
 
 import pytest
 
@@ -17,7 +16,7 @@ def pytest_addoption(parser: pytest.Parser):
     )
 
 
-def pytest_collection_modifyitems(config: pytest.Config, items: List[pytest.Item]):
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]):
     if config.getoption("--online"):
         return
     skip_online_test = pytest.mark.skip(reason="Need --online command-line flag in order to run")

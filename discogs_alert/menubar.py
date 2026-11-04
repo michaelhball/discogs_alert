@@ -24,7 +24,6 @@ import subprocess
 import threading
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from pydantic import ValidationError
 
@@ -64,19 +63,19 @@ class MenubarController:
 
     def __init__(self, cfg: da_config.Config):
         self.cfg = cfg
-        self._loop_thread: Optional[threading.Thread] = None
+        self._loop_thread: threading.Thread | None = None
         self._stop_event = threading.Event()
         self._lock = threading.Lock()
         # Reference to the worker thread's asyncio event loop, set when the
         # worker starts. Used by `check_now()` to wake the sleep that's
         # gating the next iteration.
-        self._asyncio_loop: Optional[asyncio.AbstractEventLoop] = None
-        self._tick_event: Optional[asyncio.Event] = None
+        self._asyncio_loop: asyncio.AbstractEventLoop | None = None
+        self._tick_event: asyncio.Event | None = None
         # Latest status, updated after every iteration.
-        self.last_check_at: Optional[datetime] = None
+        self.last_check_at: datetime | None = None
         self.last_alerts_24h: int = 0
         self.last_alerts_total: int = 0
-        self.last_error: Optional[str] = None
+        self.last_error: str | None = None
 
     # ---- status formatting --------------------------------------------
 
@@ -97,7 +96,7 @@ class MenubarController:
     def alerts_str(self) -> str:
         return f"Alerts (24h): {self.last_alerts_24h} / total: {self.last_alerts_total}"
 
-    def error_str(self) -> Optional[str]:
+    def error_str(self) -> str | None:
         return None if self.last_error is None else f"⚠️ {self.last_error}"
 
     # ---- loop integration ---------------------------------------------
@@ -157,7 +156,7 @@ class MenubarController:
             verbose=cfg.runtime.verbose,
         )
 
-    def _outage_alerter(self) -> Optional[da_alert.Alerter]:
+    def _outage_alerter(self) -> da_alert.Alerter | None:
         """The alerter the outage notifications go through, or None when the
         configuration cannot build one.
         """
@@ -221,7 +220,7 @@ class MenubarController:
                 # the tick event from another thread (e.g. "Check now").
                 try:
                     await asyncio.wait_for(self._tick_event.wait(), timeout=interval_seconds)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     pass
                 self._tick_event.clear()
         finally:
@@ -267,7 +266,8 @@ class MenubarController:
 def _open_path(path: Path) -> None:
     """Open a file or folder with its default macOS app."""
 
-    subprocess.run(["open", str(path)], check=False)
+    # `open` is the macOS launcher; the argument is a path from the config, not typed input.
+    subprocess.run(["/usr/bin/open", str(path)], check=False)  # noqa: S603
 
 
 def _require_rumps():
