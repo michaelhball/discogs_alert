@@ -38,7 +38,7 @@ from discogs_alert import (
     outage as da_outage,
     state as da_state,
 )
-from discogs_alert.util import constants as dac, logging as da_logging
+from discogs_alert.util import constants as dac, currency as da_currency, logging as da_logging
 
 logger = logging.getLogger(__name__)
 
@@ -402,6 +402,8 @@ def main() -> None:
     )
     for warning in da_config.config_warnings(cfg, resolved):
         logger.warning("%s", warning)
+    if cfg.runtime.currency_cache_dir:
+        da_currency.set_cache_dir(cfg.runtime.currency_cache_dir)
     MenubarApp(cfg).run()
 
 

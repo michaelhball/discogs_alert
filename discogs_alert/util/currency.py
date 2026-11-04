@@ -32,8 +32,17 @@ FRANKFURTER_BASE_URL = "https://api.frankfurter.dev/v1"
 HTTP_TIMEOUT_SECONDS = 10
 
 # Directory holding the weekly CurrencyRates JSON caches. Lives in the user's data
-# folder so it works from a read-only install such as the .app bundle.
-CACHE_DIR = pathlib.Path(os.getenv("DA_CURRENCY_CACHE_DIR", pathlib.Path.home() / ".discogs_alert" / "currency_cache"))
+# folder so it works from a read-only install such as the .app bundle. The CLI and
+# the menu-bar app call `set_cache_dir` with `runtime.currency_cache_dir` when set.
+DEFAULT_CACHE_DIR = pathlib.Path.home() / ".discogs_alert" / "currency_cache"
+CACHE_DIR = pathlib.Path(os.getenv("DA_CURRENCY_CACHE_DIR", DEFAULT_CACHE_DIR))
+
+
+def set_cache_dir(path: str | os.PathLike[str]) -> None:
+    """Keep the on-disk cache under `path` for the rest of the process."""
+
+    global CACHE_DIR
+    CACHE_DIR = pathlib.Path(path).expanduser()
 
 logger = logging.getLogger(__name__)
 

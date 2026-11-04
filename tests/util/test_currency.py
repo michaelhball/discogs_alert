@@ -232,3 +232,8 @@ def test_damaged_stale_cache_is_not_used(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(httpx, "get", _fake_response(raise_exc=httpx.ConnectError("down")))
     with pytest.raises(da_currency.CurrencyProviderError):
         da_currency.get_currency_rates("EUR")
+
+
+def test_set_cache_dir_moves_the_disk_cache(tmp_path):
+    da_currency.set_cache_dir(tmp_path / "elsewhere")
+    assert da_currency._disk_cache_path("EUR").parent == tmp_path / "elsewhere"

@@ -100,6 +100,10 @@ server = "https://ntfy.sh"
 # Defaults to the directory holding state_path.
 # heartbeat_path = "/Users/me/.discogs_alert/last_run.json"
 
+# Directory for the weekly currency-rate cache files (one small JSON file per
+# currency and week). Defaults to ~/.discogs_alert/currency_cache.
+# currency_cache_dir = "/Users/me/.discogs_alert/currency_cache"
+
 # Use the cheap /marketplace/stats API to skip the expensive scrape for
 # releases with no listings or above your price threshold. Recommended.
 stats_gate = true
