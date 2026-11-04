@@ -27,7 +27,7 @@ jobs:
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
-      - run: uv run --locked --python "$PYTHON_VERSION" pytest --cov=discogs_alert --cov-report=term-missing --cov-fail-under=88 tests
+      - run: uv run --locked --python "$PYTHON_VERSION" pytest --cov=discogs_alert --cov-report=term-missing --cov-fail-under=90 tests
         env:
           PYTHON_VERSION: ${{ matrix.python-version }}
 
