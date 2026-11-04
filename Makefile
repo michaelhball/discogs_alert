@@ -48,7 +48,7 @@ SPARKLE_ACCOUNT := discogs_alert
 RELEASE_DIR := $(HOME)/.discogs_alert_release
 PUB_KEY := $(RELEASE_DIR)/eddsa_pub.key
 
-.PHONY: all app sign-app dmg sparkle keys export-key sign appcast secrets clean clean-build clean-venv clean-vendor
+.PHONY: all app dmg sparkle keys export-key sign appcast secrets clean clean-build clean-venv clean-vendor
 
 all: dmg
 
@@ -72,13 +72,6 @@ app: $(BUILD_VENV) clean-build
 		echo "   ⚠️  Sparkle.framework NOT bundled. Run 'make sparkle' if you want auto-update."; \
 	fi
 	@echo "   Test by opening directly: open $(APP)"
-
-# Sign the built app with a codesigning identity from the Keychain, the way
-# the release workflow does with the Developer ID certificate:
-#     make sign-app SIGNING_IDENTITY="Developer ID Application: Name (TEAMID)"
-sign-app:
-	@test -d $(APP) || $(MAKE) app
-	scripts/sign_app.sh "$(SIGNING_IDENTITY)" $(APP)
 
 # ---- Sparkle auto-update ---------------------------------------------------
 #

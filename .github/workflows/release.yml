@@ -189,73 +189,9 @@ jobs:
           fi
           test -d dist/discogs_alert.app/Contents/Frameworks/Sparkle.framework
 
-      - name: Sign the app with the Developer ID certificate
-        # Without the signing secrets the app stays ad-hoc signed, as before,
-        # and the notarization steps below are skipped. See docs/release.md.
-        id: codesign
-        env:
-          MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
-          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
-        run: |
-          set -euo pipefail
-          if [ -z "$MACOS_CERTIFICATE_P12_BASE64" ]; then
-            echo "::notice::MACOS_CERTIFICATE_P12_BASE64 is not set: the app stays ad-hoc signed and macOS warns on first launch."
-            exit 0
-          fi
-          keychain="$RUNNER_TEMP/signing.keychain-db"
-          keychain_password="$(uuidgen)"
-          security create-keychain -p "$keychain_password" "$keychain"
-          security set-keychain-settings -lut 3600 "$keychain"
-          security unlock-keychain -p "$keychain_password" "$keychain"
-          printf '%s' "$MACOS_CERTIFICATE_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
-          security import "$RUNNER_TEMP/certificate.p12" -k "$keychain" -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-          rm -P "$RUNNER_TEMP/certificate.p12"
-          security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain" >/dev/null
-          security list-keychains -d user -s "$keychain" login.keychain
-          identity="$(security find-identity -v -p codesigning "$keychain" | sed -n 's/.*"\(Developer ID Application: [^"]*\)".*/\1/p' | head -1)"
-          if [ -z "$identity" ]; then
-            echo "::error::the certificate holds no 'Developer ID Application' identity"
-            exit 1
-          fi
-          scripts/sign_app.sh "$identity" dist/discogs_alert.app
-          echo "identity=$identity" >> "$GITHUB_OUTPUT"
-
-      - name: Notarize and staple the app
-        if: steps.codesign.outputs.identity != ''
-        env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-        run: |
-          set -euo pipefail
-          ditto -c -k --keepParent dist/discogs_alert.app "$RUNNER_TEMP/discogs_alert.zip"
-          xcrun notarytool submit "$RUNNER_TEMP/discogs_alert.zip" \
-              --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" \
-              --wait --timeout 30m
-          xcrun stapler staple dist/discogs_alert.app
-          spctl --assess --type execute -vv dist/discogs_alert.app
-
       - name: Build .dmg
         run: make dmg
 
-      - name: Sign, notarize and staple the DMG
-        if: steps.codesign.outputs.identity != ''
-        env:
-          IDENTITY: ${{ steps.codesign.outputs.identity }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-        run: |
-          set -euo pipefail
-          DMG="dist/discogs_alert-${GITHUB_REF_NAME#v}.dmg"
-          codesign --force --timestamp --sign "$IDENTITY" "$DMG"
-          xcrun notarytool submit "$DMG" \
-              --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" \
-              --wait --timeout 30m
-          xcrun stapler staple "$DMG"
-          spctl --assess --type open --context context:primary-signature -vv "$DMG"
-
-      # Last, because stapling changes the DMG bytes the signature covers.
       - name: Sign DMG with EdDSA
         id: sign
         env:
