@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from discogs_alert import config as da_config
+from discogs_alert import __version__, config as da_config
 
 
 def _write_toml(tmp_path: Path, body: str) -> Path:
@@ -380,3 +380,7 @@ def test_blocked_alert_after_minutes_env_override_and_floor(tmp_path: Path):
     assert da_config.load_config(path=tmp_path / "none.toml", env=env).runtime.blocked_alert_after_minutes == 5
     with pytest.raises(ValidationError):
         da_config.load_config(path=tmp_path / "none.toml", env={**env, "DA_BLOCKED_ALERT_AFTER_MINUTES": "-1"})
+
+
+def test_default_user_agent_names_the_program_its_version_and_its_page():
+    assert da_config.DEFAULT_USER_AGENT == f"discogs_alert/{__version__} +https://github.com/michaelhball/discogs_alert"
