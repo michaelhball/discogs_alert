@@ -82,7 +82,7 @@ Before you can use this project, there are a few more things that need to be set
 
 ### Discogs access token
 
-A Discogs access token allows `discogs_alert` to send requests to the discogs API on your behalf, and in particular it increases the rate at which you're allowed to make requests. This token can only be used to access the music database features of the Discogs API, not the marketplace, so there is no risk that you're accidentally granting control over the buying or selling of records. You can find more information [here](https://www.discogs.com/developers/#page:authentication).
+A Discogs access token allows `discogs_alert` to send requests to the discogs API on your behalf, and in particular it increases the rate at which you're allowed to make requests. `discogs_alert` uses it to read your list and the marketplace statistics of each release; the token cannot buy or sell records on your behalf. You can find more information [here](https://www.discogs.com/developers/#page:authentication).
 
 To create an access token, go to your Discogs settings and click on the [Developer](https://www.discogs.com/settings/developers) tab. There is a button on this page to generate a new token. For now, just copy this token to your computer.
 
@@ -92,13 +92,13 @@ There are two different ways you can create a wantlist: 1) by connecting to one 
 
 #### Discogs List
 
-Using one of your existing Discogs [lists](https://www.discogs.com/lists) only requires that you specify the ID of the list at runtime, the process for which is outlined in the [usage](#usage) section below. Ideally you should set up a list specifically for this purpose, as you'll be notified the moment any of the releases in your list go on sale. This approach makes it incredibly easy to add new releases to your wantlist: simply add a release to the specified list and `discogs_alert` will automatically identify this and add that release to those it's searching for on the next iteration.
+Using one of your existing Discogs [lists](https://www.discogs.com/lists) only requires the list's ID in your `config.toml` (`[wantlist] list_id`, see the [usage](#usage) section below). Ideally you should set up a list specifically for this purpose, as you'll be notified the moment any of the releases in your list go on sale. This approach makes it incredibly easy to add new releases to your wantlist: simply add a release to the specified list and `discogs_alert` will automatically identify this and add that release to those it's searching for on the next iteration.
 
 ##### Per-release filters in list comments
 
 You can put `@key=value` directives in a list item's _comment_ field to set per-release filters. Any other text in the comment is ignored. Recognised keys:
 
-- `@max=N` (or `@price=N`) — maximum total price (in your `--currency`).
+- `@max=N` (or `@price=N`) — maximum total price including shipping (in your configured `currency`).
 - `@media=...` — minimum media condition (e.g. `VG+`, `NM`, `M-`, `VERY_GOOD_PLUS`).
 - `@sleeve=...` — minimum sleeve condition (same vocabulary).
 
@@ -133,10 +133,10 @@ The wantlist is a list of objects, each object representing a release. The only 
 
 There are a number of optional attributes that can be included for each release. The combination of all attributes applied to a given release are used as a filter, so you will only be notified if all conditions are met for a given listing item. In the above case, the user is looking for any `VERY_GOOD` or higher copies of the `Deep²` release, with no maximum price (e.g. an example scenario here is that there are currently no copies on the market, and the user wants to be notified as soon as one goes on sale). For the `Charanjit Singh` release, the user is looking for any copies on sale for less than `€500`. NB: the currency is determined later, at runtime. This is outlined in the [usage](#usage) section below.
 
-Remember that all criteria for restricting your alerts also have global values, the setting of which is discussed in [usage](#usage)). This means that if you want the same filters for most releases you do _not_ need to specify them for every single release in your `wantlist.json`. You can set the values once globally (when you run the program), and then set only those per-release values that differ from the global settings. Any filters specified in your `wantlist.json` will override the global values.
+Remember that all criteria for restricting your alerts also have global values, the setting of which is discussed in [usage](#usage). This means that if you want the same filters for most releases you do _not_ need to specify them for every single release in your `wantlist.json`. You can set the values once globally in `config.toml`, and then set only those per-release values that differ from the global settings. Any filters specified in your `wantlist.json` will override the global values.
 
 The possible optional filters are as follows:
-* `price_threshold`: maximum allowable price (_excluding_ shipping)
+* `price_threshold`: maximum allowable price, _including_ shipping when the listing shows a shipping cost
 * `min_media_condition`: minimum allowable media condition (one of `'POOR'`, `'FAIR'`, `'GOOD'`, `'GOOD_PLUS'`,
 `'VERY_GOOD'`, `'VERY_GOOD_PLUS'`, `'NEAR_MINT'`, or `'MINT'`)
 * `min_sleeve_condition`: minimum allowable sleeve condition (one of `'POOR'`, `'FAIR'`, `'GOOD'`, `'GOOD_PLUS'`,
@@ -144,7 +144,7 @@ The possible optional filters are as follows:
 
 ### Alerting
 
-`discogs_alert` ships with three built-in alerters. Pick the one whose setup matches what you have on your phone — they all do the same job (one notification per matching listing). **ntfy.sh is the recommended default** because it has the least setup and no account dependencies.
+`discogs_alert` ships with four built-in alerters. Pick the one whose setup matches what you have on your phone — they all do the same job (one notification per matching listing). **ntfy.sh is the recommended default** because it has the least setup and no account dependencies.
 
 Configuration goes in `~/.discogs_alert/config.toml` (see [`examples/config.example.toml`](examples/config.example.toml) for the full schema). The `[alerter]` section selects which one and provides its credentials.
 
@@ -214,11 +214,11 @@ to = "you@gmail.com"             # where alerts get delivered
 
 #### Adding more alerters
 
-New alerters go in-tree as a PR: subclass `discogs_alert.alert.base.Alerter`, implement `send_alert(title, body) -> bool`, drop a file under `discogs_alert/alert/`, register it in both `_BUILTIN_ALERTERS` (in `alert/__init__.py`) and `[tool.poetry.plugins."discogs_alert.alerters"]` (in `pyproject.toml`). The built-in alerters are short — copy the closest one to whatever you're shipping (e.g. start from `ntfy.py` for a plain HTTP POST, or `gmail.py` for SMTP).
+New alerters go in-tree as a PR: subclass `discogs_alert.alert.base.Alerter`, implement `send_alert(title, body) -> bool`, drop a file under `discogs_alert/alert/`, register it in both `_BUILTIN_ALERTERS` (in `alert/__init__.py`) and `[project.entry-points."discogs_alert.alerters"]` (in `pyproject.toml`). The built-in alerters are short — copy the closest one to whatever you're shipping (e.g. start from `ntfy.py` for a plain HTTP POST, or `gmail.py` for SMTP).
 
 ## Usage
 
-`discogs_alert` can be run as a Python process or as a Docker container. Either way, the service polls your wantlist on a schedule, checks each release on the Discogs marketplace, and sends you a notification if any release (satisfying your filters) is for sale. Leave it running to be most effective.
+`discogs_alert` can be run as a Python process, as a Docker container, or as the macOS app. Either way, the service polls your wantlist on a schedule, checks each release on the Discogs marketplace, and sends you a notification if any release (satisfying your filters) is for sale. Leave it running to be most effective.
 
 Configuration lives in `~/.discogs_alert/config.toml` (or wherever `--config` points). See [`examples/config.example.toml`](examples/config.example.toml) for the full schema. Any field can be overridden by a `DA_*` environment variable — handy for Docker / launchd / CI without committing secrets.
 
@@ -267,7 +267,7 @@ Run `discogs_alert --help` for the full list.
 #### Docker
 
 ```bash
-$ docker run -d --env-file .env miggleball/discogs_alert:latest
+$ docker run -d --env-file .env -v discogs_alert:/home/app/.discogs_alert miggleball/discogs_alert:latest
 ```
 
 Your `.env` file should set the required `DA_*` variables. Minimal example:
@@ -279,7 +279,7 @@ DA_ALERTER_TYPE=NTFY
 DA_NTFY_TOPIC=<your-ntfy-topic>
 ```
 
-The `-d` flag detaches the container so it runs in the background.
+The `-d` flag detaches the container so it runs in the background. The volume keeps `state.db`, so a restarted container does not alert again on listings it already sent. `docker ps` shows the container as `unhealthy` when the last iteration failed, read no marketplace page, or is older than twice the interval.
 
 ### Extras
 
@@ -318,7 +318,7 @@ Exit codes: `0` healthy, `1` the last iteration failed, read no marketplace page
 
 When iterations keep failing, or keep reading no marketplace page, `discogs_alert` sends one notification through your alerter after `runtime.blocked_alert_after_minutes` (default 60, `DA_BLOCKED_ALERT_AFTER_MINUTES`; 0 turns it off), and one more when an iteration works again. `--once` runs share the timer through `state.db`.
 
-Each matching listing produces one notification — title is the release's display title, body is the listing URL. Deduplication is local: `discogs_alert` records every successful alert in `~/.discogs_alert/state.db` (configurable via `runtime.state_path` in `config.toml`) and won't re-alert across iterations.
+Each matching listing produces one notification — title is `Now For Sale: <display title>`, body is the listing URL. Deduplication is local: `discogs_alert` records every successful alert in `~/.discogs_alert/state.db` (configurable via `runtime.state_path` in `config.toml`) and won't re-alert across iterations.
 
 The full set of knobs lives in [`examples/config.example.toml`](examples/config.example.toml) — global filters (seller rating, media / sleeve condition, country whitelist / blacklist), runtime tuning (`max_concurrency`, `prune_after_days`, `stats_gate`), and per-alerter config. Per-release overrides go in your wantlist JSON or as `@key=value` directives in Discogs list comments (see above).
 
@@ -384,11 +384,12 @@ The menu-bar app is **not** the always-on path — closing it stops the loop. Us
 If you'd rather drag-install a `.app` than `pip install` the package, the project ships a [`Makefile`](Makefile) that wraps `py2app` and `hdiutil`:
 
 ```bash
-$ make app    # build dist/discogs_alert.app
-$ make dmg    # build dist/discogs_alert-X.Y.Z.dmg (the user-facing artifact)
+$ make sparkle    # once: download Sparkle.framework, so the app can update itself
+$ make app        # build dist/discogs_alert.app
+$ make dmg        # build dist/discogs_alert-X.Y.Z.dmg (the user-facing artifact)
 ```
 
-The build uses a clean throwaway venv at `.build-venv/` so unrelated packages on your outer Python don't pollute the bundle. End users only need to drag the `.app` from the DMG into `/Applications` — no Python install required.
+The build uses a clean throwaway venv at `.build-venv/`, filled from `uv.lock`, so unrelated packages on your outer Python don't pollute the bundle. End users only need to drag the `.app` from the DMG into `/Applications` — no Python install required.
 
 > **Code signing**: without the signing secrets described in [`docs/release.md`](docs/release.md), the `.app` is ad-hoc signed and macOS asks you to right-click → Open on first launch. With them, the release workflow signs and notarizes the app and the DMG.
 
@@ -413,7 +414,7 @@ Run the tests before you open a PR:
 
 ### Cutting a release
 
-Tag-triggered: bump `version` in `pyproject.toml` + `_FALLBACK_VERSION` in `discogs_alert/__init__.py`, commit, tag `vX.Y.Z`, push with `--follow-tags`. CI builds + signs + publishes everything (PyPI, DockerHub, GitHub Release with `.app` + DMG, Sparkle appcast PR). See [`docs/release.md`](docs/release.md) for the full recipe.
+Tag-triggered: run `uv version X.Y.Z` (updates `pyproject.toml` and `uv.lock`), set `_FALLBACK_VERSION` in `discogs_alert/__init__.py` to match, merge that as a PR, then tag the merge commit `vX.Y.Z` and push the tag. CI builds + signs + publishes everything (PyPI, DockerHub, GitHub Release with `.app` + DMG, Sparkle appcast PR). See [`docs/release.md`](docs/release.md) for the full recipe.
 
 ## Author
 
