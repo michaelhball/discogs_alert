@@ -120,6 +120,9 @@ class RuntimeConfig(_ConfigModel):
     # Where the per-iteration heartbeat (`last_run.json`, read by `--status`)
     # is written. Defaults to the directory holding `state_path`.
     heartbeat_path: str | None = None
+    # Directory for the weekly currency-rate cache files. Defaults to
+    # ~/.discogs_alert/currency_cache.
+    currency_cache_dir: str | None = None
     stats_gate: bool = True
     max_concurrency: int = 6
     prune_after_days: int = 90
@@ -249,6 +252,7 @@ _ENV_OVERRIDES = {
     "DA_GMAIL_TO": "alerter.gmail.to",
     "DA_STATE_PATH": "runtime.state_path",
     "DA_HEARTBEAT_PATH": "runtime.heartbeat_path",
+    "DA_CURRENCY_CACHE_DIR": "runtime.currency_cache_dir",
     "DA_STATS_GATE": "runtime.stats_gate",
     "DA_MAX_CONCURRENCY": "runtime.max_concurrency",
     "DA_PRUNE_AFTER_DAYS": "runtime.prune_after_days",

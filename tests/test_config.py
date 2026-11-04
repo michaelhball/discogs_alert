@@ -384,3 +384,10 @@ def test_blocked_alert_after_minutes_env_override_and_floor(tmp_path: Path):
 
 def test_default_user_agent_names_the_program_its_version_and_its_page():
     assert da_config.DEFAULT_USER_AGENT == f"discogs_alert/{__version__} +https://github.com/michaelhball/discogs_alert"
+
+
+def test_currency_cache_dir_env_override(tmp_path: Path):
+    cfg = da_config.load_config(
+        path=tmp_path / "none.toml", env={"DA_DISCOGS_TOKEN": "T", "DA_CURRENCY_CACHE_DIR": "/tmp/rates"}
+    )
+    assert cfg.runtime.currency_cache_dir == "/tmp/rates"
