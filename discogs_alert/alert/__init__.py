@@ -23,7 +23,7 @@ from __future__ import annotations
 import enum
 import logging
 from importlib.metadata import entry_points, EntryPoints
-from typing import Any, Dict, List, Type, Union
+from typing import Any
 
 from discogs_alert.alert.base import Alerter
 from discogs_alert.alert.gmail import GmailAlerter
@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 ENTRY_POINT_GROUP = "discogs_alert.alerters"
 
 # Built-in alerters — always available.
-_BUILTIN_ALERTERS: Dict[str, Type[Alerter]] = {
+_BUILTIN_ALERTERS: dict[str, type[Alerter]] = {
     "GMAIL": GmailAlerter,
     "NTFY": NtfyAlerter,
     "PUSHBULLET": PushbulletAlerter,
@@ -58,7 +58,7 @@ class AlerterType(enum.IntEnum):
     GMAIL = enum.auto()
 
 
-def _load_entry_point_alerters() -> Dict[str, Type[Alerter]]:
+def _load_entry_point_alerters() -> dict[str, type[Alerter]]:
     """Discover alerter classes registered against the `discogs_alert.alerters`
     entry-point group. Returns a mapping ``{name.upper(): AlerterClass}``.
 
@@ -66,7 +66,7 @@ def _load_entry_point_alerters() -> Dict[str, Type[Alerter]]:
     one broken plugin shouldn't take down the whole alerter registry.
     """
 
-    discovered: Dict[str, Type[Alerter]] = {}
+    discovered: dict[str, type[Alerter]] = {}
     try:
         eps: EntryPoints = entry_points(group=ENTRY_POINT_GROUP)
     except Exception:
@@ -89,7 +89,7 @@ def _load_entry_point_alerters() -> Dict[str, Type[Alerter]]:
     return discovered
 
 
-def discover_alerters() -> Dict[str, Type[Alerter]]:
+def discover_alerters() -> dict[str, type[Alerter]]:
     """Return the full alerter registry: built-ins, then any entry-point
     additions. Entry points may NOT shadow built-ins (built-ins always win).
 
@@ -98,7 +98,7 @@ def discover_alerters() -> Dict[str, Type[Alerter]]:
     cost is negligible.
     """
 
-    registry: Dict[str, Type[Alerter]] = dict(_BUILTIN_ALERTERS)
+    registry: dict[str, type[Alerter]] = dict(_BUILTIN_ALERTERS)
     for name, cls in _load_entry_point_alerters().items():
         if name in registry:
             # Expected for normal installs: the built-ins are also registered as
@@ -109,7 +109,7 @@ def discover_alerters() -> Dict[str, Type[Alerter]]:
     return registry
 
 
-def alerter_names() -> List[str]:
+def alerter_names() -> list[str]:
     """Sorted list of all registered alerter names. Used by the CLI to populate
     the `--alerter-type` Choice dynamically.
     """
@@ -117,13 +117,13 @@ def alerter_names() -> List[str]:
     return sorted(discover_alerters().keys())
 
 
-def _normalise(name_or_type: Union[str, AlerterType]) -> str:
+def _normalise(name_or_type: str | AlerterType) -> str:
     if isinstance(name_or_type, AlerterType):
         return name_or_type.name
     return str(name_or_type).upper()
 
 
-def get_alerter(alerter_type: Union[str, AlerterType], alerter_kwargs: Dict[str, Any]) -> Alerter:
+def get_alerter(alerter_type: str | AlerterType, alerter_kwargs: dict[str, Any]) -> Alerter:
     """Instantiate the alerter named `alerter_type` with the given kwargs.
 
     Args:

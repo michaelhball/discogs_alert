@@ -1,6 +1,5 @@
 import logging
 import re
-from typing import Optional
 
 from bs4 import BeautifulSoup, Tag
 
@@ -63,7 +62,7 @@ def _parse_price_string(price_string: str) -> tuple[str, float]:
     return dac.CURRENCIES[price_currency], numeric_value
 
 
-def _first_text(elt: Optional[Tag]) -> str:
+def _first_text(elt: Tag | None) -> str:
     """Return the first stripped text child of `elt`, or ``""`` if there isn't one.
 
     Defensive replacement for ``elt.contents[0].strip()`` which IndexErrors on
@@ -76,7 +75,7 @@ def _first_text(elt: Optional[Tag]) -> str:
     return text
 
 
-def _parse_shipping(shipping_text: str) -> Optional[dict]:
+def _parse_shipping(shipping_text: str) -> dict | None:
     """Try hard to extract a shipping price + currency from the (often messy)
     Discogs shipping span text.
 
@@ -143,7 +142,7 @@ def scrape_listings_from_marketplace(response_content: str, release_id: int) -> 
     return sorted(listings, key=lambda x: x.price.value)
 
 
-def _parse_listing_row(row: Tag, release_id: int) -> Optional[da_entities.Listing]:
+def _parse_listing_row(row: Tag, release_id: int) -> da_entities.Listing | None:
     """Parse one ``<tr>`` of the marketplace listings table into a `Listing`.
 
     Returns `None` if the row isn't a real listing (e.g. doesn't carry a

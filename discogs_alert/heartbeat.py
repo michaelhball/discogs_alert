@@ -25,9 +25,9 @@ import logging
 import os
 import tempfile
 import time
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 from discogs_alert import __version__, config as da_config
 from discogs_alert.loop import IterationStats
@@ -45,7 +45,7 @@ EXIT_UNHEALTHY = 1
 EXIT_NO_HEARTBEAT = 2
 
 
-def heartbeat_path_for(state_path: Optional[Path], override: Optional[Path] = None) -> Path:
+def heartbeat_path_for(state_path: Path | None, override: Path | None = None) -> Path:
     """Where the heartbeat lives: an explicit override, else next to the state DB."""
 
     if override is not None:
@@ -56,15 +56,15 @@ def heartbeat_path_for(state_path: Optional[Path], override: Optional[Path] = No
 
 
 def _iso(ts: float) -> str:
-    return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat(timespec="seconds")
+    return datetime.fromtimestamp(ts, tz=UTC).isoformat(timespec="seconds")
 
 
 def build_heartbeat(
     stats: IterationStats,
     alerter: str,
     interval_seconds: int,
-    now: Optional[float] = None,
-) -> Dict[str, Any]:
+    now: float | None = None,
+) -> dict[str, Any]:
     now = time.time() if now is None else now
     return {
         "version": __version__,
@@ -81,7 +81,7 @@ def build_heartbeat(
     }
 
 
-def write_heartbeat(path: Path, payload: Dict[str, Any]) -> None:
+def write_heartbeat(path: Path, payload: dict[str, Any]) -> None:
     """Atomic write: a reader (``--status``, a dashboard) never sees a torn file."""
 
     path = Path(path)
@@ -101,7 +101,7 @@ def write_heartbeat(path: Path, payload: Dict[str, Any]) -> None:
     logger.debug("heartbeat written to %s", path)
 
 
-def read_heartbeat(path: Path) -> Optional[Dict[str, Any]]:
+def read_heartbeat(path: Path) -> dict[str, Any] | None:
     try:
         return json.loads(Path(path).read_text())
     except FileNotFoundError:
@@ -125,11 +125,11 @@ def humanize_seconds(seconds: float) -> str:
 
 
 def status_report(
-    heartbeat: Optional[Dict[str, Any]],
-    store_stats: Optional[Dict[str, int]],
+    heartbeat: dict[str, Any] | None,
+    store_stats: dict[str, int] | None,
     interval_seconds: int,
-    now: Optional[float] = None,
-) -> Tuple[str, int]:
+    now: float | None = None,
+) -> tuple[str, int]:
     """Render the ``--status`` report. Returns ``(text, exit_code)``."""
 
     now = time.time() if now is None else now

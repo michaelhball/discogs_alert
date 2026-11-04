@@ -90,7 +90,12 @@ line-length = 120
 target-version = "py311"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "TID", "W"]
+# B: bugbear (likely bugs), S: bandit (security), UP: pyupgrade (syntax the floor Python version allows).
+select = ["B", "E", "F", "I", "S", "TID", "UP", "W"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests assert, hold fake tokens and passwords, use fixed temp paths and parse XML they wrote themselves.
+"tests/**" = ["S101", "S105", "S106", "S107", "S108", "S314"]
 
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"

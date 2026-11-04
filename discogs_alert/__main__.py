@@ -17,7 +17,6 @@ import json
 import logging
 import sys
 from pathlib import Path
-from typing import Optional
 
 import click
 from pydantic import ValidationError
@@ -40,7 +39,7 @@ logger = logging.getLogger(__name__)
 EXAMPLE_CONFIG_URL = "https://github.com/michaelhball/discogs_alert/blob/main/examples/config.example.toml"
 
 
-def _load_or_die(config_path: Optional[Path]) -> da_config.Config:
+def _load_or_die(config_path: Path | None) -> da_config.Config:
     """Load the config, or print what is wrong in plain words and exit 2.
 
     A missing file is only fatal when the environment doesn't supply the
@@ -95,7 +94,7 @@ def _alerter_kwargs(cfg: da_config.Config) -> dict:
     return alerter_kwargs
 
 
-def _outage_alerter(cfg: da_config.Config) -> Optional[da_alert.Alerter]:
+def _outage_alerter(cfg: da_config.Config) -> da_alert.Alerter | None:
     """The alerter the outage notifications go through, or None when the
     configuration cannot build one (the loop reports that error itself).
     """
@@ -212,12 +211,12 @@ def _build_loop_kwargs(cfg: da_config.Config) -> dict:
 )
 @click.version_option(__version__)
 def main(
-    config_path: Optional[Path],
+    config_path: Path | None,
     once: bool,
     verbose: bool,
-    log_level: Optional[str],
-    log_format: Optional[str],
-    log_file: Optional[Path],
+    log_level: str | None,
+    log_format: str | None,
+    log_file: Path | None,
     status: bool,
     validate_config: bool,
     print_config: bool,

@@ -7,7 +7,6 @@ pytest-asyncio runs them in `auto` mode (configured in pyproject).
 
 import json
 from pathlib import Path
-from typing import List
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -19,7 +18,7 @@ from discogs_alert.alert import AlerterType
 class FakeAnonClient:
     """Stand-in for `AnonClient` returning a canned listings list."""
 
-    def __init__(self, listings: List[da_entities.Listing]):
+    def __init__(self, listings: list[da_entities.Listing]):
         self._listings = listings
         self.aclose = AsyncMock()
 
@@ -49,7 +48,7 @@ class FakeUserTokenClient:
 
 class RecordingAlerter:
     def __init__(self, send_returns: bool = True):
-        self.calls: List[tuple] = []
+        self.calls: list[tuple] = []
         self.send_returns = send_returns
 
     def send_alert(self, title: str, body: str) -> bool:

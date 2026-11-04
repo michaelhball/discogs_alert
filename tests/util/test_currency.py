@@ -1,5 +1,4 @@
 import json
-from typing import Optional
 from unittest.mock import MagicMock
 
 import httpx
@@ -26,7 +25,7 @@ def _isolate_caches(monkeypatch: pytest.MonkeyPatch, tmp_path):
         da_currency.get_currency_rates.cache_clear()
 
 
-def _fake_response(status_code: int = 200, payload: Optional[dict] = None, raise_exc: Optional[Exception] = None):
+def _fake_response(status_code: int = 200, payload: dict | None = None, raise_exc: Exception | None = None):
     """Build an `httpx.Response`-like mock for monkey-patching `httpx.get`."""
 
     if raise_exc is not None:

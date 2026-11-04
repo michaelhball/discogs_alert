@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -122,7 +121,7 @@ def check_for_updates() -> bool:  # pragma: no cover — needs AppKit + Sparkle
     return True
 
 
-def status() -> Optional[str]:
+def status() -> str | None:
     """Return a one-line description of the updater state. Used by tests
     and by the menu-bar's debug menu (when we add one).
     """

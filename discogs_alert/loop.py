@@ -27,7 +27,7 @@ import random
 import time
 from collections import Counter
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 import httpx
 
@@ -66,7 +66,7 @@ class IterationStats:
     started_at: float = dataclasses.field(default_factory=time.time)
     duration_s: float = 0.0
     outcome: str = "ok"  # "ok" | "error"
-    error: Optional[str] = None
+    error: str | None = None
     wantlist_size: int = 0
     gate_checked: int = 0
     gate_failed: int = 0  # stats lookup failed → scraped anyway
@@ -79,8 +79,8 @@ class IterationStats:
     alerts_sent: int = 0
     alerts_failed: int = 0
     release_errors: int = 0
-    api_rate_limit_remaining: Optional[int] = None
-    api_rate_limit: Optional[int] = None
+    api_rate_limit_remaining: int | None = None
+    api_rate_limit: int | None = None
 
     def as_dict(self) -> dict:
         # Not `dataclasses.asdict`: it rebuilds a Counter from its items() and
@@ -122,7 +122,7 @@ class IterationStats:
             parts.append(f"api rate limit {self.api_rate_limit_remaining}/{self.api_rate_limit} remaining")
         return "; ".join(parts)
 
-    def problem(self) -> Optional[str]:
+    def problem(self) -> str | None:
         """Why this iteration checked nothing, in one line, or None if it worked."""
 
         if self.outcome != "ok":
@@ -141,10 +141,10 @@ class IterationStats:
 
 
 async def load_wantlist(
-    list_id: Optional[int] = None,
-    user_token_client: Optional[da_client.UserTokenClient] = None,
-    wantlist_path: Optional[str] = None,
-) -> List[da_entities.Release]:
+    list_id: int | None = None,
+    user_token_client: da_client.UserTokenClient | None = None,
+    wantlist_path: str | None = None,
+) -> list[da_entities.Release]:
     """Load the user's wantlist from one of two sources, as a list of `Release`
     objects.
 
@@ -175,7 +175,7 @@ async def load_wantlist(
 
 def stats_skip_reason(
     stats: da_entities.ReleaseStats, release: da_entities.Release, currency: str
-) -> Optional[str]:
+) -> str | None:
     """Return a human-readable reason to skip the marketplace scrape for a release based
     on its lightweight `/marketplace/stats/{release_id}` summary. ``None`` means "don't
     skip — go scrape the marketplace page".
@@ -228,12 +228,12 @@ async def process_release(
     country: str,
     seller_filters: da_entities.SellerFilters,
     record_filters: da_entities.RecordFilters,
-    country_whitelist: Set[str],
-    country_blacklist: Set[str],
+    country_whitelist: set[str],
+    country_blacklist: set[str],
     alerter: Alerter,
     store: da_state.AlertStore,
     verbose: bool = False,
-    stats: Optional[IterationStats] = None,
+    stats: IterationStats | None = None,
 ) -> int:
     """Find listings for a single release that satisfy the user's filters,
     alert on them if we haven't already, and record successful alerts in the
@@ -329,8 +329,8 @@ async def _gated_process_release(
     country: str,
     seller_filters: da_entities.SellerFilters,
     record_filters: da_entities.RecordFilters,
-    country_whitelist: Set[str],
-    country_blacklist: Set[str],
+    country_whitelist: set[str],
+    country_blacklist: set[str],
     alerter: Alerter,
     store: da_state.AlertStore,
     use_stats_gate: bool,
@@ -367,23 +367,23 @@ async def _gated_process_release(
 
 async def loop(
     discogs_token: str,
-    list_id: Optional[int],
-    wantlist_path: Optional[str],
+    list_id: int | None,
+    wantlist_path: str | None,
     user_agent: str,
     country: str,
     currency: str,
     seller_filters: da_entities.SellerFilters,
     record_filters: da_entities.RecordFilters,
-    country_whitelist: Set[str],
-    country_blacklist: Set[str],
+    country_whitelist: set[str],
+    country_blacklist: set[str],
     alerter_type: Alerter,
-    alerter_kwargs: Dict[str, Any],
-    state_path: Optional[Path] = None,
+    alerter_kwargs: dict[str, Any],
+    state_path: Path | None = None,
     use_stats_gate: bool = True,
     max_concurrency: int = DEFAULT_MAX_CONCURRENCY,
     prune_after_days: int = 90,
-    user_token_client: Optional[da_client.UserTokenClient] = None,
-    client_anon: Optional[da_client.AnonClient] = None,
+    user_token_client: da_client.UserTokenClient | None = None,
+    client_anon: da_client.AnonClient | None = None,
     verbose: bool = False,
 ) -> IterationStats:
     """One loop iteration. Async: fans out the per-release work via
@@ -442,7 +442,7 @@ async def loop(
                     for release in wantlist_items
                 ]
                 results = await asyncio.gather(*tasks, return_exceptions=True)
-                for release, result in zip(wantlist_items, results):
+                for release, result in zip(wantlist_items, results, strict=True):
                     if isinstance(result, Exception):
                         stats.release_errors += 1
                         logger.warning(

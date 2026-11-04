@@ -17,7 +17,6 @@ from __future__ import annotations
 import logging
 import sqlite3
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +51,7 @@ class AlertStore:
     are stored for forensics.
     """
 
-    def __init__(self, path: Optional[Path] = None) -> None:
+    def __init__(self, path: Path | None = None) -> None:
         self.path = Path(path) if path is not None else DEFAULT_STATE_PATH
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(self.path)
@@ -62,7 +61,7 @@ class AlertStore:
     def close(self) -> None:
         self._conn.close()
 
-    def __enter__(self) -> "AlertStore":
+    def __enter__(self) -> AlertStore:
         return self
 
     def __exit__(self, *_exc: object) -> None:
@@ -119,7 +118,7 @@ class AlertStore:
             "last_7d": int(last_7d or 0),
         }
 
-    def get_meta(self, key: str) -> Optional[str]:
+    def get_meta(self, key: str) -> str | None:
         """Read one value from the `meta` table, or None when the key is absent."""
 
         cur = self._conn.execute("SELECT value FROM meta WHERE key = ?", (key,))

@@ -20,14 +20,13 @@ import math
 import os
 import pathlib
 from datetime import datetime
-from typing import Union
 
 import httpx
 
 from discogs_alert.util.constants import CURRENCY_CHOICES
 from discogs_alert.util.system import time_cache
 
-CurrencyRates = dict[str, Union[int, float]]
+CurrencyRates = dict[str, int | float]
 
 FRANKFURTER_BASE_URL = "https://api.frankfurter.dev/v1"
 HTTP_TIMEOUT_SECONDS = 10
@@ -188,4 +187,4 @@ def convert_currency(value: float, old_currency: str, new_currency: str) -> floa
     except KeyError:
         raise InvalidCurrencyException(
             f"{old_currency} is not a supported currency (see `discogs_alert/util/constants.py`)."
-        )
+        ) from None

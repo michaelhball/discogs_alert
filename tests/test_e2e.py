@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import List
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -23,7 +22,7 @@ REAL_MARKETPLACE_HTML = (FIXTURES / "marketplace_listing_real.html").read_text(e
 
 class _RecordingAlerter:
     def __init__(self):
-        self.calls: List[tuple[str, str]] = []
+        self.calls: list[tuple[str, str]] = []
         self.send_returns = True
 
     def send_alert(self, title: str, body: str) -> bool:

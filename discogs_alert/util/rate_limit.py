@@ -18,7 +18,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import Mapping, Optional
+from collections.abc import Mapping
 
 logger = logging.getLogger(__name__)
 
@@ -51,12 +51,12 @@ class RateLimitGuard:
         self.min_remaining = min_remaining
         self.sleep_seconds = sleep_seconds
         self._sleep = sleep_fn
-        self.remaining: Optional[int] = None
-        self.limit: Optional[int] = None
-        self.used: Optional[int] = None
+        self.remaining: int | None = None
+        self.limit: int | None = None
+        self.used: int | None = None
         # Lazily-created so the guard can be used on either sync or async paths
         # without forcing an event loop at construction time.
-        self._async_lock: Optional[asyncio.Lock] = None
+        self._async_lock: asyncio.Lock | None = None
 
     def update_from_headers(self, headers: Mapping[str, str]) -> None:
         """Store the most recent header values. Missing headers leave the

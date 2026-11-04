@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Optional
 
 from discogs_alert import config as da_config, state as da_state
 from discogs_alert.alert.base import Alerter
@@ -31,8 +30,8 @@ def check(
     alerter: Alerter,
     stats: IterationStats,
     after_seconds: float,
-    now: Optional[float] = None,
-) -> Optional[str]:
+    now: float | None = None,
+) -> str | None:
     """Record this iteration's outcome and notify the user when the loop has
     checked nothing for ``after_seconds``, or when it works again after such a
     notification. Returns the title of the notification sent, or None.
@@ -70,7 +69,7 @@ def check(
     return title
 
 
-def check_for_config(cfg: da_config.Config, stats: IterationStats, alerter: Optional[Alerter]) -> Optional[str]:
+def check_for_config(cfg: da_config.Config, stats: IterationStats, alerter: Alerter | None) -> str | None:
     """`check` with the store and threshold from the config. Never raises: a
     failure here must not take the loop down.
     """

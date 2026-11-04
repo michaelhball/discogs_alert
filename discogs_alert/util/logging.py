@@ -25,9 +25,10 @@ import logging
 import logging.handlers
 import sys
 import uuid
-from datetime import datetime, timezone
+from collections.abc import Iterable, Iterator
+from datetime import datetime, UTC
 from pathlib import Path
-from typing import IO, Iterable, Iterator, Optional, Union
+from typing import IO
 
 TEXT_FORMAT = "%(asctime)s %(levelname)-7s [%(run_id)s] %(name)s: %(message)s"
 TEXT_DATEFMT = "%Y-%m-%d %H:%M:%S"
@@ -63,7 +64,7 @@ def new_run_id() -> str:
 
 
 @contextlib.contextmanager
-def run_context(run_id: Optional[str] = None) -> Iterator[str]:
+def run_context(run_id: str | None = None) -> Iterator[str]:
     """Tag every log line emitted inside the block (including from asyncio tasks
     spawned inside it, which inherit the context) with a run id.
     """
@@ -98,7 +99,7 @@ class JsonFormatter(logging.Formatter):
             if key not in _STANDARD_RECORD_ATTRS and not key.startswith("_")
         }
         payload.update(
-            ts=datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(timespec="milliseconds"),
+            ts=datetime.fromtimestamp(record.created, tz=UTC).isoformat(timespec="milliseconds"),
             level=record.levelname,
             logger=record.name,
             run_id=getattr(record, "run_id", NO_RUN_ID),
@@ -138,8 +139,8 @@ def configure_logging(
     level: str = "INFO",
     fmt: str = "text",
     verbose: bool = False,
-    stream: Optional[IO[str]] = None,
-    log_file: Optional[Union[str, Path]] = None,
+    stream: IO[str] | None = None,
+    log_file: str | Path | None = None,
     max_bytes: int = DEFAULT_LOG_MAX_BYTES,
     backup_count: int = DEFAULT_LOG_BACKUP_COUNT,
     log_stderr: bool = True,
@@ -177,7 +178,7 @@ def configure_logging(
         if isinstance(existing, logging.FileHandler):
             existing.close()
 
-    handler: Optional[logging.Handler] = None
+    handler: logging.Handler | None = None
     if log_stderr:
         handler = logging.StreamHandler(stream or sys.stderr)
         handler.addFilter(RunIdFilter())

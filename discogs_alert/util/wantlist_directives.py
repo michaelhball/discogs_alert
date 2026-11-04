@@ -32,7 +32,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Optional
+from typing import Any
 
 from discogs_alert.entities import CONDITION, Release
 
@@ -74,7 +74,7 @@ _SLEEVE_KEYS = {"sleeve", "min_sleeve", "min_sleeve_condition"}
 _DIRECTIVE_RE = re.compile(r"@([A-Za-z_]+)=(\S+)")
 
 
-def parse_directives(comment: Optional[str]) -> dict[str, Any]:
+def parse_directives(comment: str | None) -> dict[str, Any]:
     """Extract a dict of directives from a Discogs list-item comment.
 
     Returns a dict whose keys are `Release` field names (`price_threshold`,
