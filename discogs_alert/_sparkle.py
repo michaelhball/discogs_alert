@@ -15,10 +15,8 @@ requisite ``SUFeedURL`` / ``SUPublicEDKey`` keys in ``Info.plist``. When
 Sparkle isn't there and ``start_updater()`` becomes a logged no-op.
 
 Wire-up: ``menubar.MenubarApp.run()`` calls ``start_updater()`` after
-the rumps app spins up. There's no menu item for "Check for Updates…"
-in this PR — Sparkle's automatic-check-on-launch + once-per-day cadence
-covers the common case. ``check_for_updates()`` is exported for a
-follow-up that adds the menu item.
+the rumps app spins up, and the "Check for updates…" menu item calls
+``check_for_updates()``. Sparkle also checks on launch and once a day.
 
 Release process is documented in ``docs/release.md``.
 """
@@ -115,8 +113,7 @@ def start_updater() -> bool:  # pragma: no cover — needs AppKit + Sparkle
 def check_for_updates() -> bool:  # pragma: no cover — needs AppKit + Sparkle
     """Trigger a manual update check. Returns False if Sparkle isn't loaded.
 
-    Hook this up to a "Check for Updates…" menu item if you want one — the
-    standard controller already shows its own progress / install UI.
+    The standard controller shows its own progress and install UI.
     """
 
     if _updater_controller is None:
