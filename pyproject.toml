@@ -7,7 +7,7 @@ license-files = ["LICENSE"]
 authors = [{ name = "mhsb", email = "michael.h.s.ball@gmail.com" }]
 keywords = ["discogs", "dig", "digger"]
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "beautifulsoup4>=4.15,<5",
     "click>=8.5,<9",
@@ -15,7 +15,6 @@ dependencies = [
     "httpx>=0.28,<0.29",
     "pydantic>=2.14,<3",
     "requests>=2.34,<3",
-    "tomli>=2.4,<3; python_version < '3.11'",
 ]
 
 [project.urls]
@@ -49,7 +48,7 @@ TELEGRAM = "discogs_alert.alert.telegram:TelegramAlerter"
 
 [dependency-groups]
 dev = [
-    "pre-commit>=4.7; python_version >= '3.11'",
+    "pre-commit>=4.7",
     "pytest>=9.2",
     "pytest-asyncio>=1.4",
     "pytest-cov>=7.1",
@@ -79,7 +78,7 @@ markers = [
 exclude = [".git", ".ruff_cache", "dist", "docker", "img"]
 fix = false
 line-length = 120
-target-version = "py310"
+target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "TID", "W"]

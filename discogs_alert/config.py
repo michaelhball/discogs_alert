@@ -15,17 +15,11 @@ Three layers, applied in priority order:
 from __future__ import annotations
 
 import os
-import sys
+import tomllib
 from pathlib import Path
 from typing import List, Literal, Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-
-if sys.version_info >= (3, 11):
-    import tomllib
-else:
-    import tomli as tomllib  # type: ignore[no-redef]
-
 
 DEFAULT_CONFIG_DIR = Path.home() / ".discogs_alert"
 DEFAULT_CONFIG_PATH = DEFAULT_CONFIG_DIR / "config.toml"
