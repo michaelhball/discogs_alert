@@ -13,6 +13,7 @@ a custom instance.
 
 from __future__ import annotations
 
+import base64
 import logging
 
 import requests
@@ -26,6 +27,20 @@ DEFAULT_SERVER = "https://ntfy.sh"
 HTTP_TIMEOUT_SECONDS = 10
 
 
+def encode_header(value: str) -> str:
+    """Return `value` as an HTTP header value that ntfy shows unchanged.
+
+    HTTP headers carry ASCII only, and `requests` rejects anything else. ntfy
+    reads RFC 2047 encoded words (``=?UTF-8?B?<base64>?=``) in any header, so
+    a title with characters such as "²" or "—" is sent that way. ASCII titles
+    pass through untouched.
+    """
+
+    if value.isascii():
+        return value
+    return "=?UTF-8?B?" + base64.b64encode(value.encode("utf-8")).decode("ascii") + "?="
+
+
 class NtfyAlerter(Alerter):
     def __init__(self, ntfy_topic: str, ntfy_server: str = DEFAULT_SERVER, ntfy_token: str | None = None):
         if not ntfy_topic:
@@ -36,11 +51,7 @@ class NtfyAlerter(Alerter):
 
     def send_alert(self, message_title: str, message_body: str) -> bool:
         url = f"{self.ntfy_server}/{self.ntfy_topic}"
-        # ntfy uses HTTP headers for metadata. Strip non-Latin-1 chars from the
-        # title — the spec requires Latin-1 in headers, and Discogs titles can
-        # contain things like "Deep²" that requests will reject.
-        safe_title = message_title.encode("ascii", "replace").decode("ascii")
-        headers = {"Title": safe_title}
+        headers = {"Title": encode_header(message_title)}
         if self.ntfy_token:
             headers["Authorization"] = f"Bearer {self.ntfy_token}"
         try:
