@@ -69,6 +69,7 @@ module-root = ""
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 markers = [
     "online: marks tests as requiring internet access (select with '--online')",
