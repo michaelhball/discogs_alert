@@ -1,3 +1,4 @@
+from email.header import decode_header
 from unittest.mock import MagicMock
 
 import pytest
@@ -60,16 +61,26 @@ def test_token_adds_auth_header(monkeypatch: pytest.MonkeyPatch):
     assert captured["headers"]["Authorization"] == "Bearer TOK"
 
 
-def test_unicode_title_is_latin1_safe(monkeypatch: pytest.MonkeyPatch, alerter):
-    """ntfy uses HTTP headers for titles, which must be Latin-1. Discogs titles
-    can contain things like 'Deep²' that requests would reject — we coerce
-    rather than crashing.
+def test_unicode_title_is_sent_as_an_rfc_2047_encoded_word(monkeypatch: pytest.MonkeyPatch, alerter):
+    """HTTP headers carry ASCII only. ntfy reads RFC 2047 encoded words, so a
+    Discogs title such as 'Deep² — Sphere' arrives with every character intact.
     """
 
     post, captured = _fake_post(200)
     monkeypatch.setattr(requests, "post", post)
     assert alerter.send_alert("Deep² — Sphere", "body") is True
-    captured["headers"]["Title"].encode("latin-1")  # would raise if invalid
+    header = captured["headers"]["Title"]
+    header.encode("ascii")  # would raise if the header still held non-ASCII bytes
+    assert header.startswith("=?UTF-8?B?") and header.endswith("?=")
+    decoded, charset = decode_header(header)[0]
+    assert decoded.decode(charset) == "Deep² — Sphere"
+
+
+def test_ascii_title_is_sent_unchanged(monkeypatch: pytest.MonkeyPatch, alerter):
+    post, captured = _fake_post(200)
+    monkeypatch.setattr(requests, "post", post)
+    alerter.send_alert("Plain title", "body")
+    assert captured["headers"]["Title"] == "Plain title"
 
 
 def test_send_alert_returns_false_on_4xx(monkeypatch: pytest.MonkeyPatch, alerter):
