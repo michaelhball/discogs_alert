@@ -111,7 +111,7 @@ examples/            # config.example.toml
 scripts/             # append_to_appcast.py (used by the release workflow)
 tests/               # pytest + pytest-asyncio (auto mode); offline by default,
                      #   network tests gated with @pytest.mark.online + --online
-.github/workflows/   # pr_checks.yml + release.yml (tag-triggered full release)
+.github/workflows/   # pr_checks.yml, release.yml (tag-triggered full release), online_check.yml (daily real-page parse)
 Makefile             # make app / dmg / sparkle / keys / sign / secrets
 setup_app.py         # py2app config for the .app bundle
 ```
@@ -176,6 +176,8 @@ If you spawn a background agent to monitor PRs or do other long-running work:
   any `async def test_*` runs in an event loop automatically.
 - Network-gated tests use `@pytest.mark.online` and `--online`. Don't add
   online-only tests without that marker, and don't make them load-bearing.
+  `online_check.yml` runs them once a day; a 403 from the runner is a warning,
+  a parse failure is a failed run.
 - Prefer fixture-based tests over mocks where practical — saved marketplace
   HTML in `tests/data/` catches real Discogs HTML changes as test diffs.
 
