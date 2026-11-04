@@ -436,7 +436,9 @@ def test_outage_alerter_is_none_when_the_alerter_cannot_be_built(caplog):
 def test_currency_cache_dir_setting_moves_the_cache(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(da_currency, "CACHE_DIR", da_currency.CACHE_DIR)  # restored after the test
     config_file = tmp_path / "config.toml"
-    config_file.write_text(f'discogs_token = "T"\n[runtime]\ncurrency_cache_dir = "{tmp_path / "rates"}"\n')
+    # Forward slashes: a backslash starts an escape inside a TOML string, so a Windows path would not parse.
+    cache_dir = (tmp_path / "rates").as_posix()
+    config_file.write_text(f'discogs_token = "T"\n[runtime]\ncurrency_cache_dir = "{cache_dir}"\n')
     result = CliRunner().invoke(da_main.main, ["--config", str(config_file), "--validate-config"])
     assert result.exit_code == 0, result.output
     assert da_currency.CACHE_DIR == tmp_path / "rates"
