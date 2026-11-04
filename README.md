@@ -368,7 +368,7 @@ On macOS, the cleanest "always-on" path is a `launchd` agent — survives logout
 
 #### macOS menu-bar app
 
-For a lightweight GUI with status, "check now", and quick links to your config + state files, install the menu-bar extra and launch the app:
+For a lightweight GUI with status, "Check now", "Check for updates…" (only in the `.app`, which ships Sparkle) and quick links to your config + state files, install the menu-bar extra and launch the app:
 
 ```bash
 $ pip install 'discogs_alert[menubar]'

@@ -270,26 +270,15 @@ class MenubarApp:  # pragma: no cover — wired up to AppKit at runtime, not uni
         _require_rumps()
         self.controller = MenubarController(cfg)
         self.app = rumps.App("discogs_alert", title=self.controller.status_title())
-        self.app.menu = [
-            rumps.MenuItem(self.controller.last_check_str(), key=""),
-            rumps.MenuItem(self.controller.alerts_str(), key=""),
-            None,
-            rumps.MenuItem("Check now", callback=self._on_check_now),
-            None,
-            rumps.MenuItem("Open config file…", callback=self._on_open_config),
-            rumps.MenuItem("Reveal state DB…", callback=self._on_reveal_state),
-        ]
+        self.app.menu = self._menu_items()
         # Refresh the menu titles every few seconds so stats stay current.
         rumps.Timer(self._refresh_menu, interval=5).start()
 
-    def _refresh_menu(self, _timer):
-        self.app.title = self.controller.status_title()
-        # rumps menu items are keyed by their original title — easier to
-        # rebuild than rename. The 5s tick is cheap enough.
-        try:
-            self.app.menu.clear()
-        except Exception:
-            return
+    def _menu_items(self) -> list:
+        """The menu, rebuilt on every refresh: rumps keys items by their original
+        title, so a changed title needs a new item.
+        """
+
         items = [
             rumps.MenuItem(self.controller.last_check_str(), key=""),
             rumps.MenuItem(self.controller.alerts_str(), key=""),
@@ -299,12 +288,28 @@ class MenubarApp:  # pragma: no cover — wired up to AppKit at runtime, not uni
         items += [
             None,
             rumps.MenuItem("Check now", callback=self._on_check_now),
+            rumps.MenuItem("Check for updates…", callback=self._on_check_for_updates),
             None,
             rumps.MenuItem("Open config file…", callback=self._on_open_config),
             rumps.MenuItem("Reveal state DB…", callback=self._on_reveal_state),
         ]
-        for it in items:
-            self.app.menu.add(it)
+        return items
+
+    def _refresh_menu(self, _timer):
+        self.app.title = self.controller.status_title()
+        try:
+            self.app.menu.clear()
+        except Exception:
+            return
+        for item in self._menu_items():
+            self.app.menu.add(item)
+
+    def _on_check_for_updates(self, _sender):
+        if not _sparkle.check_for_updates():
+            # Running from source, or built without Sparkle.framework.
+            rumps.notification(
+                "discogs_alert", "", "Updates come with the .app from the Releases page; this copy has no updater."
+            )
 
     def _on_check_now(self, _sender):
         if self.controller.check_now():
