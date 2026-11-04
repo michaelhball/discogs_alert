@@ -28,7 +28,7 @@ with `DA_*` env-var overrides on top. The CLI is intentionally tiny: `--config`,
 - **Many small PRs, squash-merged into `main`.** Each PR is a single concern.
   PR title becomes the squash commit title and ends with ` (#NN)`.
 - **`main` changes only through PRs, for everyone including admins.** Branch
-  protection requires the ten `pr_checks.yml` checks to pass before a merge,
+  protection requires the nine `pr_checks.yml` checks to pass before a merge,
   so `gh pr merge` fails until CI is green. A ruleset blocks deleting or
   moving `v*` tags; repository admins can bypass it, which the release skill's
   "delete the tag and re-tag" recovery relies on.
