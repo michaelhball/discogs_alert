@@ -114,7 +114,7 @@ examples/            # config.example.toml
 scripts/             # append_to_appcast.py (used by the release workflow)
 tests/               # pytest + pytest-asyncio (auto mode); offline by default,
                      #   network tests gated with @pytest.mark.online + --online
-.github/workflows/   # pr_checks.yml, release.yml (tag-triggered full release), online_check.yml (daily real-page parse)
+.github/workflows/   # pr_checks.yml, release.yml (tag push publishes; a manual run only builds), online_check.yml (daily real-page parse)
 Makefile             # make app / dmg / sparkle / keys / sign / secrets
 setup_app.py         # py2app config for the .app bundle
 ```

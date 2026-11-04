@@ -1,9 +1,13 @@
+# A tag push (vX.Y.Z) publishes everything: PyPI, GitHub Release, Docker image,
+# macOS DMG and the appcast PR. A manual run (workflow_dispatch) builds and checks
+# the same things but publishes nothing; the DMG is attached to the run instead.
 name: release
 
 on:
   push:
     tags:
       - "v*.*.*"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -12,6 +16,8 @@ jobs:
   build:
     name: Build distribution
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
@@ -20,23 +26,29 @@ jobs:
 
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
 
-      - name: Sanity-check the tag matches pyproject.toml
+      - name: Read the version from pyproject.toml and check it matches the tag
+        id: version
         run: |
-          tag="${GITHUB_REF#refs/tags/v}"
           pyver="$(uv version --short)"
-          if [ "$tag" != "$pyver" ]; then
-            echo "::error::tag v$tag does not match pyproject.toml version $pyver"
-            exit 1
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            tag="${GITHUB_REF#refs/tags/v}"
+            if [ "$tag" != "$pyver" ]; then
+              echo "::error::tag v$tag does not match pyproject.toml version $pyver"
+              exit 1
+            fi
           fi
+          echo "version=$pyver" >> "$GITHUB_OUTPUT"
 
       - name: Build sdist + wheel
         run: uv build
 
       - name: Install the wheel into a clean environment and run it
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           uv venv "$RUNNER_TEMP/wheel-venv"
           uv pip install --python "$RUNNER_TEMP/wheel-venv/bin/python" dist/*.whl
-          "$RUNNER_TEMP/wheel-venv/bin/discogs_alert" --version | grep -F "${GITHUB_REF_NAME#v}"
+          "$RUNNER_TEMP/wheel-venv/bin/discogs_alert" --version | grep -F "$VERSION"
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
@@ -46,17 +58,15 @@ jobs:
   publish-pypi:
     name: Publish to PyPI
     needs: build
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     environment:
       name: pypi
       url: https://pypi.org/project/discogs-alert
     permissions:
       id-token: write  # required for PyPI trusted publishing
-    # PyPI failures (e.g. missing trusted-publisher config on pypi.org)
-    # shouldn't block the GitHub Release / .app build. Set
-    # `continue-on-error` so the chain proceeds and the user can fix
-    # PyPI out-of-band if they want.
-    continue-on-error: true
+    # A failure here fails the run. The GitHub Release and the macOS app do not
+    # wait for this job, so they still get built.
     steps:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
         with:
@@ -68,6 +78,7 @@ jobs:
   github-release:
     name: Create GitHub Release
     needs: build  # not publish-pypi — independent of PyPI's trusted-publisher setup
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -98,7 +109,7 @@ jobs:
     # Setup: set `DOCKERHUB_USERNAME` as a repo VARIABLE (usernames
     # aren't sensitive — keeps the `if:` gate on the same source the
     # login uses) and `DOCKERHUB_TOKEN` as a SECRET.
-    if: ${{ vars.DOCKERHUB_USERNAME != '' }}
+    if: ${{ github.event_name == 'push' && vars.DOCKERHUB_USERNAME != '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
@@ -125,7 +136,9 @@ jobs:
 
   build-macos-app:
     name: Build macOS .app + .dmg, sign, append to appcast
-    needs: github-release
+    needs: [build, github-release]
+    # A manual run skips github-release; the app is still built, checked and signed.
+    if: ${{ !cancelled() && needs.build.result == 'success' && (github.event_name != 'push' || needs.github-release.result == 'success') }}
     runs-on: macos-latest
     # GitHub Actions forbids `secrets.*` in `if:` conditionals (the
     # secret's existence would be a side channel), so we can't gate the
@@ -140,10 +153,6 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
-        with:
-          python-version: "3.12"
 
       # py2app bundles the interpreter it runs under; the toolcache build is a
       # macOS framework build, which is what a double-clickable .app needs.
@@ -174,12 +183,14 @@ jobs:
       - name: Build .app
         run: make app
 
-      - name: Check the bundle reports the tagged version and carries the public key
+      - name: Check the bundle reports the built version and carries the public key
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
         run: |
           plist=dist/discogs_alert.app/Contents/Info.plist
           bundled="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$plist")"
-          if [ "$bundled" != "${GITHUB_REF_NAME#v}" ]; then
-            echo "::error::bundle version $bundled does not match tag $GITHUB_REF_NAME"
+          if [ "$bundled" != "$VERSION" ]; then
+            echo "::error::bundle version $bundled does not match version $VERSION"
             exit 1
           fi
           key="$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "$plist")"
@@ -196,9 +207,9 @@ jobs:
         id: sign
         env:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+          VERSION: ${{ needs.build.outputs.version }}
         run: |
           set -euo pipefail
-          VERSION="${GITHUB_REF_NAME#v}"
           DMG="dist/discogs_alert-${VERSION}.dmg"
           # `sign_update` reads the private key from stdin via `-f -` and
           # prints `sparkle:edSignature="…" length="…"` to stdout.
@@ -213,7 +224,15 @@ jobs:
             echo "SIGEOF"
           } >> "$GITHUB_OUTPUT"
 
+      - name: Attach the DMG to this run (manual run only)
+        if: github.event_name != 'push'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: dmg
+          path: ${{ steps.sign.outputs.dmg }}
+
       - name: Upload DMG to the GitHub Release
+        if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DMG: ${{ steps.sign.outputs.dmg }}
@@ -221,6 +240,7 @@ jobs:
           gh release upload "$GITHUB_REF_NAME" "$DMG" --clobber
 
       - name: Open PR to append <item> to docs/appcast.xml
+        if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DMG: ${{ steps.sign.outputs.dmg }}

@@ -92,6 +92,18 @@ to install. The appcast PR has to be merged first — until then the
 new `<item>` isn't served from Pages, so existing installs won't see
 the new version.
 
+## Dry run (no publishing)
+
+A manual run of the same workflow builds and checks everything and publishes
+nothing: no PyPI upload, no GitHub Release, no Docker push, no appcast PR. The
+signed DMG is attached to the run as an artifact. Use it after changing the
+workflow, before pushing a tag:
+
+```bash
+gh workflow run release.yml --ref main
+gh run watch "$(gh run list --workflow=release.yml --limit 1 --json databaseId --jq '.[0].databaseId')" --exit-status
+```
+
 ## Each release (manual fallback)
 
 If the workflow is broken or you want to ship a hotfix from your own
