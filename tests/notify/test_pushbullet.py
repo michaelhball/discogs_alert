@@ -1,8 +1,7 @@
-import json
 from unittest.mock import MagicMock
 
+import httpx
 import pytest
-import requests
 
 from discogs_alert.alert import pushbullet as da_pushbullet
 
@@ -15,9 +14,9 @@ def alerter() -> da_pushbullet.PushbulletAlerter:
 def _fake_post(status_code: int = 200, content: bytes = b"{}", raise_exc=None):
     captured: dict = {}
 
-    def _post(url, data=None, headers=None, timeout=None):
+    def _post(url, json=None, headers=None, timeout=None):
         captured["url"] = url
-        captured["data"] = data
+        captured["json"] = json
         captured["headers"] = headers
         captured["timeout"] = timeout
         if raise_exc is not None:
@@ -32,25 +31,23 @@ def _fake_post(status_code: int = 200, content: bytes = b"{}", raise_exc=None):
 
 def test_send_alert_posts_correct_payload(monkeypatch: pytest.MonkeyPatch, alerter):
     post, captured = _fake_post(200)
-    monkeypatch.setattr(requests, "post", post)
+    monkeypatch.setattr(httpx, "post", post)
 
     assert alerter.send_alert("title", "body") is True
 
     assert captured["url"] == da_pushbullet.PUSHBULLET_API_URL
     assert captured["headers"]["Authorization"] == "Bearer TEST_TOKEN"
-    assert captured["headers"]["Content-Type"] == "application/json"
     assert captured["timeout"] == da_pushbullet.HTTP_TIMEOUT_SECONDS
-    body = json.loads(captured["data"])
-    assert body == {"type": "note", "title": "title", "body": "body"}
+    assert captured["json"] == {"type": "note", "title": "title", "body": "body"}
 
 
 def test_send_alert_returns_false_on_non_200(monkeypatch: pytest.MonkeyPatch, alerter):
     post, _ = _fake_post(429, b'{"error":"rate"}')
-    monkeypatch.setattr(requests, "post", post)
+    monkeypatch.setattr(httpx, "post", post)
     assert alerter.send_alert("title", "body") is False
 
 
 def test_send_alert_returns_false_on_request_exception(monkeypatch: pytest.MonkeyPatch, alerter):
-    post, _ = _fake_post(raise_exc=requests.ConnectionError("nope"))
-    monkeypatch.setattr(requests, "post", post)
+    post, _ = _fake_post(raise_exc=httpx.ConnectError("nope"))
+    monkeypatch.setattr(httpx, "post", post)
     assert alerter.send_alert("title", "body") is False

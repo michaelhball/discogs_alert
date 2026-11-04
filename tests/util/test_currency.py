@@ -2,8 +2,8 @@ import json
 from typing import Optional
 from unittest.mock import MagicMock
 
+import httpx
 import pytest
-import requests
 
 from discogs_alert.util import constants as dac, currency as da_currency
 
@@ -27,7 +27,7 @@ def _isolate_caches(monkeypatch: pytest.MonkeyPatch, tmp_path):
 
 
 def _fake_response(status_code: int = 200, payload: Optional[dict] = None, raise_exc: Optional[Exception] = None):
-    """Build a `requests.Response`-like mock for monkey-patching `requests.get`."""
+    """Build an `httpx.Response`-like mock for monkey-patching `httpx.get`."""
 
     if raise_exc is not None:
 
@@ -70,7 +70,7 @@ def test_get_currency_rates_calls_frankfurter(monkeypatch: pytest.MonkeyPatch):
         captured["timeout"] = timeout
         return _fake_response(200, {"base": "EUR", "rates": {"USD": 1.1}})()
 
-    monkeypatch.setattr(requests, "get", fake_get)
+    monkeypatch.setattr(httpx, "get", fake_get)
     rates = da_currency.get_currency_rates("EUR")
 
     assert captured["url"] == f"{da_currency.FRANKFURTER_BASE_URL}/latest"
@@ -81,7 +81,7 @@ def test_get_currency_rates_calls_frankfurter(monkeypatch: pytest.MonkeyPatch):
 
 
 def test_get_currency_rates_writes_disk_cache(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(requests, "get", _fake_response(200, {"base": "EUR", "rates": {"USD": 1.1}}))
+    monkeypatch.setattr(httpx, "get", _fake_response(200, {"base": "EUR", "rates": {"USD": 1.1}}))
     da_currency.get_currency_rates("EUR")
     cache_file = da_currency._disk_cache_path("EUR")
     assert cache_file.exists()
@@ -99,25 +99,25 @@ def test_get_currency_rates_uses_disk_cache(monkeypatch: pytest.MonkeyPatch):
     def boom(*_a, **_kw):
         raise AssertionError("Frankfurter must not be called when disk cache is present")
 
-    monkeypatch.setattr(requests, "get", boom)
+    monkeypatch.setattr(httpx, "get", boom)
     rates = da_currency.get_currency_rates("EUR")
     assert rates == {"USD": 9.99, "EUR": 1.0}
 
 
 def test_get_currency_rates_raises_on_provider_http_error(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(requests, "get", _fake_response(503, {"error": "down"}))
+    monkeypatch.setattr(httpx, "get", _fake_response(503, {"error": "down"}))
     with pytest.raises(da_currency.CurrencyProviderError):
         da_currency.get_currency_rates("EUR")
 
 
 def test_get_currency_rates_raises_on_network_error(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(requests, "get", _fake_response(raise_exc=requests.ConnectionError("nope")))
+    monkeypatch.setattr(httpx, "get", _fake_response(raise_exc=httpx.ConnectError("nope")))
     with pytest.raises(da_currency.CurrencyProviderError):
         da_currency.get_currency_rates("EUR")
 
 
 def test_get_currency_rates_raises_on_malformed_payload(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(requests, "get", _fake_response(200, {"base": "EUR"}))  # no `rates`
+    monkeypatch.setattr(httpx, "get", _fake_response(200, {"base": "EUR"}))  # no `rates`
     with pytest.raises(da_currency.CurrencyProviderError):
         da_currency.get_currency_rates("EUR")
 
@@ -133,7 +133,7 @@ def test_falls_back_to_stale_cache_on_network_error(monkeypatch: pytest.MonkeyPa
     stale = da_currency.CACHE_DIR / "1999-1-EUR.json"
     json.dump({"USD": 1.05, "EUR": 1.0}, stale.open("w"))
 
-    monkeypatch.setattr(requests, "get", _fake_response(raise_exc=requests.ConnectionError("nope")))
+    monkeypatch.setattr(httpx, "get", _fake_response(raise_exc=httpx.ConnectError("nope")))
     rates = da_currency.get_currency_rates("EUR")
     assert rates == {"USD": 1.05, "EUR": 1.0}
 
@@ -143,7 +143,7 @@ def test_falls_back_to_stale_cache_on_5xx(monkeypatch: pytest.MonkeyPatch):
     stale = da_currency.CACHE_DIR / "1999-1-EUR.json"
     json.dump({"USD": 1.07, "EUR": 1.0}, stale.open("w"))
 
-    monkeypatch.setattr(requests, "get", _fake_response(503, {"error": "down"}))
+    monkeypatch.setattr(httpx, "get", _fake_response(503, {"error": "down"}))
     rates = da_currency.get_currency_rates("EUR")
     assert rates == {"USD": 1.07, "EUR": 1.0}
 
@@ -161,7 +161,7 @@ def test_stale_cache_fallback_picks_newest(monkeypatch: pytest.MonkeyPatch, tmp_
     os.utime(older, (1, 1))
     os.utime(newer, (1000, 1000))
 
-    monkeypatch.setattr(requests, "get", _fake_response(raise_exc=requests.ConnectionError("nope")))
+    monkeypatch.setattr(httpx, "get", _fake_response(raise_exc=httpx.ConnectError("nope")))
     rates = da_currency.get_currency_rates("EUR")
     assert rates == {"USD": 2.0}
 
@@ -171,7 +171,7 @@ def test_no_stale_cache_means_we_still_raise(monkeypatch: pytest.MonkeyPatch):
     as `CurrencyProviderError` so the loop's exception logging fires.
     """
 
-    monkeypatch.setattr(requests, "get", _fake_response(raise_exc=requests.ConnectionError("nope")))
+    monkeypatch.setattr(httpx, "get", _fake_response(raise_exc=httpx.ConnectError("nope")))
     with pytest.raises(da_currency.CurrencyProviderError):
         da_currency.get_currency_rates("EUR")
 
@@ -217,12 +217,12 @@ def test_validated_rates_rejects_unusable_payloads(payload):
 def test_damaged_current_week_cache_is_refetched(monkeypatch: pytest.MonkeyPatch):
     da_currency.CACHE_DIR.mkdir(parents=True, exist_ok=True)
     da_currency._disk_cache_path("EUR").write_text(json.dumps({"USD": 0}))
-    monkeypatch.setattr(requests, "get", _fake_response(payload={"rates": {"USD": 1.2}}))
+    monkeypatch.setattr(httpx, "get", _fake_response(payload={"rates": {"USD": 1.2}}))
     assert da_currency.get_currency_rates("EUR")["USD"] == 1.2
 
 
 def test_provider_response_with_a_zero_rate_is_rejected(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(requests, "get", _fake_response(payload={"rates": {"USD": 0}}))
+    monkeypatch.setattr(httpx, "get", _fake_response(payload={"rates": {"USD": 0}}))
     with pytest.raises(da_currency.CurrencyProviderError):
         da_currency.get_currency_rates("EUR")
 
@@ -230,6 +230,6 @@ def test_provider_response_with_a_zero_rate_is_rejected(monkeypatch: pytest.Monk
 def test_damaged_stale_cache_is_not_used(monkeypatch: pytest.MonkeyPatch):
     da_currency.CACHE_DIR.mkdir(parents=True, exist_ok=True)
     (da_currency.CACHE_DIR / "1999-1-EUR.json").write_text(json.dumps({"USD": "junk"}))
-    monkeypatch.setattr(requests, "get", _fake_response(raise_exc=requests.ConnectionError("down")))
+    monkeypatch.setattr(httpx, "get", _fake_response(raise_exc=httpx.ConnectError("down")))
     with pytest.raises(da_currency.CurrencyProviderError):
         da_currency.get_currency_rates("EUR")

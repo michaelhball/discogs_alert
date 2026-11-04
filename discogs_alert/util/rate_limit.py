@@ -34,7 +34,7 @@ class RateLimitGuard:
 
         guard = RateLimitGuard()
         guard.before_request()              # sleeps if needed
-        resp = requests.get(...)
+        resp = httpx.get(...)
         guard.update_from_headers(resp.headers)
     """
 

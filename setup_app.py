@@ -25,9 +25,8 @@ dist/discogs_alert.app/Contents/Frameworks/...`` to see whether the
 
 import os
 import sys
-from pathlib import Path
-
 import tomllib
+from pathlib import Path
 
 # py2app's modulegraph traversal recurses through every dep's AST. With
 # pydantic / curl_cffi / httpx in the picture, the default 1000-frame
@@ -121,10 +120,6 @@ OPTIONS = {
         "httpx",
         "h11",
         "certifi",
-        # `requests` pulls these in dynamically; py2app's static analysis
-        # doesn't catch them and the `.app` warns about missing chardet
-        # at startup without them.
-        "charset_normalizer",
         "idna",
         # PyObjC — needed for the Sparkle bridge (discogs_alert/_sparkle.py).
         # rumps depends on PyObjC anyway, but listing the umbrella package

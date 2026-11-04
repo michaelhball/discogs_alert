@@ -1,8 +1,8 @@
 from email.header import decode_header
 from unittest.mock import MagicMock
 
+import httpx
 import pytest
-import requests
 
 from discogs_alert.alert import ntfy as da_ntfy
 
@@ -15,9 +15,9 @@ def alerter() -> da_ntfy.NtfyAlerter:
 def _fake_post(status_code: int = 200, content: bytes = b"{}", raise_exc=None):
     captured: dict = {}
 
-    def _post(url, data=None, headers=None, timeout=None):
+    def _post(url, content=None, headers=None, timeout=None):
         captured["url"] = url
-        captured["data"] = data
+        captured["content"] = content
         captured["headers"] = headers
         captured["timeout"] = timeout
         if raise_exc is not None:
@@ -32,14 +32,14 @@ def _fake_post(status_code: int = 200, content: bytes = b"{}", raise_exc=None):
 
 def test_send_alert_posts_to_topic(monkeypatch: pytest.MonkeyPatch, alerter):
     post, captured = _fake_post(200)
-    monkeypatch.setattr(requests, "post", post)
+    monkeypatch.setattr(httpx, "post", post)
 
     assert alerter.send_alert("Hello", "World") is True
 
     assert captured["url"] == "https://ntfy.sh/my-topic"
     assert captured["headers"]["Title"] == "Hello"
     assert "Authorization" not in captured["headers"]
-    assert captured["data"] == b"World"
+    assert captured["content"] == b"World"
     assert captured["timeout"] == da_ntfy.HTTP_TIMEOUT_SECONDS
 
 
@@ -48,7 +48,7 @@ def test_self_hosted_server_url(monkeypatch: pytest.MonkeyPatch):
 
     alerter = da_ntfy.NtfyAlerter(ntfy_topic="t", ntfy_server="https://ntfy.example.com/")
     post, captured = _fake_post(200)
-    monkeypatch.setattr(requests, "post", post)
+    monkeypatch.setattr(httpx, "post", post)
     alerter.send_alert("t", "b")
     assert captured["url"] == "https://ntfy.example.com/t"
 
@@ -56,7 +56,7 @@ def test_self_hosted_server_url(monkeypatch: pytest.MonkeyPatch):
 def test_token_adds_auth_header(monkeypatch: pytest.MonkeyPatch):
     alerter = da_ntfy.NtfyAlerter(ntfy_topic="t", ntfy_token="TOK")
     post, captured = _fake_post(200)
-    monkeypatch.setattr(requests, "post", post)
+    monkeypatch.setattr(httpx, "post", post)
     alerter.send_alert("t", "b")
     assert captured["headers"]["Authorization"] == "Bearer TOK"
 
@@ -67,7 +67,7 @@ def test_unicode_title_is_sent_as_an_rfc_2047_encoded_word(monkeypatch: pytest.M
     """
 
     post, captured = _fake_post(200)
-    monkeypatch.setattr(requests, "post", post)
+    monkeypatch.setattr(httpx, "post", post)
     assert alerter.send_alert("Deep² — Sphere", "body") is True
     header = captured["headers"]["Title"]
     header.encode("ascii")  # would raise if the header still held non-ASCII bytes
@@ -78,20 +78,20 @@ def test_unicode_title_is_sent_as_an_rfc_2047_encoded_word(monkeypatch: pytest.M
 
 def test_ascii_title_is_sent_unchanged(monkeypatch: pytest.MonkeyPatch, alerter):
     post, captured = _fake_post(200)
-    monkeypatch.setattr(requests, "post", post)
+    monkeypatch.setattr(httpx, "post", post)
     alerter.send_alert("Plain title", "body")
     assert captured["headers"]["Title"] == "Plain title"
 
 
 def test_send_alert_returns_false_on_4xx(monkeypatch: pytest.MonkeyPatch, alerter):
     post, _ = _fake_post(403, b"forbidden")
-    monkeypatch.setattr(requests, "post", post)
+    monkeypatch.setattr(httpx, "post", post)
     assert alerter.send_alert("t", "b") is False
 
 
 def test_send_alert_returns_false_on_request_exception(monkeypatch: pytest.MonkeyPatch, alerter):
-    post, _ = _fake_post(raise_exc=requests.ConnectionError("nope"))
-    monkeypatch.setattr(requests, "post", post)
+    post, _ = _fake_post(raise_exc=httpx.ConnectError("nope"))
+    monkeypatch.setattr(httpx, "post", post)
     assert alerter.send_alert("t", "b") is False
 
 

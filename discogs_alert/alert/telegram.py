@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-import requests
+import httpx
 
 from discogs_alert.alert._response import log_alerter_failure
 from discogs_alert.alert.base import Alerter
@@ -27,12 +27,12 @@ class TelegramAlerter(Alerter):
         text = f"{message_title} ({message_body})"
         url = f"{TELEGRAM_API_BASE}/bot{self.bot_token}/sendMessage"
         try:
-            resp = requests.post(
+            resp = httpx.post(
                 url,
                 json={"chat_id": self.bot_chat_id, "text": text},
                 timeout=HTTP_TIMEOUT_SECONDS,
             )
-        except requests.exceptions.RequestException as exc:
+        except httpx.HTTPError as exc:
             # No traceback or exception text: both contain the request URL, which holds the bot token.
             logger.error("Exception sending telegram message: %s", type(exc).__name__)
             return False

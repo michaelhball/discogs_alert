@@ -36,7 +36,7 @@ LOG_FORMATS = ("text", "json")
 # Loggers that emit one INFO line per HTTP request. With a 300-release wantlist
 # that is ~350 lines per iteration of pure noise; keep them at WARNING unless
 # the operator asked for verbose output.
-NOISY_LOGGERS = ("httpx", "httpcore", "urllib3", "curl_cffi", "asyncio")
+NOISY_LOGGERS = ("httpx", "httpcore", "curl_cffi", "asyncio")
 
 NO_RUN_ID = "-"
 
@@ -112,7 +112,7 @@ class JsonFormatter(logging.Formatter):
 class RedactingFormatter(logging.Formatter):
     """Masks secret strings in the finished line, tracebacks included. Secrets can
     reach a log line inside a library's message: Telegram's bot token is part of the
-    request URL, and `requests` and `urllib3` both print that URL.
+    request URL, and httpx logs that URL at INFO.
     """
 
     def __init__(self, inner: logging.Formatter, secrets: Iterable[str]) -> None:
