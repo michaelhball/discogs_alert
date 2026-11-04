@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import os
 import tomllib
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Literal
 
@@ -315,16 +316,16 @@ def _set_dotted(target: dict, dotted: str, value: object) -> None:
     cur[parts[-1]] = value
 
 
-def _apply_env_overrides(data: dict, env: dict | None = None) -> dict:
+def _apply_env_overrides(data: dict, env: Mapping[str, str] | None = None) -> dict:
     """Layer ``DA_*`` env vars on top of a parsed-TOML dict.
 
     Returns a new dict; doesn't mutate the input.
     """
 
-    env = os.environ if env is None else env
+    resolved_env: Mapping[str, str] = os.environ if env is None else env
     out = {**data}
     for env_name, dotted in _ENV_OVERRIDES.items():
-        if (raw := env.get(env_name)) is None:
+        if (raw := resolved_env.get(env_name)) is None:
             continue
         _set_dotted(out, dotted, _coerce_env_value(env_name, raw))
     return out
@@ -332,7 +333,7 @@ def _apply_env_overrides(data: dict, env: dict | None = None) -> dict:
 
 def load_config(
     path: Path | None = None,
-    env: dict | None = None,
+    env: Mapping[str, str] | None = None,
 ) -> Config:
     """Load and validate the config from ``path`` (default
     ``~/.discogs_alert/config.toml``), applying ``DA_*`` env-var overrides on

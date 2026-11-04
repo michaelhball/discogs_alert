@@ -15,6 +15,7 @@ of "have I sent this before?".
 from __future__ import annotations
 
 import logging
+import os
 import sqlite3
 from pathlib import Path
 
@@ -51,7 +52,7 @@ class AlertStore:
     are stored for forensics.
     """
 
-    def __init__(self, path: Path | None = None) -> None:
+    def __init__(self, path: str | os.PathLike[str] | None = None) -> None:
         self.path = Path(path) if path is not None else DEFAULT_STATE_PATH
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(self.path)

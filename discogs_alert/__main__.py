@@ -243,7 +243,7 @@ def main(
     if log_level is not None:
         cfg.runtime.log_level = log_level.upper()
     if log_format is not None:
-        cfg.runtime.log_format = log_format.lower()
+        cfg.runtime.log_format = "json" if log_format.lower() == "json" else "text"
     if log_file is not None:
         cfg.runtime.log_file = str(log_file)
     da_logging.configure_logging(

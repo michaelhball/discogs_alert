@@ -1,7 +1,7 @@
 import logging
 import re
 
-from bs4 import BeautifulSoup, Tag
+from bs4 import BeautifulSoup, NavigableString, Tag
 
 from discogs_alert import entities as da_entities
 from discogs_alert.util import constants as dac
@@ -40,7 +40,8 @@ def _parse_price_string(price_string: str) -> tuple[str, float]:
         or if the numeric portion can't be parsed as a float.
     """
 
-    price_currency, price_value = None, None
+    price_currency: str | None = None
+    price_value = ""
     try:
         price_currency = re.findall(CURRENCY_REGEX, price_string)[0]
         price_value = price_string.replace(price_currency, "")
@@ -162,7 +163,7 @@ def _parse_listing_row(row: Tag, release_id: int) -> da_entities.Listing | None:
     anchor = item_desc_cell.find("a")
     if anchor is None or "href" not in anchor.attrs:
         return None
-    listing_url = anchor["href"]
+    listing_url = str(anchor["href"])
     listing["id"] = int(listing_url.split("/")[-1].split("?")[0])
 
     paragraphs = item_desc_cell.find_all("p")
@@ -220,7 +221,7 @@ def _parse_listing_row(row: Tag, release_id: int) -> da_entities.Listing | None:
         # No "Ships From:" — typically a scam listing; skip quietly.
         return None
     try:
-        listing["seller_ships_from"] = ships_from_label.parent.contents[1].strip()
+        listing["seller_ships_from"] = str(ships_from_label.parent.contents[1]).strip()
     except IndexError:
         return None
 
@@ -228,7 +229,7 @@ def _parse_listing_row(row: Tag, release_id: int) -> da_entities.Listing | None:
     price_span = item_price_cell.find("span", class_="price")
     if price_span is None:
         return None
-    price_text_pieces = [elt for elt in price_span.contents if elt.name is None]
+    price_text_pieces = [elt for elt in price_span.contents if isinstance(elt, NavigableString)]
     if not price_text_pieces:
         return None
     price_string = price_text_pieces[0].strip().replace("+", "").replace(",", "")
@@ -242,7 +243,7 @@ def _parse_listing_row(row: Tag, release_id: int) -> da_entities.Listing | None:
 
     shipping_span = item_price_cell.find("span", class_="item_shipping")
     if shipping_span is not None:
-        shipping_pieces = [elt for elt in shipping_span.contents if elt.name is None]
+        shipping_pieces = [elt for elt in shipping_span.contents if isinstance(elt, NavigableString)]
         if shipping_pieces:
             shipping = _parse_shipping(shipping_pieces[0])
             if shipping is not None:

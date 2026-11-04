@@ -224,12 +224,18 @@ def conditions_satisfied(
     ):
         return False
 
-    # verify media condition, either globally or for this specific release
-    if listing.media_condition < (release.min_media_condition or record_filters.min_media_condition):
+    # verify media condition, either globally or for this specific release. `is not None`, not `or`: POOR is 0.
+    min_media = release.min_media_condition
+    if min_media is None:
+        min_media = record_filters.min_media_condition
+    if min_media is not None and listing.media_condition < min_media:
         return False
 
     # optionally sleeve condition, either globally or for this specific release
-    if listing.sleeve_condition < (release.min_sleeve_condition or record_filters.min_sleeve_condition):
+    min_sleeve = release.min_sleeve_condition
+    if min_sleeve is None:
+        min_sleeve = record_filters.min_sleeve_condition
+    if min_sleeve is not None and listing.sleeve_condition < min_sleeve:
         return False
 
     return True
