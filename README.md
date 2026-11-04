@@ -316,6 +316,8 @@ heartbeat:    /Users/me/.discogs_alert/last_run.json
 
 Exit codes: `0` healthy, `1` the last iteration failed, read no marketplace page at all, or is stale (older than 2× the interval, minimum 15 minutes), `2` no heartbeat yet. Point a cron job, a launchd watchdog, or a monitoring probe at it; `--status --log-format json` prints the raw heartbeat + counts as JSON instead.
 
+When iterations keep failing, or keep reading no marketplace page, `discogs_alert` sends one notification through your alerter after `runtime.blocked_alert_after_minutes` (default 60, `DA_BLOCKED_ALERT_AFTER_MINUTES`; 0 turns it off), and one more when an iteration works again. `--once` runs share the timer through `state.db`.
+
 Each matching listing produces one notification — title is the release's display title, body is the listing URL. Deduplication is local: `discogs_alert` records every successful alert in `~/.discogs_alert/state.db` (configurable via `runtime.state_path` in `config.toml`) and won't re-alert across iterations.
 
 The full set of knobs lives in [`examples/config.example.toml`](examples/config.example.toml) — global filters (seller rating, media / sleeve condition, country whitelist / blacklist), runtime tuning (`max_concurrency`, `prune_after_days`, `stats_gate`), and per-alerter config. Per-release overrides go in your wantlist JSON or as `@key=value` directives in Discogs list comments (see above).

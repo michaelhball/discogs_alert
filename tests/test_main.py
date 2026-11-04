@@ -400,3 +400,37 @@ def test_cli_warns_about_a_world_readable_config(stub_run, config_file):
     result = CliRunner().invoke(da_main.main, ["--config", str(config_file), "--validate-config"])
     assert result.exit_code == 0, result.output
     assert "chmod 600" in result.output
+
+
+async def test_run_checks_for_an_outage_after_each_iteration(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    from unittest.mock import AsyncMock, MagicMock
+
+    from discogs_alert import client as da_client, loop as da_loop, outage as da_outage
+    from discogs_alert.alert.ntfy import NtfyAlerter
+    from discogs_alert.loop import IterationStats
+
+    for name in ("AnonClient", "UserTokenClient"):
+        fake = MagicMock()
+        fake.aclose = AsyncMock()
+        monkeypatch.setattr(da_client, name, lambda *_a, _fake=fake, **_kw: _fake)
+
+    async def fake_loop(**_kwargs):
+        return IterationStats()
+
+    monkeypatch.setattr(da_loop, "loop", fake_loop)
+    checks: list = []
+    monkeypatch.setattr(da_outage, "check_for_config", lambda cfg, stats, alerter: checks.append((stats, alerter)))
+
+    cfg = da_config.load_config(
+        path=tmp_path / "none.toml",
+        env={"DA_DISCOGS_TOKEN": "T", "DA_NTFY_TOPIC": "t", "DA_STATE_PATH": str(tmp_path / "s.db")},
+    )
+    await da_main._run(loop_kwargs=da_main._build_loop_kwargs(cfg), run_once=True, interval_seconds=1, cfg=cfg)
+    assert len(checks) == 1
+    assert isinstance(checks[0][1], NtfyAlerter)
+
+
+def test_outage_alerter_is_none_when_the_alerter_cannot_be_built(caplog):
+    cfg = da_config.Config.model_validate({"discogs_token": "T"})  # NTFY without a topic
+    assert da_main._outage_alerter(cfg) is None
+    assert "outage notifications are off" in caplog.text

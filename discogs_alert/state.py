@@ -34,6 +34,10 @@ CREATE TABLE IF NOT EXISTS sent_alerts (
 );
 CREATE INDEX IF NOT EXISTS idx_sent_alerts_release_id ON sent_alerts(release_id);
 CREATE INDEX IF NOT EXISTS idx_sent_alerts_sent_at   ON sent_alerts(sent_at);
+CREATE TABLE IF NOT EXISTS meta (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
 """
 
 
@@ -114,6 +118,21 @@ class AlertStore:
             "last_24h": int(last_24h or 0),
             "last_7d": int(last_7d or 0),
         }
+
+    def get_meta(self, key: str) -> Optional[str]:
+        """Read one value from the `meta` table, or None when the key is absent."""
+
+        cur = self._conn.execute("SELECT value FROM meta WHERE key = ?", (key,))
+        row = cur.fetchone()
+        return None if row is None else str(row[0])
+
+    def set_meta(self, key: str, value: str) -> None:
+        with self._conn:
+            self._conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", (key, value))
+
+    def delete_meta(self, key: str) -> None:
+        with self._conn:
+            self._conn.execute("DELETE FROM meta WHERE key = ?", (key,))
 
     def prune_older_than(self, days: int) -> int:
         """Delete alert records older than `days` days. Returns the number of rows

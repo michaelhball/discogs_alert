@@ -124,6 +124,9 @@ class RuntimeConfig(_ConfigModel):
     stats_gate: bool = True
     max_concurrency: int = 6
     prune_after_days: int = 90
+    # Send one notification through the alerter when iterations have failed, or
+    # read no marketplace page, for this long; 0 turns it off.
+    blocked_alert_after_minutes: int = Field(default=60, ge=0)
     verbose: bool = False
     log_level: str = "INFO"
     # "text" (timestamped, human-readable) or "json" (one object per line).
@@ -250,6 +253,7 @@ _ENV_OVERRIDES = {
     "DA_STATS_GATE": "runtime.stats_gate",
     "DA_MAX_CONCURRENCY": "runtime.max_concurrency",
     "DA_PRUNE_AFTER_DAYS": "runtime.prune_after_days",
+    "DA_BLOCKED_ALERT_AFTER_MINUTES": "runtime.blocked_alert_after_minutes",
     "DA_LOG_LEVEL": "runtime.log_level",
     "DA_LOG_FORMAT": "runtime.log_format",
     "DA_LOG_FILE": "runtime.log_file",

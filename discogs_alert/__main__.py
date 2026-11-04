@@ -24,11 +24,13 @@ from pydantic import ValidationError
 
 from discogs_alert import (
     __version__,
+    alert as da_alert,
     client as da_client,
     config as da_config,
     entities as da_entities,
     heartbeat as da_heartbeat,
     loop as da_loop,
+    outage as da_outage,
     state as da_state,
 )
 from discogs_alert.util import constants as dac, logging as da_logging
@@ -66,8 +68,8 @@ def _load_or_die(config_path: Optional[Path]) -> da_config.Config:
     sys.exit(2)
 
 
-def _build_loop_kwargs(cfg: da_config.Config) -> dict:
-    """Translate the validated Config into the kwargs that ``loop.loop`` accepts."""
+def _alerter_kwargs(cfg: da_config.Config) -> dict:
+    """The constructor arguments for the configured alerter."""
 
     alerter_type = cfg.alerter.type.upper()
     alerter_kwargs: dict = {}
@@ -90,6 +92,23 @@ def _build_loop_kwargs(cfg: da_config.Config) -> dict:
             "gmail_app_password": cfg.alerter.gmail.app_password,
             "gmail_to": cfg.alerter.gmail.to,
         }
+    return alerter_kwargs
+
+
+def _outage_alerter(cfg: da_config.Config) -> Optional[da_alert.Alerter]:
+    """The alerter the outage notifications go through, or None when the
+    configuration cannot build one (the loop reports that error itself).
+    """
+
+    try:
+        return da_alert.get_alerter(cfg.alerter.type, _alerter_kwargs(cfg))
+    except Exception as exc:
+        logger.warning("outage notifications are off: %s", exc)
+        return None
+
+
+def _build_loop_kwargs(cfg: da_config.Config) -> dict:
+    """Translate the validated Config into the kwargs that ``loop.loop`` accepts."""
 
     return dict(
         discogs_token=cfg.discogs_token,
@@ -108,8 +127,8 @@ def _build_loop_kwargs(cfg: da_config.Config) -> dict:
         ),
         country_whitelist=set(dac.COUNTRIES[c] for c in cfg.country_filters.whitelist),
         country_blacklist=set(dac.COUNTRIES[c] for c in cfg.country_filters.blacklist),
-        alerter_type=alerter_type,
-        alerter_kwargs=alerter_kwargs,
+        alerter_type=cfg.alerter.type.upper(),
+        alerter_kwargs=_alerter_kwargs(cfg),
         state_path=cfg.runtime.state_path,
         use_stats_gate=cfg.runtime.stats_gate,
         max_concurrency=cfg.runtime.max_concurrency,
@@ -309,11 +328,12 @@ async def _run(
 ) -> None:
     """Drive the async loop. Holds a single ``UserTokenClient`` and ``AnonClient``
     across all iterations so TLS handshakes amortize. Writes the heartbeat
-    file after every iteration.
+    file and runs the outage check after every iteration.
     """
 
     user_token_client = da_client.UserTokenClient(cfg.user_agent, cfg.discogs_token)
     anon_client = da_client.AnonClient(cfg.user_agent)
+    outage_alerter = _outage_alerter(cfg)
     try:
         while True:
             stats = await da_loop.loop(
@@ -322,6 +342,7 @@ async def _run(
                 client_anon=anon_client,
             )
             da_heartbeat.write_for_config(cfg, stats)
+            da_outage.check_for_config(cfg, stats, outage_alerter)
             if run_once:
                 break
             await asyncio.sleep(interval_seconds)
