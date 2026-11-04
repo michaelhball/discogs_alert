@@ -115,7 +115,7 @@ def stale_after_seconds(interval_seconds: int) -> int:
     return max(STALE_FLOOR_SECONDS, STALE_INTERVAL_MULTIPLIER * int(interval_seconds))
 
 
-def _humanize(seconds: float) -> str:
+def humanize_seconds(seconds: float) -> str:
     seconds = int(max(0, seconds))
     if seconds < 60:
         return f"{seconds}s"
@@ -151,7 +151,7 @@ def status_report(
     if healthy:
         verdict = "HEALTHY"
     elif stale:
-        verdict = f"STALE (last run {_humanize(age)} ago > {_humanize(threshold)} threshold)"
+        verdict = f"STALE (last run {humanize_seconds(age)} ago > {humanize_seconds(threshold)} threshold)"
     elif outcome != "ok":
         verdict = f"UNHEALTHY (last run {outcome}: {heartbeat.get('error') or 'unknown error'})"
     else:
@@ -159,7 +159,7 @@ def status_report(
 
     lines = [
         f"discogs_alert {heartbeat.get('version', '?')} — {verdict}",
-        f"last run:     {heartbeat.get('started_at', '?')} ({_humanize(age)} ago), "
+        f"last run:     {heartbeat.get('started_at', '?')} ({humanize_seconds(age)} ago), "
         f"took {heartbeat.get('duration_s', '?')}s, alerter {heartbeat.get('alerter', '?')}",
         f"summary:      {heartbeat.get('summary', '?')}",
     ]

@@ -151,3 +151,14 @@ def test_sent_at_is_iso_like(tmp_store: da_state.AlertStore):
     sent_at = cur.fetchone()[0]
     assert isinstance(sent_at, str)
     time.strptime(sent_at, "%Y-%m-%d %H:%M:%S")
+
+
+def test_meta_get_set_delete(tmp_store: da_state.AlertStore):
+    assert tmp_store.get_meta("k") is None
+    tmp_store.set_meta("k", "1.5")
+    assert tmp_store.get_meta("k") == "1.5"
+    tmp_store.set_meta("k", "2")
+    assert tmp_store.get_meta("k") == "2"
+    tmp_store.delete_meta("k")
+    tmp_store.delete_meta("k")
+    assert tmp_store.get_meta("k") is None

@@ -371,3 +371,12 @@ def test_warns_when_an_ntfy_token_goes_over_plain_http(tmp_path: Path):
     env["DA_NTFY_SERVER"] = "https://ntfy.example.com"
     cfg = da_config.load_config(path=tmp_path / "none.toml", env=env)
     assert da_config.config_warnings(cfg, tmp_path / "none.toml") == []
+
+
+def test_blocked_alert_after_minutes_env_override_and_floor(tmp_path: Path):
+    cfg = da_config.load_config(path=tmp_path / "none.toml", env={"DA_DISCOGS_TOKEN": "T"})
+    assert cfg.runtime.blocked_alert_after_minutes == 60
+    env = {"DA_DISCOGS_TOKEN": "T", "DA_BLOCKED_ALERT_AFTER_MINUTES": "5"}
+    assert da_config.load_config(path=tmp_path / "none.toml", env=env).runtime.blocked_alert_after_minutes == 5
+    with pytest.raises(ValidationError):
+        da_config.load_config(path=tmp_path / "none.toml", env={**env, "DA_BLOCKED_ALERT_AFTER_MINUTES": "-1"})

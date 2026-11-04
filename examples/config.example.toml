@@ -113,6 +113,12 @@ max_concurrency = 6
 # can never match a new listing.
 prune_after_days = 90
 
+# When iterations keep failing, or keep reading no marketplace page (for
+# example every fetch blocked with HTTP 403), send one notification through
+# the alerter after this many minutes, and one more once an iteration works
+# again. 0 turns this off.
+blocked_alert_after_minutes = 60
+
 # Verbose logs (per-iteration stats, skip reasons, listing decisions).
 verbose = false
 

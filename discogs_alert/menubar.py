@@ -30,11 +30,13 @@ from pydantic import ValidationError
 
 from discogs_alert import (
     _sparkle,
+    alert as da_alert,
     client as da_client,
     config as da_config,
     entities as da_entities,
     heartbeat as da_heartbeat,
     loop as da_loop,
+    outage as da_outage,
     state as da_state,
 )
 from discogs_alert.util import constants as dac, logging as da_logging
@@ -155,6 +157,18 @@ class MenubarController:
             verbose=cfg.runtime.verbose,
         )
 
+    def _outage_alerter(self) -> Optional[da_alert.Alerter]:
+        """The alerter the outage notifications go through, or None when the
+        configuration cannot build one.
+        """
+
+        kwargs = self._build_loop_kwargs()
+        try:
+            return da_alert.get_alerter(kwargs["alerter_type"], kwargs["alerter_kwargs"])
+        except Exception as exc:
+            logger.warning("outage notifications are off: %s", exc)
+            return None
+
     async def _run_one_iteration(  # pragma: no cover — needs a real Discogs token + network
         self,
         user_token_client: da_client.UserTokenClient,
@@ -166,6 +180,7 @@ class MenubarController:
             client_anon=anon_client,
         )
         da_heartbeat.write_for_config(self.cfg, stats)
+        da_outage.check_for_config(self.cfg, stats, self._outage_alerter())
         with self._lock:
             self.last_check_at = datetime.now()
             self.last_error = stats.problem()
