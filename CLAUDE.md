@@ -28,7 +28,7 @@ with `DA_*` env-var overrides on top. The CLI is intentionally tiny: `--config`,
 - **Many small PRs, squash-merged into `main`.** Each PR is a single concern.
   PR title becomes the squash commit title and ends with ` (#NN)`.
 - **`main` changes only through PRs, for everyone including admins.** Branch
-  protection requires the nine `pr_checks.yml` checks to pass before a merge,
+  protection requires the ten `pr_checks.yml` checks to pass before a merge,
   so `gh pr merge` fails until CI is green. A ruleset blocks deleting or
   moving `v*` tags; repository admins can bypass it, which the release skill's
   "delete the tag and re-tag" recovery relies on.
@@ -186,8 +186,9 @@ If you spawn a background agent to monitor PRs or do other long-running work:
 
 ## Style
 
-- `ruff` configured in `pyproject.toml` (E, F, I, TID, W, line-length 120,
+- `ruff` configured in `pyproject.toml` (B, E, F, I, S, TID, UP, W, line-length 120,
   ban relative imports). Auto-fixes via the pre-commit hook on commit.
+- `mypy` checks the `discogs_alert` package (`uv run mypy`); CI and the pre-commit hook run it.
 - Imports use the `da_xxx` alias convention for in-package modules (e.g.
   `from discogs_alert import entities as da_entities`). Match it.
 

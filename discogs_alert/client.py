@@ -192,7 +192,7 @@ class AnonClient:
     def __init__(self, user_agent: str, impersonate: str = DEFAULT_IMPERSONATE) -> None:
         self.user_agent = user_agent
         self.impersonate = impersonate
-        self._session = CurlAsyncSession(impersonate=impersonate)
+        self._session: CurlAsyncSession = CurlAsyncSession(impersonate=impersonate)
         self._session.headers["User-Agent"] = user_agent
 
     async def aclose(self) -> None:

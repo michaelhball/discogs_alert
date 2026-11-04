@@ -200,4 +200,6 @@ def configure_logging(
     root.setLevel(level.upper())
     for name in NOISY_LOGGERS:
         logging.getLogger(name).setLevel(logging.DEBUG if verbose else logging.WARNING)
+    if handler is None:
+        raise ValueError("no logging destination configured")
     return handler

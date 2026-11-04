@@ -56,6 +56,7 @@ TELEGRAM = "discogs_alert.alert.telegram:TelegramAlerter"
 
 [dependency-groups]
 dev = [
+    "mypy>=2.4.1",
     "pre-commit>=4.7",
     "pytest>=9.2",
     "pytest-asyncio>=1.4",
@@ -74,6 +75,12 @@ build-backend = "uv_build"
 
 [tool.uv.build-backend]
 module-root = ""
+
+[tool.mypy]
+python_version = "3.11"
+packages = ["discogs_alert"]
+# rumps, objc and Foundation ship no stubs and only exist on macOS.
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

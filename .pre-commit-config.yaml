@@ -25,6 +25,13 @@ repos:
 # still runs on CI.
 - repo: local
   hooks:
+    - id: mypy
+      name: mypy
+      entry: uv run --locked mypy
+      language: system
+      pass_filenames: false
+      types: [python]
+      stages: [pre-commit]
     - id: pytest-offline
       name: pytest (offline)
       entry: uv run --locked pytest -q -m "not online"

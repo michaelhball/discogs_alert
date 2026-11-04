@@ -32,7 +32,7 @@ from typing import Any
 import httpx
 
 from discogs_alert import client as da_client, entities as da_entities, state as da_state
-from discogs_alert.alert import Alerter, get_alerter
+from discogs_alert.alert import Alerter, AlerterType, get_alerter
 from discogs_alert.util import constants as dac, currency as da_currency, logging as da_logging
 from discogs_alert.util.wantlist_directives import apply_directives
 
@@ -154,11 +154,11 @@ async def load_wantlist(
     so `wantlist.json` users are unaffected.
     """
 
-    if wantlist_path is None and (list_id is None or user_token_client is None):
-        raise ValueError("no wantlist configured: set wantlist.list_id or wantlist.path")
-    if list_id is not None:
+    if list_id is not None and user_token_client is not None:
         user_list = await user_token_client.get_list(list_id)
         return [apply_directives(r) for r in user_list.items]
+    if wantlist_path is None:
+        raise ValueError("no wantlist configured: set wantlist.list_id or wantlist.path")
 
     # The wantlist.json schema accepts condition fields as their string names
     # (e.g. "VERY_GOOD"); pydantic's `Release.model_validate` accepts both the
@@ -344,7 +344,7 @@ async def _gated_process_release(
     if use_stats_gate:
         stats.gate_checked += 1
         release_stats = await user_token_client.get_release_stats(release.id)
-        if release_stats is False:
+        if not isinstance(release_stats, da_entities.ReleaseStats):
             stats.gate_failed += 1
             logger.debug("stats lookup failed for release %s; scraping anyway", release.id)
         else:
@@ -376,7 +376,7 @@ async def loop(
     record_filters: da_entities.RecordFilters,
     country_whitelist: set[str],
     country_blacklist: set[str],
-    alerter_type: Alerter,
+    alerter_type: str | AlerterType,
     alerter_kwargs: dict[str, Any],
     state_path: Path | None = None,
     use_stats_gate: bool = True,
@@ -407,6 +407,8 @@ async def loop(
         if own_clients:
             client_anon = da_client.AnonClient(user_agent)
             user_token_client = da_client.UserTokenClient(user_agent, discogs_token)
+        if user_token_client is None or client_anon is None:
+            raise ValueError("pass both user_token_client and client_anon, or neither")
 
         try:
             alerter = get_alerter(alerter_type, alerter_kwargs)
