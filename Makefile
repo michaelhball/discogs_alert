@@ -44,7 +44,7 @@ SPARKLE_ACCOUNT := discogs_alert
 # The public key file is what the build reads via DA_SPARKLE_PUBLIC_KEY
 # into Info.plist. The private key stays in the macOS Keychain; nothing
 # here writes it to disk except `make secrets`, which exports it to a
-# temporary file for `gh secret set` and deletes that file afterwards.
+# temporary directory for `gh secret set` and deletes it afterwards.
 RELEASE_DIR := $(HOME)/.discogs_alert_release
 PUB_KEY := $(RELEASE_DIR)/eddsa_pub.key
 
@@ -179,9 +179,13 @@ clean-vendor:
 secrets: $(PUB_KEY) $(SPARKLE_FRAMEWORK)
 	@echo "Pushing Sparkle keys to GitHub repo secrets…"
 	@gh secret set SPARKLE_PUBLIC_KEY < $(PUB_KEY)
-	@tmp="$$(mktemp)"; \
-	$(VENDOR)/bin/generate_keys --account $(SPARKLE_ACCOUNT) -x "$$tmp" >/dev/null; \
-	gh secret set SPARKLE_PRIVATE_KEY --env release < "$$tmp"; rm -P "$$tmp"
+	@# `generate_keys -x` refuses to write to a file that exists, so export into a new
+	@# private directory. Any failure stops before `gh secret set`; the export is always deleted.
+	@dir="$$(mktemp -d)"; \
+	$(VENDOR)/bin/generate_keys --account $(SPARKLE_ACCOUNT) -x "$$dir/key" >/dev/null \
+	    && test -s "$$dir/key" \
+	    && gh secret set SPARKLE_PRIVATE_KEY --env release < "$$dir/key"; \
+	status=$$?; rm -Pf "$$dir/key"; rmdir "$$dir"; exit $$status
 	@echo
 	@echo "✅ Secrets installed:"
 	@echo "   SPARKLE_PUBLIC_KEY"
