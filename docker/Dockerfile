@@ -10,9 +10,9 @@ ENV PYTHONUNBUFFERED=1 \
 FROM python-base AS builder
 
 ENV UV_PROJECT_ENVIRONMENT=/venv \
-    UV_PYTHON_PREFERENCE=only-system \
-    UV_VERSION=0.13.7
-RUN pip install --no-cache-dir "uv==$UV_VERSION"
+    UV_PYTHON_PREFERENCE=only-system
+# uv's official image, pinned by digest; Dependabot's docker updates track it.
+COPY --from=ghcr.io/astral-sh/uv:0.13.8@sha256:5cc1805e2426484abca4ad46ea783bab281fdb225fd82d8ce6d66a81254bac85 /uv /bin/uv
 
 # `curl_cffi` ships musl wheels, so no browser, webdriver or compiler is needed.
 WORKDIR /src
@@ -23,10 +23,12 @@ RUN uv sync --locked --no-dev --no-editable
 
 FROM python-base AS final
 
-# pip and setuptools are only needed to build; dropping them removes their
+# `apk upgrade` applies the Alpine security fixes released since the base image was built.
+# pip and setuptools are not needed at runtime; dropping them removes their
 # vendored copies of urllib3 and msgpack from the image.
-RUN pip uninstall -y pip setuptools 2>/dev/null; \
-    rm -rf /usr/local/lib/python3.15/site-packages/pip* /usr/local/lib/python3.15/site-packages/setuptools* \
+RUN apk upgrade --no-cache \
+    && { pip uninstall -y pip setuptools 2>/dev/null || true; } \
+    && rm -rf /usr/local/lib/python3.15/site-packages/pip* /usr/local/lib/python3.15/site-packages/setuptools* \
     && adduser -D -h /home/app app
 
 COPY --from=builder /venv /venv
