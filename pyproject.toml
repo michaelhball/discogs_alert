@@ -16,13 +16,16 @@ classifiers = [
     "Programming Language :: Python :: 3.14",
 ]
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11.5"
 dependencies = [
     "beautifulsoup4>=4.15,<5",
     "click>=8.5,<9",
     "curl_cffi>=0.17,<0.18",
     "httpx>=0.28,<0.29",
     "pydantic>=2.14,<3",
+    # beautifulsoup4 pulls soupsieve in; the floor keeps installs off the releases with
+    # the denial-of-service advisories GHSA-mmhr-3c5m-f64f, GHSA-6655-6qjp-jx7x and GHSA-7g44-g9rc-x53w.
+    "soupsieve>=4.1",
 ]
 
 [project.urls]
