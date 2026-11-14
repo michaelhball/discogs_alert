@@ -23,7 +23,7 @@ from __future__ import annotations
 import argparse
 import re
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
@@ -104,9 +104,10 @@ def append_item(
 ) -> None:
     """Insert a new ``<item>`` at the top of the existing channel."""
 
-    pub_date = pub_date or datetime.now(timezone.utc)
+    pub_date = pub_date or datetime.now(UTC)
 
-    tree = ET.parse(appcast_path)
+    # The appcast is a file in this repository, written by this script.
+    tree = ET.parse(appcast_path)  # noqa: S314
     root = tree.getroot()
     channel = root.find("channel")
     if channel is None:
