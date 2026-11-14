@@ -127,6 +127,9 @@ OPTIONS = {
         "objc",
         "Foundation",
     ],
+    # `selectors` imports the C module `_math_integer`, which is new in Python 3.15.
+    # py2app 0.28.10 does not know it, and the bundle fails at launch without it.
+    "includes": ["_math_integer"],
 
     "plist": PLIST,
 }

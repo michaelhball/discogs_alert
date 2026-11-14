@@ -1,6 +1,6 @@
 # Two stages: `builder` installs the locked dependencies with uv, `final` holds
 # only the Python runtime and that environment, and runs as an unprivileged user.
-FROM python:3.13-alpine@sha256:7984cf56ceaddebe4fefeb75d64000b9f45d8b77b11a09b24524da6cdc3af0c8 AS python-base
+FROM python:3.15-alpine@sha256:0f9552bb28711333da16915ec146f5e6bb44a7fdac9ced15dc17c2e0206346dd AS python-base
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -26,7 +26,7 @@ FROM python-base AS final
 # pip and setuptools are only needed to build; dropping them removes their
 # vendored copies of urllib3 and msgpack from the image.
 RUN pip uninstall -y pip setuptools 2>/dev/null; \
-    rm -rf /usr/local/lib/python3.13/site-packages/pip* /usr/local/lib/python3.13/site-packages/setuptools* \
+    rm -rf /usr/local/lib/python3.15/site-packages/pip* /usr/local/lib/python3.15/site-packages/setuptools* \
     && adduser -D -h /home/app app
 
 COPY --from=builder /venv /venv

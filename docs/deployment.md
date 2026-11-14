@@ -24,7 +24,7 @@ only the scheduler differs.
 
 ```bash
 # 1. Python environment (uv; plain `python -m venv` + pip works too)
-uv venv --python 3.13 ~/.discogs_alert/venv
+uv venv --python 3.15 ~/.discogs_alert/venv
 uv pip install --python ~/.discogs_alert/venv/bin/python discogs-alert       # from PyPI
 #   …or from a checkout:  uv pip install --python ~/.discogs_alert/venv/bin/python /path/to/discogs_alert
 
