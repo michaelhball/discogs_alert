@@ -109,7 +109,10 @@ Existing `.app` installs poll the appcast on launch + once a day,
 download the new DMG, verify the EdDSA signature, and prompt the user
 to install. The appcast PR has to be merged first — until then the
 new `<item>` isn't served from Pages, so existing installs won't see
-the new version.
+the new version. GitHub starts no workflow for a pull request that a
+workflow opened with its own token, so the required checks on the appcast
+PR stay missing until you close and reopen it
+(`gh pr close <N> && gh pr reopen <N>`), which starts them.
 
 ## Dry run (no publishing)
 
