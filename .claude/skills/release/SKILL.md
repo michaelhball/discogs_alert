@@ -129,7 +129,10 @@ gh pr create --base main --head release/vX.Y.Z-appcast --title "Append vX.Y.Z to
 
 ```bash
 gh pr list --search "Append vX.Y.Z to appcast" --json number --jq '.[0].number'
-gh pr checks <M> --watch
+# GitHub starts no workflow for a PR opened with the workflow's own token, so the
+# required checks never report. Closing and reopening the PR as the user starts them.
+gh pr close <M> && gh pr reopen <M>
+sleep 25; gh pr checks <M> --watch --interval 15
 gh pr merge <M> --squash --delete-branch
 git pull --ff-only
 ```
