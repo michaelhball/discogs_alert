@@ -32,7 +32,12 @@ from discogs_alert import (
     outage as da_outage,
     state as da_state,
 )
-from discogs_alert.util import constants as dac, currency as da_currency, logging as da_logging
+from discogs_alert.util import (
+    constants as dac,
+    currency as da_currency,
+    logging as da_logging,
+    system as da_system,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -232,6 +237,7 @@ def main(
       python -m discogs_alert
     """
 
+    da_system.restrict_new_files_to_owner()
     cfg = _load_or_die(config_path)
 
     # Apply CLI overrides on top of the loaded config, then configure logging

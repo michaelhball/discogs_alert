@@ -1,5 +1,18 @@
 import functools
+import os
 import time
+
+
+def restrict_new_files_to_owner() -> None:
+    """Make every file and directory this process creates readable by its owner only.
+
+    The state database, the log and the currency cache hold alert history, release
+    titles and the Gmail address. Windows has no POSIX permission bits, so this does
+    nothing there.
+    """
+
+    if os.name != "nt":
+        os.umask(0o077)
 
 
 def time_cache(seconds: int, maxsize=None, typed=False):

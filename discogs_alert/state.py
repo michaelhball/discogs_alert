@@ -56,6 +56,10 @@ class AlertStore:
         self.path = Path(path) if path is not None else DEFAULT_STATE_PATH
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(self.path)
+        # The alert history is private; a database created before the program set its
+        # umask may still be readable by other users.
+        if os.name != "nt":
+            self.path.chmod(0o600)
         self._conn.executescript(_SCHEMA)
         self._conn.commit()
 

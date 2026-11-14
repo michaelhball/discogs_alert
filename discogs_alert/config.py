@@ -280,9 +280,11 @@ def config_warnings(cfg: Config, path: Path | None = None) -> list[str]:
             f"run: chmod 600 {resolved_path}"
         )
     ntfy = cfg.alerter.ntfy
-    if cfg.alerter.type.upper() == "NTFY" and ntfy.token and ntfy.server.lower().startswith("http://"):
+    # The topic is in the URL and works as a password: anyone who knows it can read and post.
+    if cfg.alerter.type.upper() == "NTFY" and ntfy.server.lower().startswith("http://"):
         warnings.append(
-            f"alerter.ntfy.server is {ntfy.server}, so the ntfy token travels unencrypted; use an https:// server"
+            f"alerter.ntfy.server is {ntfy.server}, so the ntfy topic and token travel unencrypted; "
+            "use an https:// server"
         )
     return warnings
 

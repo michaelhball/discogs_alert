@@ -1,4 +1,5 @@
 import sqlite3
+import sys
 import time
 from pathlib import Path
 
@@ -19,6 +20,15 @@ def test_creates_database_file(tmp_path: Path):
     assert not db_path.exists()
     with da_state.AlertStore(db_path):
         assert db_path.exists()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX permission bits")
+def test_existing_database_is_made_private(tmp_path: Path):
+    db_path = tmp_path / "state.db"
+    sqlite3.connect(db_path).close()
+    db_path.chmod(0o644)
+    with da_state.AlertStore(db_path):
+        assert db_path.stat().st_mode & 0o777 == 0o600
 
 
 def test_has_seen_starts_false(tmp_store: da_state.AlertStore):
