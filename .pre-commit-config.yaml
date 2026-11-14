@@ -9,14 +9,14 @@ repos:
 # Ruff: lint + import-order + tidy-imports. Mirrors the `ruff (Python 3.x)`
 # CI matrix — same config (`[tool.ruff]` in pyproject.toml).
 - repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.17.3
+  rev: ef6cf06c079dd6b299dfc720b0f14400c9d168e1  # frozen: v0.17.5
   hooks:
     - id: ruff
       args: ["--fix"]
 
 # uv.lock stays in step with pyproject.toml.
 - repo: https://github.com/astral-sh/uv-pre-commit
-  rev: 0.13.7
+  rev: b9d5257d60a86c20fd9a3919d548e08ba5ab905b  # frozen: 0.13.8
   hooks:
     - id: uv-lock
 
