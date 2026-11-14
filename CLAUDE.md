@@ -67,9 +67,10 @@ again, even if they named it.** Short version of what the skill does:
 3. `git tag vX.Y.Z`
 4. `git push origin main --follow-tags`
 
-CI on `macos-latest` then builds `.app` + `.dmg`, signs with EdDSA from the
-`SPARKLE_PRIVATE_KEY` secret, uploads to a GitHub Release, publishes to PyPI
-via trusted publishing, pushes Docker image, and **opens a PR** appending to
+CI on `macos-latest` then builds `.app` + `.dmg`; a separate job signs the DMG
+with EdDSA from the `SPARKLE_PRIVATE_KEY` secret of the `release` environment
+and uploads it to a GitHub Release. CI also publishes to PyPI via trusted
+publishing, pushes the Docker image, and **opens a PR** appending to
 `docs/appcast.xml` (direct push to main is blocked by branch protection). The
 maintainer one-click-merges that appcast PR; that's the only manual step.
 
