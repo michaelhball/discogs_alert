@@ -16,10 +16,10 @@ readme = "README.md"
 requires-python = ">=3.15"
 dependencies = [
     "beautifulsoup4>=4.15,<5",
-    "click>=8.5,<9",
-    "curl_cffi>=0.17,<0.18",
-    "httpx>=0.28,<0.29",
-    "pydantic>=2.14,<3",
+    "click>=8.5.1,<9",
+    "curl_cffi>=0.17.0,<0.18",
+    "httpx>=0.28.1,<0.29",
+    "pydantic>=2.14.3,<3",
     # beautifulsoup4 pulls soupsieve in; the floor keeps installs off the releases with
     # the denial-of-service advisories GHSA-mmhr-3c5m-f64f, GHSA-6655-6qjp-jx7x and GHSA-7g44-g9rc-x53w.
     "soupsieve>=4.1",
@@ -34,7 +34,7 @@ Repository = "https://github.com/michaelhball/discogs_alert"
 # `sys_platform == "darwin"` so non-Mac installs of the extra silently
 # skip it rather than failing.
 [project.optional-dependencies]
-menubar = ["rumps>=0.4,<0.5; sys_platform == 'darwin'"]
+menubar = ["rumps>=0.4.0,<0.5; sys_platform == 'darwin'"]
 
 # Console script so `pip install discogs-alert` / `uv tool install discogs-alert`
 # / `pipx install discogs-alert` expose a `discogs_alert` command. Same click
@@ -57,16 +57,16 @@ TELEGRAM = "discogs_alert.alert.telegram:TelegramAlerter"
 [dependency-groups]
 dev = [
     "mypy>=2.4.1",
-    "pre-commit>=4.7",
-    "pytest>=9.2",
-    "pytest-asyncio>=1.4",
-    "pytest-cov>=7.1",
-    "ruff>=0.17",
+    "pre-commit>=4.7.0",
+    "pytest>=9.2.0",
+    "pytest-asyncio>=1.5.0",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.17.5",
 ]
 # The tools `make app` needs to build the macOS bundle.
 app = [
-    "py2app>=0.28; sys_platform == 'darwin'",
-    "setuptools>=80; sys_platform == 'darwin'",
+    "py2app>=0.28.10; sys_platform == 'darwin'",
+    "setuptools>=84.2.1; sys_platform == 'darwin'",
 ]
 
 [build-system]
