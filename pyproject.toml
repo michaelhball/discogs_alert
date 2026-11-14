@@ -10,13 +10,10 @@ keywords = ["discogs", "dig", "digger"]
 # Keep them equal to the versions CI tests (`pr_checks.yml`).
 classifiers = [
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
-    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
 ]
 readme = "README.md"
-requires-python = ">=3.11.5"
+requires-python = ">=3.15"
 dependencies = [
     "beautifulsoup4>=4.15,<5",
     "click>=8.5,<9",
@@ -80,7 +77,7 @@ build-backend = "uv_build"
 module-root = ""
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.15"
 packages = ["discogs_alert"]
 # rumps, objc and Foundation ship no stubs and only exist on macOS.
 ignore_missing_imports = true
@@ -97,7 +94,7 @@ markers = [
 exclude = [".git", ".ruff_cache", "dist", "docker", "img"]
 fix = false
 line-length = 120
-target-version = "py311"
+target-version = "py315"
 
 [tool.ruff.lint]
 # B: bugbear (likely bugs), S: bandit (security), UP: pyupgrade (syntax the floor Python version allows).
