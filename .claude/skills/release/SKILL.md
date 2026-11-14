@@ -101,7 +101,8 @@ Jobs and what "done" means:
 | Publish to PyPI | success | a failure fails the run; the other jobs still finish |
 | Create GitHub Release | success | `gh release view vX.Y.Z` shows sdist + wheel |
 | Publish Docker image | success or skipped | skipped when `vars.DOCKERHUB_USERNAME` is unset |
-| Build macOS .app + .dmg, sign, append to appcast | success | uploads the DMG and opens the appcast PR |
+| Build macOS .app + .dmg | success | builds and checks the app and DMG; signs only with a key made for the run |
+| Sign the DMG, attach it to the release, open the appcast PR | success | uses the `release` environment's signing key |
 
 Then wait for the wheel to be visible on PyPI (CDN lag of a minute or two):
 

@@ -181,10 +181,10 @@ secrets: $(PUB_KEY) $(SPARKLE_FRAMEWORK)
 	@gh secret set SPARKLE_PUBLIC_KEY < $(PUB_KEY)
 	@tmp="$$(mktemp)"; \
 	$(VENDOR)/bin/generate_keys --account $(SPARKLE_ACCOUNT) -x "$$tmp" >/dev/null; \
-	gh secret set SPARKLE_PRIVATE_KEY < "$$tmp"; rm -P "$$tmp"
+	gh secret set SPARKLE_PRIVATE_KEY --env release < "$$tmp"; rm -P "$$tmp"
 	@echo
 	@echo "✅ Secrets installed:"
 	@echo "   SPARKLE_PUBLIC_KEY"
-	@echo "   SPARKLE_PRIVATE_KEY"
+	@echo "   SPARKLE_PRIVATE_KEY (environment: release)"
 	@echo
 	@echo "Next: 'git tag vX.Y.Z && git push --tags' to trigger an automated release."

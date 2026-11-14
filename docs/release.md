@@ -39,14 +39,23 @@ existing installs upgrade themselves automatically.
    - That URL is baked into the bundle's `Info.plist` as
      `SUFeedURL`. Override at build time with `DA_APPCAST_URL=…`.
 
-4. **Push the signing keys to GitHub Actions secrets** (one-time):
+4. **Create the `release` environment and push the signing keys** (one-time).
+   The jobs that sign the DMG and push the Docker image run in a GitHub
+   environment named `release`. Its secrets reach a job only when the run
+   was started by a `v*` tag, so a workflow edited on a branch, or a manual
+   run, cannot read them:
    ```bash
+   echo '{"deployment_branch_policy":{"protected_branches":false,"custom_branch_policies":true}}' \
+       | gh api -X PUT repos/OWNER/REPO/environments/release --input -
+   gh api -X POST repos/OWNER/REPO/environments/release/deployment-branch-policies \
+       -f name='v*' -f type=tag
    make secrets
+   gh secret set DOCKERHUB_TOKEN --env release
    ```
-   That runs `gh secret set SPARKLE_PUBLIC_KEY` from the public-key file
-   and `gh secret set SPARKLE_PRIVATE_KEY` from a temporary export of the
-   Keychain entry, which it deletes afterwards. The release workflow reads
-   both at runtime.
+   `make secrets` runs `gh secret set SPARKLE_PUBLIC_KEY` from the public-key
+   file and `gh secret set SPARKLE_PRIVATE_KEY --env release` from a temporary
+   export of the Keychain entry, which it deletes afterwards. The public key
+   stays a repository secret, because the job that builds the app reads it.
 
    *Re-running `make secrets` overwrites the secrets in place, so you
    can do this again any time (e.g. after rotating keys).*
