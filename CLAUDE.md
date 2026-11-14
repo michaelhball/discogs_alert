@@ -29,9 +29,9 @@ with `DA_*` env-var overrides on top. The CLI is intentionally tiny: `--config`,
   PR title becomes the squash commit title and ends with ` (#NN)`.
 - **`main` changes only through PRs, for everyone including admins.** Branch
   protection requires the nine `pr_checks.yml` checks to pass before a merge,
-  so `gh pr merge` fails until CI is green. A ruleset blocks deleting or
-  moving `v*` tags; repository admins can bypass it, which the release skill's
-  "delete the tag and re-tag" recovery relies on.
+  so `gh pr merge` fails until CI is green. A ruleset blocks creating, deleting
+  or moving `v*` tags; repository admins can bypass it, which tagging a release
+  and the release skill's "delete the tag and re-tag" recovery both rely on.
 - **CI is the source of truth — merge autonomously.** The user does not want
   to manually review every PR. Workflow:
   1. Open the PR. Wait for the GitHub Actions checks (`ruff`, `tests`,
