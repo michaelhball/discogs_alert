@@ -16,6 +16,16 @@ def pytest_addoption(parser: pytest.Parser):
     )
 
 
+@pytest.fixture(autouse=True)
+def _restore_umask():
+    """The CLI sets the process umask; put it back so one test cannot change another's file modes."""
+
+    previous = os.umask(0o022)
+    os.umask(previous)
+    yield
+    os.umask(previous)
+
+
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]):
     if config.getoption("--online"):
         return

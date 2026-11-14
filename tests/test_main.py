@@ -121,6 +121,14 @@ def test_cli_validate_config_short_circuits(stub_run, config_file):
     assert "loop_kwargs" not in stub_run
 
 
+def test_cli_makes_new_files_private(stub_run, config_file, monkeypatch):
+    calls = []
+    monkeypatch.setattr(da_main.da_system, "restrict_new_files_to_owner", lambda: calls.append(True))
+    result = CliRunner().invoke(da_main.main, ["--config", str(config_file), "--validate-config"])
+    assert result.exit_code == 0, result.output
+    assert calls == [True]
+
+
 def test_cli_print_config_emits_json(stub_run, config_file):
     runner = CliRunner()
     result = runner.invoke(da_main.main, ["--config", str(config_file), "--print-config"])
