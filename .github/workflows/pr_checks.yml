@@ -74,10 +74,11 @@ jobs:
       - run: docker build -f docker/Dockerfile -t discogs_alert:pr .
       - run: docker run --rm discogs_alert:pr --version
       - name: Fail on a fixable HIGH or CRITICAL vulnerability in the image
+        # Dependabot does not update an image started with `docker run`; bump this pin by hand.
         run: |
           docker save discogs_alert:pr -o "$RUNNER_TEMP/image.tar"
           docker run --rm -v "$RUNNER_TEMP/image.tar:/image.tar:ro" \
-              aquasec/trivy:0.76.1@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c \
+              aquasec/trivy:0.76.2@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb \
               image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --input /image.tar
 
   large-files:
